@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,6 +20,8 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { formatTimeAgo } from '@/src/hooks/useHistory';
 import { useSettlements } from '@/src/hooks/useSettlements';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
+import { Share } from 'react-native';
 
 const CATEGORY_COLORS = [Brand.cyan, Brand.magenta, Brand.blue, Brand.purple];
 
@@ -104,6 +107,7 @@ export default function GroupScreen() {
     await Promise.all(inserts);
     setAdding(false);
     setConfirmationText(tallyCount === 1 ? 'Streepje gezet!' : `${tallyCount} streepjes gezet!`);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowConfirmation(true);
     setTimeout(() => setShowConfirmation(false), 2000);
     setSelectedCategory(null);
@@ -182,6 +186,7 @@ export default function GroupScreen() {
     await createSettlement(group, Array.from(selectedForSettlement));
     setShowSettlement(false);
     setConfirmationText('Afrekening gemaakt!');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowConfirmation(true);
     setTimeout(() => setShowConfirmation(false), 2000);
   };
@@ -203,6 +208,20 @@ export default function GroupScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      {/* Header */}
+      <View style={styles.groupHeader}>
+        {(group as any)?.avatar_url ? (
+          <Image source={{ uri: (group as any).avatar_url }} style={styles.headerAvatar} />
+        ) : (
+          <View style={[styles.headerAvatar, { backgroundColor: colors.surfaceLight }]}>
+            <Text style={{ color: colors.textSecondary, fontSize: 16, fontWeight: '600' }}>
+              {group?.name?.[0]?.toUpperCase() ?? '?'}
+            </Text>
+          </View>
+        )}
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{group?.name ?? ''}</Text>
+      </View>
+
       <ScrollView>
         {/* Confirmation toast */}
         {showConfirmation && (
@@ -240,13 +259,24 @@ export default function GroupScreen() {
             onPress={async () => {
               await Clipboard.setStringAsync(group.invite_code);
               setConfirmationText('Gekopieerd!');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setShowConfirmation(true);
               setTimeout(() => setShowConfirmation(false), 1500);
             }}
           >
             <Text style={[styles.inviteLabel, { color: colors.textSecondary }]}>Uitnodigingscode:</Text>
             <Text style={[styles.inviteCode, { color: colors.text }]}>{group.invite_code}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 11 }}>tap om te kopiëren</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>tap om te kopiëren</Text>
+              <TouchableOpacity
+                onPress={async (e) => {
+                  e.stopPropagation();
+                  await Share.share({ message: `Join mijn groep "${group.name}" op Streeps! Code: ${group.invite_code}` });
+                }}
+              >
+                <Text style={{ color: Brand.cyan, fontSize: 11 }}>delen</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -313,27 +343,43 @@ export default function GroupScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             LEDEN
           </Text>
-          {members.map((member) => (
-            <TouchableOpacity
-              key={member.id}
-              style={[styles.memberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => setSelectedMemberId(member.user_id)}
-            >
-              <View style={[
-                styles.activeDot,
-                { backgroundColor: member.is_active ? Brand.cyan : colors.textSecondary },
-              ]} />
-              <Text style={[styles.memberName, { color: colors.text }]}>
-                {member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend')}
-                {member.is_admin && ' (admin)'}
-              </Text>
-              <View style={[styles.memberTallies, { backgroundColor: colors.surfaceLight }]}>
-                <Text style={[styles.memberTallyCount, { color: colors.text }]}>
-                  {tallyCounts[member.user_id] ?? 0}
+          {members.map((member) => {
+            const name = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
+            const avatarUrl = member.profile?.avatar_url;
+            return (
+              <TouchableOpacity
+                key={member.id}
+                style={[styles.memberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setSelectedMemberId(member.user_id)}
+              >
+                <View style={styles.avatarContainer}>
+                  {avatarUrl ? (
+                    <Image source={{ uri: avatarUrl }} style={styles.memberAvatar} />
+                  ) : (
+                    <View style={[styles.memberAvatar, { backgroundColor: colors.surfaceLight }]}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '600' }}>
+                        {name[0]?.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  {member.is_active && (
+                    <View style={styles.statusBadge}>
+                      <View style={styles.statusDot} />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.memberName, { color: colors.text }]}>
+                  {name}
+                  {member.is_admin && ' (admin)'}
                 </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={[styles.memberTallies, { backgroundColor: colors.surfaceLight }]}>
+                  <Text style={[styles.memberTallyCount, { color: colors.text }]}>
+                    {tallyCounts[member.user_id] ?? 0}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Admin actions */}
@@ -702,6 +748,24 @@ export default function GroupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { justifyContent: 'center', alignItems: 'center' },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
   section: { padding: 16, paddingBottom: 0 },
   sectionTitle: {
     fontSize: 12,
@@ -767,11 +831,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 6,
   },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  avatarContainer: {
+    position: 'relative',
     marginRight: 12,
+  },
+  memberAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#1A1A2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Brand.cyan,
   },
   catDot: {
     width: 10,

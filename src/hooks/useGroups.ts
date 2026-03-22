@@ -6,6 +6,8 @@ import type { Group } from '../types/database';
 interface GroupWithStats extends Group {
   member_count: number;
   my_tally_count: number;
+  is_active: boolean;
+  avatar_url: string | null;
 }
 
 export function useGroups() {
@@ -20,7 +22,7 @@ export function useGroups() {
       .from('groups')
       .select(`
         *,
-        group_members!inner(user_id)
+        group_members!inner(user_id, is_active)
       `)
       .eq('group_members.user_id', user.id);
 
@@ -46,11 +48,13 @@ export function useGroups() {
             .eq('removed', false),
         ]);
 
+        const myMembership = Array.isArray(group.group_members) ? group.group_members[0] : null;
         return {
           ...group,
           group_members: undefined,
           member_count: membersRes.count ?? 0,
           my_tally_count: talliesRes.count ?? 0,
+          is_active: myMembership?.is_active ?? false,
         } as GroupWithStats;
       })
     );

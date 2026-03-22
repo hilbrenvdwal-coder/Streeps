@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -62,6 +63,22 @@ export default function GroupsScreen() {
       onPress={() => router.push(`/groups/${item.id}` as any)}
       activeOpacity={0.7}
     >
+      <View style={styles.groupAvatarContainer}>
+        {item.avatar_url ? (
+          <Image source={{ uri: item.avatar_url }} style={styles.groupAvatar} />
+        ) : (
+          <View style={[styles.groupAvatar, { backgroundColor: colors.surfaceLight }]}>
+            <Text style={{ color: colors.textSecondary, fontSize: 18, fontWeight: '600' }}>
+              {item.name[0]?.toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {item.is_active && (
+          <View style={styles.groupStatusBadge}>
+            <View style={styles.groupStatusDot} />
+          </View>
+        )}
+      </View>
       <View style={styles.groupInfo}>
         <Text style={[styles.groupName, { color: colors.text }]}>{item.name}</Text>
         <Text style={[styles.groupMeta, { color: colors.textSecondary }]}>
@@ -201,6 +218,34 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  groupAvatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  groupAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupStatusBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#1A1A2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupStatusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Brand.cyan,
   },
   groupInfo: { flex: 1 },
   groupName: { fontSize: 18, fontWeight: '600' },

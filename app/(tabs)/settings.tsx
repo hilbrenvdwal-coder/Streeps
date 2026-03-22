@@ -1,31 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Colors, Brand } from '@/src/constants/Colors';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { user, signOut } = useAuth();
+  const { preference, setPreference } = useTheme();
   const router = useRouter();
 
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [nameChangedAt, setNameChangedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from('profiles')
-      .select('name_changed_at')
+      .select('name_changed_at, avatar_url')
       .eq('id', user.id)
       .single()
       .then(({ data }) => {
-        if (data) setNameChangedAt(data.name_changed_at);
+        if (data) {
+          setNameChangedAt(data.name_changed_at);
+          setAvatarUrl(data.avatar_url);
+        }
       });
   }, [user]);
 
@@ -97,6 +105,54 @@ export default function SettingsScreen() {
     setSaving(false);
   };
 
+  const handlePickAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (result.canceled || !result.assets[0] || !user) return;
+
+    setUploadingAvatar(true);
+    const asset = result.assets[0];
+    const ext = asset.uri.split('.').pop() ?? 'jpg';
+    const path = `${user.id}/avatar.${ext}`;
+
+    // Upload to Supabase Storage
+    const response = await fetch(asset.uri);
+    const blob = await response.blob();
+    const arrayBuffer = await new Response(blob).arrayBuffer();
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, arrayBuffer, {
+        contentType: asset.mimeType ?? 'image/jpeg',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      Alert.alert('Upload mislukt', uploadError.message);
+      setUploadingAvatar(false);
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+
+    // Update profile
+    await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', user.id);
+
+    setAvatarUrl(publicUrl);
+    setUploadingAvatar(false);
+  };
+
   const handleSignOut = () => {
     Alert.alert('Uitloggen', 'Weet je het zeker?', [
       { text: 'Annuleren', style: 'cancel' },
@@ -120,6 +176,22 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Avatar */}
+      <TouchableOpacity style={styles.avatarSection} onPress={handlePickAvatar} disabled={uploadingAvatar}>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: colors.surfaceLight }]}>
+            <Text style={{ fontSize: 32, color: colors.textSecondary }}>
+              {(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <Text style={{ color: Brand.cyan, fontSize: 13, marginTop: 8 }}>
+          {uploadingAvatar ? 'Uploaden...' : 'Foto wijzigen'}
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PROFIEL</Text>
 
@@ -168,7 +240,27 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>APP</Text>
-        <SettingsRow label="Thema" value={colorScheme === 'dark' ? 'Donker' : 'Licht'} />
+        <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.rowLabel, { color: colors.text }]}>Thema</Text>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {(['system', 'light', 'dark'] as const).map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 6,
+                  backgroundColor: preference === opt ? Brand.cyan + '20' : 'transparent',
+                }}
+                onPress={() => setPreference(opt)}
+              >
+                <Text style={{ color: preference === opt ? Brand.cyan : colors.textSecondary, fontSize: 13, fontWeight: preference === opt ? '600' : '400' }}>
+                  {opt === 'system' ? 'Systeem' : opt === 'dark' ? 'Donker' : 'Licht'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         <SettingsRow label="Versie" value="1.0.0" />
       </View>
 
@@ -184,6 +276,18 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  avatarSection: {
+    alignItems: 'center',
+    paddingTop: 32,
+    paddingBottom: 8,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   section: { marginTop: 24, paddingHorizontal: 16 },
   sectionTitle: {
     fontSize: 12,

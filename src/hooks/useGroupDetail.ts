@@ -148,9 +148,20 @@ export function useGroupDetail(groupId: string) {
     const me = members.find((m) => m.user_id === user.id);
     if (!me) return;
 
+    const becomingActive = !me.is_active;
+
+    if (becomingActive) {
+      // Deactivate all other groups first
+      await supabase
+        .from('group_members')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .neq('group_id', groupId);
+    }
+
     await supabase
       .from('group_members')
-      .update({ is_active: !me.is_active })
+      .update({ is_active: becomingActive })
       .eq('group_id', groupId)
       .eq('user_id', user.id);
   };

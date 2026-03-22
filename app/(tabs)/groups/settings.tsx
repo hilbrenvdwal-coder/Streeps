@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +15,8 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { Colors, Brand } from '@/src/constants/Colors';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { supabase } from '@/src/lib/supabase';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,10 +50,13 @@ export default function GroupSettingsScreen() {
   const [newDrinkName, setNewDrinkName] = useState('');
   const [newDrinkEmoji, setNewDrinkEmoji] = useState('');
   const [newDrinkCategory, setNewDrinkCategory] = useState('1');
+  const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null);
+  const [uploadingGroupAvatar, setUploadingGroupAvatar] = useState(false);
 
   useEffect(() => {
     if (group) {
       setGroupName(group.name);
+      setGroupAvatarUrl((group as any).avatar_url ?? null);
       setPrice1(String(group.price_category_1));
       setPrice2(String(group.price_category_2));
       setPrice3(group.price_category_3 ? String(group.price_category_3) : '');
@@ -164,6 +170,65 @@ export default function GroupSettingsScreen() {
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Groep instellingen</Text>
         </View>
+
+        {/* Group avatar */}
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.groupAvatarSection}
+            onPress={async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.5,
+              });
+              if (result.canceled || !result.assets[0]) return;
+
+              setUploadingGroupAvatar(true);
+              const asset = result.assets[0];
+              const ext = asset.uri.split('.').pop() ?? 'jpg';
+              const path = `groups/${id}/avatar.${ext}`;
+
+              const response = await fetch(asset.uri);
+              const blob = await response.blob();
+              const arrayBuffer = await new Response(blob).arrayBuffer();
+
+              const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(path, arrayBuffer, {
+                  contentType: asset.mimeType ?? 'image/jpeg',
+                  upsert: true,
+                });
+
+              if (uploadError) {
+                Alert.alert('Upload mislukt', uploadError.message);
+                setUploadingGroupAvatar(false);
+                return;
+              }
+
+              const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+              const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+
+              await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', id);
+              setGroupAvatarUrl(publicUrl);
+              setUploadingGroupAvatar(false);
+            }}
+            disabled={uploadingGroupAvatar}
+          >
+            {groupAvatarUrl ? (
+              <Image source={{ uri: groupAvatarUrl }} style={styles.groupAvatarImg} />
+            ) : (
+              <View style={[styles.groupAvatarImg, { backgroundColor: colors.surfaceLight }]}>
+                <Text style={{ color: colors.textSecondary, fontSize: 28, fontWeight: '600' }}>
+                  {group?.name?.[0]?.toUpperCase() ?? '?'}
+                </Text>
+              </View>
+            )}
+            <Text style={{ color: Brand.cyan, fontSize: 13, marginTop: 8 }}>
+              {uploadingGroupAvatar ? 'Uploaden...' : 'Groepsfoto wijzigen'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Group name */}
         {isAdmin && (
@@ -306,6 +371,17 @@ export default function GroupSettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  groupAvatarSection: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  groupAvatarImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: { padding: 16, gap: 8 },
   title: { fontSize: 22, fontWeight: '700' },
   section: { padding: 16, paddingBottom: 0 },

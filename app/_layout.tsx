@@ -7,6 +7,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
+import { ThemeProvider as StreepsThemeProvider } from '@/src/contexts/ThemeContext';
 import { Colors, Brand } from '@/src/constants/Colors';
 
 export { ErrorBoundary } from 'expo-router';
@@ -56,9 +57,11 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <RootLayoutNav />
-      </AuthProvider>
+      <StreepsThemeProvider>
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      </StreepsThemeProvider>
     </SafeAreaProvider>
   );
 }
