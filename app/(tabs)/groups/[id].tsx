@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Colors, Brand } from '@/src/constants/Colors';
@@ -47,16 +48,16 @@ export default function GroupScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, styles.center, { backgroundColor: colors.background }]} edges={['top']}>
         <ActivityIndicator size="large" color={Brand.magenta} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   const me = members.find((m) => m.user_id === user?.id);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}><ScrollView>
       {/* Confirmation toast */}
       {showConfirmation && (
         <View style={[styles.toast, { backgroundColor: Brand.cyan }]}>
@@ -174,7 +175,7 @@ export default function GroupScreen() {
       </View>
 
       <View style={{ height: 40 }} />
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }
 

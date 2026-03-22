@@ -74,28 +74,35 @@ export function useGroups() {
       .single();
 
     if (error || !group) {
-      console.error('Error creating group:', error);
-      return null;
+      console.error('Error creating group:', error?.message, error?.details, error?.hint);
+      return { error: error?.message ?? 'Groep aanmaken mislukt' };
     }
 
     // Add creator as admin member
-    await supabase.from('group_members').insert({
+    const { error: memberError } = await supabase.from('group_members').insert({
       group_id: group.id,
       user_id: user.id,
       is_admin: true,
     });
+    if (memberError) {
+      console.error('Error adding member:', memberError.message);
+      return { error: memberError.message };
+    }
 
     // Add default drinks
-    await supabase.from('drinks').insert([
+    const { error: drinksError } = await supabase.from('drinks').insert([
       { group_id: group.id, name: 'Bier', category: 1, emoji: '🍺' },
       { group_id: group.id, name: 'Wijn', category: 2, emoji: '🍷' },
       { group_id: group.id, name: '0.0', category: 1, emoji: '🚗' },
       { group_id: group.id, name: 'Fris', category: 1, emoji: '🥤' },
       { group_id: group.id, name: 'Cocktail', category: 2, emoji: '🍸' },
     ]);
+    if (drinksError) {
+      console.error('Error adding drinks:', drinksError.message);
+    }
 
     await fetchGroups();
-    return group;
+    return { data: group, error: null };
   };
 
   const joinGroup = async (inviteCode: string) => {

@@ -11,7 +11,17 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const noop = async () => ({ error: null });
+const defaultContext: AuthContextType = {
+  session: null,
+  user: null,
+  loading: true,
+  signIn: noop as any,
+  signUp: noop as any,
+  signOut: async () => {},
+};
+
+const AuthContext = createContext<AuthContextType>(defaultContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -63,7 +73,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
+  return useContext(AuthContext);
 }

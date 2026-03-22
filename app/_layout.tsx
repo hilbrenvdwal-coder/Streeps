@@ -4,8 +4,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import 'react-native-reanimated';
-
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
 import { Colors, Brand } from '@/src/constants/Colors';
@@ -56,9 +55,11 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -76,7 +77,7 @@ function RootLayoutNav() {
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login' as any);
     } else if (session && inAuthGroup) {
-      router.replace('/(tabs)' as any);
+      router.replace('/(tabs)/groups' as any);
     }
   }, [session, loading]);
 

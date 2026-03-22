@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Brand } from '@/src/constants/Colors';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { supabase } from '@/src/lib/supabase';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -30,8 +31,27 @@ export default function RegisterScreen() {
       Alert.alert('Wachtwoord moet minimaal 6 tekens zijn');
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Ongeldig e-mailadres', 'Controleer je e-mailadres en probeer opnieuw.');
+      return;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: exists } = await supabase.rpc('email_exists', { check_email: normalizedEmail });
+    if (exists) {
+      Alert.alert('E-mailadres al in gebruik', 'Log in of gebruik een ander e-mailadres.');
+      return;
+    }
+    const confirmed = await new Promise<boolean>((resolve) =>
+      Alert.alert('Klopt dit?', `We sturen een bevestiging naar:\n\n${normalizedEmail}`, [
+        { text: 'Wijzig', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Klopt!', onPress: () => resolve(true) },
+      ])
+    );
+    if (!confirmed) return;
+
     setLoading(true);
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(normalizedEmail, password, fullName);
     setLoading(false);
     if (error) {
       Alert.alert('Fout', error.message);

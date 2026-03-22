@@ -25,8 +25,13 @@ export default function TabLayout() {
       }}>
       <Tabs.Screen
         name="index"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="groups"
         options={{
           title: 'Groepen',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size} color={color} />
           ),
