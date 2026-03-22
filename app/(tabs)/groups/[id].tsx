@@ -17,6 +17,7 @@ import { Colors, Brand } from '@/src/constants/Colors';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { formatTimeAgo } from '@/src/hooks/useHistory';
+import { useSettlements } from '@/src/hooks/useSettlements';
 import * as Clipboard from 'expo-clipboard';
 
 const CATEGORY_COLORS = [Brand.cyan, Brand.magenta, Brand.blue, Brand.purple];
@@ -42,7 +43,13 @@ export default function GroupScreen() {
     removeMember,
   } = useGroupDetail(id);
 
+  const { settling, getUnsettledTallies, createSettlement, fetchHistory, history } = useSettlements(id);
+
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [showSettlement, setShowSettlement] = useState(false);
+  const [unsettledMembers, setUnsettledMembers] = useState<any[]>([]);
+  const [selectedForSettlement, setSelectedForSettlement] = useState<Set<string>>(new Set());
+  const [showSettlementHistory, setShowSettlementHistory] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationText, setConfirmationText] = useState('Streepje gezet!');
   const [adding, setAdding] = useState(false);
@@ -139,6 +146,49 @@ export default function GroupScreen() {
     const toRemove = removableTallies.slice(0, removeCount);
     await Promise.all(toRemove.map((t) => removeTally(t.id)));
     setRemoveCategory(null);
+  };
+
+  const handleOpenSettlement = async () => {
+    if (!group) return;
+    const members = await getUnsettledTallies(group);
+    if (members.length === 0) {
+      Alert.alert('Geen streepjes', 'Er zijn geen onafgerekende streepjes.');
+      return;
+    }
+    setUnsettledMembers(members);
+    setSelectedForSettlement(new Set(members.map((m) => m.user_id)));
+    setShowSettlement(true);
+  };
+
+  const toggleSettlementMember = (userId: string) => {
+    setSelectedForSettlement((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const toggleAllSettlement = () => {
+    if (selectedForSettlement.size === unsettledMembers.length) {
+      setSelectedForSettlement(new Set());
+    } else {
+      setSelectedForSettlement(new Set(unsettledMembers.map((m) => m.user_id)));
+    }
+  };
+
+  const handleConfirmSettlement = async () => {
+    if (!group || selectedForSettlement.size === 0) return;
+    await createSettlement(group, Array.from(selectedForSettlement));
+    setShowSettlement(false);
+    setConfirmationText('Afrekening gemaakt!');
+    setShowConfirmation(true);
+    setTimeout(() => setShowConfirmation(false), 2000);
+  };
+
+  const handleOpenHistory = async () => {
+    await fetchHistory();
+    setShowSettlementHistory(true);
   };
 
   if (loading) {
@@ -286,16 +336,35 @@ export default function GroupScreen() {
           ))}
         </View>
 
-        {/* Group settings link for admin */}
+        {/* Admin actions */}
         {isAdmin && (
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.surfaceLight, marginTop: 8 }]}
-            onPress={() => router.push(`/groups/settings?id=${id}` as any)}
-          >
-            <Text style={[styles.addButtonText, { color: colors.text }]}>
-              Groep instellingen
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: Brand.cyan, margin: 0, marginBottom: 8 }]}
+              onPress={handleOpenSettlement}
+              disabled={settling}
+            >
+              <Text style={[styles.addButtonText, { color: '#1A1A2E' }]}>
+                {settling ? 'Bezig...' : 'Afrekenen'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.surfaceLight, margin: 0, marginBottom: 8 }]}
+              onPress={handleOpenHistory}
+            >
+              <Text style={[styles.addButtonText, { color: colors.text }]}>
+                Afrekening historie
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.surfaceLight, margin: 0 }]}
+              onPress={() => router.push(`/groups/settings?id=${id}` as any)}
+            >
+              <Text style={[styles.addButtonText, { color: colors.text }]}>
+                Groep instellingen
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         <View style={{ height: 40 }} />
@@ -519,6 +588,113 @@ export default function GroupScreen() {
         </Pressable>
       </Modal>
 
+      {/* Settlement modal */}
+      <Modal visible={showSettlement} transparent animationType="slide">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowSettlement(false)}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+            <ScrollView style={{ maxHeight: 500 }}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Afrekenen</Text>
+
+              {/* Select all */}
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
+                onPress={toggleAllSettlement}
+              >
+                <View style={[styles.checkbox, selectedForSettlement.size === unsettledMembers.length && styles.checkboxChecked]} />
+                <Text style={{ color: colors.text, fontWeight: '600' }}>Selecteer alles</Text>
+              </TouchableOpacity>
+
+              {/* Per member */}
+              {unsettledMembers.map((member) => {
+                const selected = selectedForSettlement.has(member.user_id);
+                return (
+                  <TouchableOpacity
+                    key={member.user_id}
+                    style={[styles.settlementRow, { backgroundColor: colors.card, borderColor: selected ? Brand.cyan : colors.border }]}
+                    onPress={() => toggleSettlementMember(member.user_id)}
+                  >
+                    <View style={[styles.checkbox, selected && styles.checkboxChecked]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text, fontWeight: '600' }}>
+                        {member.user_id === user?.id ? 'Jij' : member.full_name}
+                      </Text>
+                      {activeCategories.map((cat) => {
+                        const count = member.counts[cat] || 0;
+                        if (count === 0) return null;
+                        return (
+                          <Text key={cat} style={{ color: colors.textSecondary, fontSize: 12 }}>
+                            {getCategoryName(cat)}: {count}x
+                          </Text>
+                        );
+                      })}
+                    </View>
+                    <Text style={{ color: Brand.cyan, fontWeight: '700', fontSize: 16 }}>
+                      {(member.amount / 100).toFixed(2).replace('.', ',')}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Total */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 4 }}>
+                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Totaal</Text>
+                <Text style={{ color: Brand.cyan, fontWeight: '700', fontSize: 16 }}>
+                  {(unsettledMembers
+                    .filter((m) => selectedForSettlement.has(m.user_id))
+                    .reduce((sum, m) => sum + m.amount, 0) / 100
+                  ).toFixed(2).replace('.', ',')}
+                </Text>
+              </View>
+
+              {/* Confirm */}
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: Brand.cyan, margin: 0, marginTop: 16 }]}
+                onPress={handleConfirmSettlement}
+                disabled={settling || selectedForSettlement.size === 0}
+              >
+                <Text style={[styles.addButtonText, { color: '#1A1A2E' }]}>
+                  {settling ? 'Bezig...' : 'Bevestigen'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Settlement history modal */}
+      <Modal visible={showSettlementHistory} transparent animationType="slide">
+        <Pressable style={styles.modalOverlay} onPress={() => setShowSettlementHistory(false)}>
+          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+            <ScrollView style={{ maxHeight: 500 }}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Afrekening historie</Text>
+              {history.length === 0 && (
+                <Text style={{ color: colors.textSecondary }}>Nog geen afrekeningen</Text>
+              )}
+              {history.map((settlement) => (
+                <View
+                  key={settlement.id}
+                  style={[styles.settlementRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>
+                      {formatTimeAgo(settlement.created_at)}
+                    </Text>
+                    {settlement.lines.map((line) => (
+                      <Text key={line.user_id} style={{ color: colors.textSecondary, fontSize: 12 }}>
+                        {line.full_name}: {(line.amount / 100).toFixed(2).replace('.', ',')}
+                      </Text>
+                    ))}
+                  </View>
+                  <Text style={{ color: Brand.cyan, fontWeight: '700', fontSize: 16 }}>
+                    {(settlement.total_amount / 100).toFixed(2).replace('.', ',')}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -643,6 +819,26 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#666',
+    marginRight: 12,
+  },
+  checkboxChecked: {
+    backgroundColor: Brand.cyan,
+    borderColor: Brand.cyan,
+  },
+  settlementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 6,
   },
   adminBtn: {
     flex: 1,

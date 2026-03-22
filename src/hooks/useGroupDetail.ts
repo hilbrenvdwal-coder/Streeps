@@ -48,6 +48,7 @@ export function useGroupDetail(groupId: string) {
       .select('*, profile:profiles!tallies_user_id_fkey(full_name)')
       .eq('group_id', groupId)
       .eq('removed', false)
+      .is('settlement_id', null)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -68,7 +69,8 @@ export function useGroupDetail(groupId: string) {
             .select('id', { count: 'exact', head: true })
             .eq('group_id', groupId)
             .eq('user_id', member.user_id)
-            .eq('removed', false);
+            .eq('removed', false)
+            .is('settlement_id', null);
           counts[member.user_id] = count ?? 0;
         })
       );
