@@ -4,8 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface HistoryItem {
   id: string;
-  drink_name: string;
-  drink_emoji: string | null;
   group_name: string;
   category: number;
   created_at: string;
@@ -24,9 +22,9 @@ export function useHistory() {
       .from('tallies')
       .select(`
         id,
+        category,
         created_at,
         removed,
-        drink:drinks(name, emoji, category),
         group:groups(name)
       `)
       .eq('user_id', user.id)
@@ -41,10 +39,8 @@ export function useHistory() {
 
     const items: HistoryItem[] = (data ?? []).map((t: any) => ({
       id: t.id,
-      drink_name: t.drink?.name ?? '?',
-      drink_emoji: t.drink?.emoji ?? null,
       group_name: t.group?.name ?? '?',
-      category: t.drink?.category ?? 1,
+      category: t.category ?? 1,
       created_at: t.created_at,
       removed: t.removed,
     }));
@@ -68,10 +64,12 @@ export function formatTimeAgo(dateStr: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
+  const time = date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+
   if (diffMin < 1) return 'zojuist';
   if (diffMin < 60) return `${diffMin} min geleden`;
-  if (diffHours < 24) return `${diffHours} uur geleden`;
-  if (diffDays === 1) return 'gisteren';
-  if (diffDays < 7) return `${diffDays} dagen geleden`;
-  return date.toLocaleDateString('nl-NL');
+  if (diffHours < 24) return `${diffHours} uur geleden · ${time}`;
+  if (diffDays === 1) return `gisteren · ${time}`;
+  if (diffDays < 7) return `${diffDays} dagen geleden · ${time}`;
+  return `${date.toLocaleDateString('nl-NL')} · ${time}`;
 }

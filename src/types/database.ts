@@ -20,6 +20,10 @@ export interface Group {
   price_category_2: number;
   price_category_3: number | null;
   price_category_4: number | null;
+  name_category_1: string;
+  name_category_2: string;
+  name_category_3: string;
+  name_category_4: string;
   created_at: string;
   created_by: string;
 }

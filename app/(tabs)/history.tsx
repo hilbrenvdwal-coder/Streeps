@@ -21,10 +21,9 @@ export default function HistoryScreen() {
         styles.categoryDot,
         { backgroundColor: CATEGORY_COLORS[(item.category - 1) % 4] },
       ]} />
-      <Text style={styles.emoji}>{item.drink_emoji ?? '🍺'}</Text>
       <View style={styles.itemInfo}>
-        <Text style={[styles.drinkName, { color: colors.text }, item.removed && styles.removedText]}>
-          {item.drink_name}
+        <Text style={[styles.categoryName, { color: colors.text }, item.removed && styles.removedText]}>
+          Categorie {item.category}
           {item.removed ? ' (verwijderd)' : ''}
         </Text>
         <Text style={[styles.groupName, { color: colors.textSecondary }]}>{item.group_name}</Text>
@@ -83,9 +82,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginRight: 10,
   },
-  emoji: { fontSize: 20, marginRight: 10 },
   itemInfo: { flex: 1 },
-  drinkName: { fontSize: 16, fontWeight: '500' },
+  categoryName: { fontSize: 16, fontWeight: '500' },
   groupName: { fontSize: 13, marginTop: 2 },
   time: { fontSize: 13 },
   empty: { alignItems: 'center', paddingTop: 60 },
