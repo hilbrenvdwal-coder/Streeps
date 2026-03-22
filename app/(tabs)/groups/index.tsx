@@ -16,12 +16,23 @@ import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Colors, Brand } from '@/src/constants/Colors';
 import { useGroups } from '@/src/hooks/useGroups';
+import { useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect } from 'react';
 
 export default function GroupsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
+  const navigation = useNavigation();
   const { groups, loading, createGroup, joinGroup, refresh } = useGroups();
+
+  // Refresh when this screen gets focus (including back navigation)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refresh();
+    });
+    return unsubscribe;
+  }, [navigation, refresh]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');

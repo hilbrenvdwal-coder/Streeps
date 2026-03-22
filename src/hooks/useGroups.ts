@@ -65,7 +65,34 @@ export function useGroups() {
 
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+
+    if (!user) return;
+
+    // Subscribe to all group_members changes (catches active status updates across groups)
+    const membersChannel = supabase
+      .channel('my-memberships')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'group_members',
+      }, () => fetchGroups())
+      .subscribe();
+
+    // Subscribe to group updates (name, avatar changes)
+    const groupsChannel = supabase
+      .channel('my-groups')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'groups',
+      }, () => fetchGroups())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(membersChannel);
+      supabase.removeChannel(groupsChannel);
+    };
+  }, [fetchGroups, user]);
 
   const createGroup = async (name: string) => {
     if (!user) return null;
