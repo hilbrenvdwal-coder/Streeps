@@ -3,32 +3,45 @@ import {
   StyleSheet,
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
+  Pressable,
+  Image,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Brand } from '@/src/constants/Colors';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
+import AuroraBackground from '@/src/components/AuroraBackground';
+import PillInput from '@/src/components/PillInput';
+import PillButton from '@/src/components/PillButton';
+import { brand } from '@/src/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !confirmPassword) {
       Alert.alert('Vul alle velden in');
       return;
     }
     if (password.length < 6) {
       Alert.alert('Wachtwoord moet minimaal 6 tekens zijn');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Wachtwoorden komen niet overeen');
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -63,72 +76,139 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>Account aanmaken</Text>
-        <Text style={styles.subtitle}>Vul je gegevens in</Text>
+    <View style={styles.root}>
+      <AuroraBackground />
+      <StatusBar style="light" />
+      <SafeAreaView style={styles.flex}>
+        {/* Back button */}
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#A0A0B8" />
+        </Pressable>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Volledige naam"
-          placeholderTextColor="#666680"
-          value={fullName}
-          onChangeText={setFullName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="E-mailadres"
-          placeholderTextColor="#666680"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Wachtwoord"
-          placeholderTextColor="#666680"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity
-          style={[styles.registerButton, loading && styles.disabled]}
-          onPress={handleRegister}
-          disabled={loading}
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <Text style={styles.registerButtonText}>
-            {loading ? 'Laden...' : 'Registreren'}
-          </Text>
-        </TouchableOpacity>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Logo + Branding */}
+            <View style={styles.hero}>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require('../../logo_dark.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.title}>Account aanmaken</Text>
+              <Text style={styles.subtitle}>Vul je gegevens in</Text>
+            </View>
 
-        <TouchableOpacity onPress={() => router.back()} style={styles.loginLink}>
-          <Text style={styles.loginText}>
-            Al een account? <Text style={styles.loginTextBold}>Inloggen</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+            {/* Inputs */}
+            <View style={styles.inputGroup}>
+              <PillInput
+                placeholder="Volledige naam"
+                value={fullName}
+                onChangeText={setFullName}
+              />
+              <PillInput
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <PillInput
+                placeholder="Wachtwoord"
+                value={password}
+                onChangeText={setPassword}
+                isPassword
+              />
+              <PillInput
+                placeholder="Wachtwoord herhalen"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                isPassword
+              />
+            </View>
+
+            {/* Register Button */}
+            <PillButton
+              title={loading ? 'Laden...' : 'Stuur e-mail verificatie'}
+              onPress={handleRegister}
+              disabled={loading}
+              color={brand.magenta}
+            />
+
+            {/* Login link */}
+            <Pressable onPress={() => router.back()} style={styles.link}>
+              <Text style={styles.linkText}>
+                Al een account?{' '}
+                <Text style={styles.linkAccent}>Inloggen</Text>
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1A1A2E' },
-  content: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 28, fontWeight: '700', color: '#fff', textAlign: 'center' },
-  subtitle: { fontSize: 16, color: '#A0A0A0', textAlign: 'center', marginTop: 8, marginBottom: 32 },
-  input: {
-    backgroundColor: '#2D2D44', borderRadius: 12, padding: 16, fontSize: 16,
-    color: '#fff', marginBottom: 12, borderWidth: 1, borderColor: '#3A3A55',
+  root: { flex: 1, backgroundColor: '#0F0F1E' },
+  flex: { flex: 1 },
+  backBtn: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  registerButton: { backgroundColor: Brand.cyan, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  disabled: { opacity: 0.6 },
-  registerButtonText: { color: '#1A1A2E', fontSize: 18, fontWeight: '600' },
-  loginLink: { marginTop: 20, alignItems: 'center' },
-  loginText: { color: '#A0A0A0', fontSize: 15 },
-  loginTextBold: { color: Brand.magenta, fontWeight: '600' },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 56,
+    paddingBottom: 40,
+  },
+
+  // Hero
+  hero: { alignItems: 'center', marginBottom: 40 },
+  logoContainer: {
+    width: 94,
+    height: 94,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+  logo: { width: 94, height: 94 },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#A0A0B8',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+
+  // Inputs
+  inputGroup: { gap: 14, marginBottom: 20 },
+
+  // Link
+  link: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  linkText: { fontSize: 14, color: '#666680' },
+  linkAccent: { color: '#E91E8C', fontWeight: '600' },
 });

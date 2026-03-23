@@ -8,35 +8,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
 import { ThemeProvider as StreepsThemeProvider } from '@/src/contexts/ThemeContext';
-import { Colors, Brand } from '@/src/constants/Colors';
+import { getTheme } from '@/src/theme';
 
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
-
-const StreepsDarkTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: Colors.dark.tint,
-    background: Colors.dark.background,
-    card: Colors.dark.surface,
-    text: Colors.dark.text,
-    border: Colors.dark.border,
-  },
-};
-
-const StreepsLightTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: Colors.light.tint,
-    background: Colors.light.background,
-    card: Colors.light.surface,
-    text: Colors.light.text,
-    border: Colors.light.border,
-  },
-};
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -67,33 +43,56 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const mode = useColorScheme();
+  const t = getTheme(mode);
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
+  const navTheme = mode === 'dark'
+    ? {
+        ...DarkTheme,
+        colors: {
+          ...DarkTheme.colors,
+          primary: t.colors.tint,
+          background: t.colors.background.primary,
+          card: t.colors.surface.default,
+          text: t.colors.text.primary,
+          border: t.colors.border.default,
+        },
+      }
+    : {
+        ...DefaultTheme,
+        colors: {
+          ...DefaultTheme.colors,
+          primary: t.colors.tint,
+          background: t.colors.background.primary,
+          card: t.colors.surface.default,
+          text: t.colors.text.primary,
+          border: t.colors.border.default,
+        },
+      };
+
   useEffect(() => {
     if (loading) return;
-
     const inAuthGroup = segments[0] === '(auth)';
-
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login' as any);
     } else if (session && inAuthGroup) {
-      router.replace('/(tabs)/groups' as any);
+      router.replace('/(tabs)/home' as any);
     }
   }, [session, loading]);
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background }}>
-        <ActivityIndicator size="large" color={Brand.magenta} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: t.colors.background.primary }}>
+        <ActivityIndicator size="large" color={t.brand.magenta} />
       </View>
     );
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? StreepsDarkTheme : StreepsLightTheme}>
+    <ThemeProvider value={navTheme}>
       <Slot />
     </ThemeProvider>
   );

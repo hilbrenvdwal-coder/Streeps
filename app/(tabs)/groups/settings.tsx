@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
-import { Colors, Brand } from '@/src/constants/Colors';
+import { getTheme, type Theme } from '@/src/theme';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
@@ -21,21 +23,14 @@ import * as ImagePicker from 'expo-image-picker';
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const mode = useColorScheme();
+  const t = getTheme(mode);
+  const s = useMemo(() => createStyles(t, mode), [mode]);
   const { user } = useAuth();
   const {
-    group,
-    drinks,
-    isAdmin,
-    updateGroupPrices,
-    addDrink,
-    removeDrink,
-    updateGroupName,
-    deleteGroup,
-    leaveGroup,
-    regenerateInviteCode,
-    refresh,
+    group, drinks, isAdmin,
+    updateGroupPrices, addDrink, removeDrink, updateGroupName,
+    deleteGroup, leaveGroup, regenerateInviteCode, refresh,
   } = useGroupDetail(id);
 
   const [groupName, setGroupName] = useState('');
@@ -102,264 +97,237 @@ export default function GroupSettingsScreen() {
   };
 
   const handleRegenerateCode = () => {
-    Alert.alert(
-      'Nieuwe uitnodigingscode',
-      'De huidige code werkt dan niet meer. Doorgaan?',
-      [
-        { text: 'Annuleren', style: 'cancel' },
-        {
-          text: 'Vernieuwen',
-          onPress: async () => {
-            await regenerateInviteCode();
-            Alert.alert('Code vernieuwd!');
-          },
-        },
-      ]
-    );
+    Alert.alert('Nieuwe uitnodigingscode', 'De huidige code werkt dan niet meer. Doorgaan?', [
+      { text: 'Annuleren', style: 'cancel' },
+      { text: 'Vernieuwen', onPress: async () => { await regenerateInviteCode(); Alert.alert('Code vernieuwd!'); } },
+    ]);
   };
 
   const handleDeleteGroup = () => {
-    Alert.alert(
-      'Weet je zeker dat je de groep wilt verwijderen?',
-      'Alle leden, streepjes gaan verloren.',
-      [
-        { text: 'Annuleren', style: 'cancel' },
-        {
-          text: 'Verwijderen',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteGroup();
-            router.replace('/(tabs)/groups' as any);
-          },
-        },
-      ]
-    );
+    Alert.alert('Weet je zeker dat je de groep wilt verwijderen?', 'Alle leden, streepjes gaan verloren.', [
+      { text: 'Annuleren', style: 'cancel' },
+      { text: 'Verwijderen', style: 'destructive', onPress: async () => { await deleteGroup(); router.replace('/(tabs)/home' as any); } },
+    ]);
   };
 
   const handleLeaveGroup = () => {
-    Alert.alert(
-      'Groep verlaten',
-      'Weet je zeker dat je deze groep wilt verlaten?',
-      [
-        { text: 'Annuleren', style: 'cancel' },
-        {
-          text: 'Verlaten',
-          style: 'destructive',
-          onPress: async () => {
-            await leaveGroup();
-            router.replace('/(tabs)/groups' as any);
-          },
-        },
-      ]
-    );
+    Alert.alert('Groep verlaten', 'Weet je zeker dat je deze groep wilt verlaten?', [
+      { text: 'Annuleren', style: 'cancel' },
+      { text: 'Verlaten', style: 'destructive', onPress: async () => { await leaveGroup(); router.replace('/(tabs)/home' as any); } },
+    ]);
   };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <ScrollView>
-        <View style={styles.header}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Text style={{ color: Brand.cyan, fontSize: 16 }}>← Terug</Text>
-            </TouchableOpacity>
-            {isAdmin && (
-              <TouchableOpacity onPress={handleSaveAll}>
-                <Text style={{ color: Brand.cyan, fontSize: 16, fontWeight: '600' }}>Opslaan</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={[styles.title, { color: colors.text }]}>Groep instellingen</Text>
-        </View>
+  const handlePickGroupAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setUploadingGroupAvatar(true);
+    const asset = result.assets[0];
+    const ext = asset.uri.split('.').pop() ?? 'jpg';
+    const path = `groups/${id}/avatar.${ext}`;
+    const response = await fetch(asset.uri);
+    const blob = await response.blob();
+    const arrayBuffer = await new Response(blob).arrayBuffer();
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+    if (uploadError) { Alert.alert('Upload mislukt', uploadError.message); setUploadingGroupAvatar(false); return; }
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+    await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', id);
+    setGroupAvatarUrl(publicUrl);
+    setUploadingGroupAvatar(false);
+  };
 
+  const categories = [
+    { name: catName1, setName: setCatName1, price: price1, setPrice: setPrice1 },
+    { name: catName2, setName: setCatName2, price: price2, setPrice: setPrice2 },
+    { name: catName3, setName: setCatName3, price: price3, setPrice: setPrice3 },
+    { name: catName4, setName: setCatName4, price: price4, setPrice: setPrice4 },
+  ];
+
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      {/* Header */}
+      <View style={s.header}>
+        <Pressable onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={t.colors.text.secondary} />
+        </Pressable>
+        <Text style={s.headerTitle}>Instellingen</Text>
+        {isAdmin && (
+          <Pressable onPress={handleSaveAll} style={s.saveBtn}>
+            <Text style={s.saveBtnText}>Opslaan</Text>
+          </Pressable>
+        )}
+      </View>
+
+      <ScrollView contentContainerStyle={s.content}>
         {/* Group avatar */}
         {isAdmin && (
-          <TouchableOpacity
-            style={styles.groupAvatarSection}
-            onPress={async () => {
-              const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.5,
-              });
-              if (result.canceled || !result.assets[0]) return;
-
-              setUploadingGroupAvatar(true);
-              const asset = result.assets[0];
-              const ext = asset.uri.split('.').pop() ?? 'jpg';
-              const path = `groups/${id}/avatar.${ext}`;
-
-              const response = await fetch(asset.uri);
-              const blob = await response.blob();
-              const arrayBuffer = await new Response(blob).arrayBuffer();
-
-              const { error: uploadError } = await supabase.storage
-                .from('avatars')
-                .upload(path, arrayBuffer, {
-                  contentType: asset.mimeType ?? 'image/jpeg',
-                  upsert: true,
-                });
-
-              if (uploadError) {
-                Alert.alert('Upload mislukt', uploadError.message);
-                setUploadingGroupAvatar(false);
-                return;
-              }
-
-              const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-              const publicUrl = urlData.publicUrl + '?t=' + Date.now();
-
-              await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', id);
-              setGroupAvatarUrl(publicUrl);
-              setUploadingGroupAvatar(false);
-            }}
-            disabled={uploadingGroupAvatar}
-          >
+          <Pressable style={s.avatarSection} onPress={handlePickGroupAvatar} disabled={uploadingGroupAvatar}>
             {groupAvatarUrl ? (
-              <Image source={{ uri: groupAvatarUrl }} style={styles.groupAvatarImg} />
+              <Image source={{ uri: groupAvatarUrl }} style={s.avatar} />
             ) : (
-              <View style={[styles.groupAvatarImg, { backgroundColor: colors.surfaceLight }]}>
-                <Text style={{ color: colors.textSecondary, fontSize: 28, fontWeight: '600' }}>
-                  {group?.name?.[0]?.toUpperCase() ?? '?'}
-                </Text>
+              <View style={[s.avatar, s.avatarFallback]}>
+                <Text style={s.avatarLetter}>{group?.name?.[0]?.toUpperCase() ?? '?'}</Text>
               </View>
             )}
-            <Text style={{ color: Brand.cyan, fontSize: 13, marginTop: 8 }}>
+            <Text style={s.avatarAction}>
               {uploadingGroupAvatar ? 'Uploaden...' : 'Groepsfoto wijzigen'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
 
         {/* Group name */}
         {isAdmin && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>GROEPSNAAM</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceLight, color: colors.text, borderColor: colors.border }]}
-              value={groupName}
-              onChangeText={setGroupName}
-            />
-          </View>
-        )}
-
-        {/* Prices */}
-        {isAdmin && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-              CATEGORIEËN
-            </Text>
-            {[
-              { name: catName1, setName: setCatName1, price: price1, setPrice: setPrice1 },
-              { name: catName2, setName: setCatName2, price: price2, setPrice: setPrice2 },
-              { name: catName3, setName: setCatName3, price: price3, setPrice: setPrice3 },
-              { name: catName4, setName: setCatName4, price: price4, setPrice: setPrice4 },
-            ].map(({ name, setName, price, setPrice }, i) => (
-              <View key={i} style={styles.categoryRow}>
+          <>
+            <Text style={s.sectionHeader}>GROEPSNAAM</Text>
+            <View style={s.card}>
+              <View style={s.inputRow}>
+                <Ionicons name="people-outline" size={20} color={t.colors.text.tertiary} style={s.inputIcon} />
                 <TextInput
-                  style={[styles.catNameInput, { backgroundColor: colors.surfaceLight, color: colors.text, borderColor: colors.border }]}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={`Categorie ${i + 1}`}
-                  placeholderTextColor={colors.textSecondary}
-                />
-                <TextInput
-                  style={[styles.priceInput, { backgroundColor: colors.surfaceLight, color: colors.text, borderColor: colors.border }]}
-                  value={price}
-                  onChangeText={setPrice}
-                  keyboardType="numeric"
-                  placeholder="ct"
-                  placeholderTextColor={colors.textSecondary}
+                  style={s.inputText}
+                  value={groupName}
+                  onChangeText={setGroupName}
+                  placeholder="Groepsnaam"
+                  placeholderTextColor={t.colors.text.tertiary}
                 />
               </View>
-            ))}
-          </View>
+            </View>
+          </>
+        )}
+
+        {/* Categories */}
+        {isAdmin && (
+          <>
+            <Text style={s.sectionHeader}>CATEGORIEËN</Text>
+            <View style={s.card}>
+              {categories.map(({ name, setName, price, setPrice }, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <View style={s.divider} />}
+                  <View style={s.catRow}>
+                    <View style={[s.catDot, { backgroundColor: t.categoryColors[i] }]} />
+                    <TextInput
+                      style={s.catNameInput}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder={`Categorie ${i + 1}`}
+                      placeholderTextColor={t.colors.text.tertiary}
+                    />
+                    <TextInput
+                      style={s.catPriceInput}
+                      value={price}
+                      onChangeText={setPrice}
+                      keyboardType="numeric"
+                      placeholder="ct"
+                      placeholderTextColor={t.colors.text.tertiary}
+                    />
+                  </View>
+                </React.Fragment>
+              ))}
+            </View>
+          </>
         )}
 
         {/* Current drinks */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DRANKJES</Text>
-          {drinks.map((drink) => (
-            <View key={drink.id} style={[styles.drinkRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={{ fontSize: 20, marginRight: 8 }}>{drink.emoji ?? '🍺'}</Text>
-              <Text style={[{ color: colors.text, flex: 1 }]}>{drink.name}</Text>
-              <Text style={[{ color: colors.textSecondary, marginRight: 8 }]}>cat. {drink.category}</Text>
-              {isAdmin && (
-                <TouchableOpacity onPress={() => handleRemoveDrink(drink.id, drink.name)}>
-                  <Text style={{ color: '#ff4444' }}>✕</Text>
-                </TouchableOpacity>
-              )}
+        <Text style={s.sectionHeader}>DRANKJES</Text>
+        <View style={s.card}>
+          {drinks.length === 0 && (
+            <View style={s.emptyRow}>
+              <Text style={s.emptyText}>Geen drankjes</Text>
             </View>
+          )}
+          {drinks.map((drink, i) => (
+            <React.Fragment key={drink.id}>
+              {i > 0 && <View style={s.divider} />}
+              <View style={s.drinkRow}>
+                <Text style={s.drinkEmoji}>{drink.emoji ?? '🍺'}</Text>
+                <Text style={s.drinkName}>{drink.name}</Text>
+                <View style={[s.catBadge, { backgroundColor: t.categoryColors[(drink.category - 1) % 4] + '18' }]}>
+                  <Text style={[s.catBadgeText, { color: t.categoryColors[(drink.category - 1) % 4] }]}>
+                    {drink.category}
+                  </Text>
+                </View>
+                {isAdmin && (
+                  <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} style={s.removeBtn}>
+                    <Ionicons name="close" size={16} color={t.semantic.error} />
+                  </Pressable>
+                )}
+              </View>
+            </React.Fragment>
           ))}
         </View>
 
         {/* Add drink */}
         {isAdmin && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DRANKJE TOEVOEGEN</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceLight, color: colors.text, borderColor: colors.border }]}
-              placeholder="Naam"
-              placeholderTextColor={colors.textSecondary}
-              value={newDrinkName}
-              onChangeText={setNewDrinkName}
-            />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TextInput
-                style={[styles.input, { flex: 1, backgroundColor: colors.surfaceLight, color: colors.text, borderColor: colors.border }]}
-                placeholder="Emoji"
-                placeholderTextColor={colors.textSecondary}
-                value={newDrinkEmoji}
-                onChangeText={setNewDrinkEmoji}
-              />
-              <TextInput
-                style={[styles.input, { flex: 1, backgroundColor: colors.surfaceLight, color: colors.text, borderColor: colors.border }]}
-                placeholder="Categorie (1-4)"
-                placeholderTextColor={colors.textSecondary}
-                value={newDrinkCategory}
-                onChangeText={setNewDrinkCategory}
-                keyboardType="numeric"
-              />
+          <>
+            <Text style={s.sectionHeader}>DRANKJE TOEVOEGEN</Text>
+            <View style={s.card}>
+              <View style={s.inputRow}>
+                <Ionicons name="beer-outline" size={20} color={t.colors.text.tertiary} style={s.inputIcon} />
+                <TextInput
+                  style={s.inputText}
+                  placeholder="Naam"
+                  placeholderTextColor={t.colors.text.tertiary}
+                  value={newDrinkName}
+                  onChangeText={setNewDrinkName}
+                />
+              </View>
+              <View style={s.divider} />
+              <View style={s.inputRow}>
+                <TextInput
+                  style={[s.inputText, { flex: 1 }]}
+                  placeholder="Emoji"
+                  placeholderTextColor={t.colors.text.tertiary}
+                  value={newDrinkEmoji}
+                  onChangeText={setNewDrinkEmoji}
+                />
+                <TextInput
+                  style={[s.inputText, { width: 100, textAlign: 'center' }]}
+                  placeholder="Cat (1-4)"
+                  placeholderTextColor={t.colors.text.tertiary}
+                  value={newDrinkCategory}
+                  onChangeText={setNewDrinkCategory}
+                  keyboardType="numeric"
+                />
+              </View>
             </View>
-            <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: Brand.magenta }]}
-              onPress={handleAddDrink}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600' }}>Toevoegen</Text>
-            </TouchableOpacity>
-          </View>
+            <Pressable style={s.addBtn} onPress={handleAddDrink}>
+              <Text style={s.addBtnText}>Toevoegen</Text>
+            </Pressable>
+          </>
         )}
 
         {/* Invite code */}
         {isAdmin && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>UITNODIGINGSCODE</Text>
-            <View style={[styles.drinkRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={{ color: colors.text, flex: 1, fontSize: 16, fontWeight: '700', letterSpacing: 2 }}>
-                {group?.invite_code}
-              </Text>
-              <TouchableOpacity onPress={handleRegenerateCode}>
-                <Text style={{ color: Brand.cyan, fontSize: 13 }}>Vernieuwen</Text>
-              </TouchableOpacity>
+          <>
+            <Text style={s.sectionHeader}>UITNODIGINGSCODE</Text>
+            <View style={s.card}>
+              <View style={s.inviteRow}>
+                <Ionicons name="key-outline" size={20} color={t.colors.text.tertiary} style={s.inputIcon} />
+                <Text style={s.inviteCode}>{group?.invite_code}</Text>
+                <Pressable onPress={handleRegenerateCode}>
+                  <Text style={s.refreshText}>Vernieuwen</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          </>
         )}
 
         {/* Danger zone */}
-        <View style={[styles.section, { marginTop: 24 }]}>
-          <Text style={[styles.sectionTitle, { color: '#ff4444' }]}>GEVARENZONE</Text>
-          <TouchableOpacity
-            style={[styles.dangerButton, { borderColor: '#ff444440' }]}
-            onPress={handleLeaveGroup}
-          >
-            <Text style={{ color: '#ff4444', fontWeight: '600' }}>Groep verlaten</Text>
-          </TouchableOpacity>
+        <Text style={s.dangerHeader}>GEVARENZONE</Text>
+        <View style={s.card}>
+          <Pressable style={s.dangerRow} onPress={handleLeaveGroup}>
+            <Ionicons name="exit-outline" size={20} color={t.semantic.error} style={s.inputIcon} />
+            <Text style={s.dangerText}>Groep verlaten</Text>
+          </Pressable>
           {isAdmin && (
-            <TouchableOpacity
-              style={[styles.dangerButton, { backgroundColor: '#ff444415', borderColor: '#ff4444' }]}
-              onPress={handleDeleteGroup}
-            >
-              <Text style={{ color: '#ff4444', fontWeight: '600' }}>Groep verwijderen</Text>
-            </TouchableOpacity>
+            <>
+              <View style={s.divider} />
+              <Pressable style={s.dangerRow} onPress={handleDeleteGroup}>
+                <Ionicons name="trash-outline" size={20} color={t.semantic.error} style={s.inputIcon} />
+                <Text style={s.dangerText}>Groep verwijderen</Text>
+              </Pressable>
+            </>
           )}
         </View>
 
@@ -369,65 +337,154 @@ export default function GroupSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  groupAvatarSection: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  groupAvatarImg: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: { padding: 16, gap: 8 },
-  title: { fontSize: 22, fontWeight: '700' },
-  section: { padding: 16, paddingBottom: 0 },
-  sectionTitle: { fontSize: 12, fontWeight: '600', letterSpacing: 1, marginBottom: 12 },
-  categoryRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
-  catNameInput: {
-    flex: 1,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-  },
-  priceInput: {
-    width: 80,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  saveButton: {
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  drinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  input: {
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  dangerButton: {
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-});
+function createStyles(t: Theme, mode: 'light' | 'dark') {
+  const isDark = mode === 'dark';
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: t.colors.background.primary },
+    content: { paddingBottom: 40 },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { ...t.typography.heading2, color: t.colors.text.primary, flex: 1 },
+    saveBtn: { paddingHorizontal: 16, paddingVertical: 8 },
+    saveBtnText: { ...t.typography.bodyMedium, color: t.colors.tint },
+
+    // Avatar
+    avatarSection: { alignItems: 'center', paddingVertical: 16 },
+    avatar: { width: 80, height: 80, borderRadius: 9999 },
+    avatarFallback: {
+      backgroundColor: t.colors.surface.overlay,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarLetter: { fontSize: 28, fontWeight: '600', color: t.colors.text.secondary },
+    avatarAction: { ...t.typography.caption, color: t.colors.tint, marginTop: 8 },
+
+    // Section
+    sectionHeader: {
+      ...t.typography.overline,
+      color: t.colors.text.tertiary,
+      marginLeft: 28,
+      marginTop: 24,
+      marginBottom: 8,
+    },
+    dangerHeader: {
+      ...t.typography.overline,
+      color: t.semantic.error,
+      marginLeft: 28,
+      marginTop: 32,
+      marginBottom: 8,
+    },
+
+    // Grouped card
+    card: {
+      backgroundColor: t.colors.surface.raised,
+      borderRadius: t.radius.lg,
+      marginHorizontal: 24,
+      overflow: 'hidden',
+    },
+    divider: { height: 1, backgroundColor: t.colors.border.default, marginLeft: 48 },
+
+    // Input row
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      minHeight: 52,
+    },
+    inputIcon: { marginRight: 12, width: 20 },
+    inputText: {
+      flex: 1,
+      ...t.typography.body,
+      color: t.colors.text.primary,
+      height: 52,
+    },
+
+    // Category row
+    catRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      height: 52,
+    },
+    catDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+    catNameInput: {
+      flex: 1,
+      ...t.typography.body,
+      color: t.colors.text.primary,
+      height: 52,
+    },
+    catPriceInput: {
+      width: 72,
+      ...t.typography.body,
+      color: t.colors.text.primary,
+      textAlign: 'right',
+      height: 52,
+    },
+
+    // Drinks
+    drinkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      minHeight: 52,
+    },
+    drinkEmoji: { fontSize: 20, marginRight: 12 },
+    drinkName: { ...t.typography.body, color: t.colors.text.primary, flex: 1 },
+    catBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 9999,
+    },
+    catBadgeText: { ...t.typography.caption, fontWeight: '600' },
+    removeBtn: { padding: 8, marginLeft: 8 },
+    emptyRow: { padding: 16 },
+    emptyText: { ...t.typography.bodySm, color: t.colors.text.tertiary },
+
+    // Add button
+    addBtn: {
+      marginHorizontal: 24,
+      marginTop: 12,
+      height: 48,
+      backgroundColor: t.brand.magenta,
+      borderRadius: 9999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...(isDark
+        ? Platform.select({ ios: { shadowColor: t.brand.magenta, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12 }, android: { elevation: 4 }, default: {} })
+        : {}
+      ),
+    },
+    addBtnText: { color: '#FFFFFF', ...t.typography.bodyMedium },
+
+    // Invite
+    inviteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      minHeight: 52,
+    },
+    inviteCode: {
+      ...t.typography.bodyMedium,
+      color: t.colors.text.primary,
+      flex: 1,
+      letterSpacing: 2,
+    },
+    refreshText: { ...t.typography.bodySm, color: t.colors.tint },
+
+    // Danger
+    dangerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      minHeight: 52,
+    },
+    dangerText: { ...t.typography.body, color: t.semantic.error, flex: 1 },
+  });
+}

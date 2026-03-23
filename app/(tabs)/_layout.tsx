@@ -1,67 +1,59 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-
-import { Colors } from '@/src/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import { getTheme } from '@/src/theme';
+import CustomNavBar from '@/src/components/CustomNavBar';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const mode = useColorScheme();
+  const t = getTheme(mode);
 
   return (
     <Tabs
+      tabBar={(props) => <CustomNavBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: colors.tabIconSelected,
-        tabBarInactiveTintColor: colors.tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-        },
         headerStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: t.colors.background.primary,
+          shadowColor: 'transparent',
+          elevation: 0,
         },
-        headerTintColor: colors.text,
+        headerTintColor: t.colors.text.primary,
+        headerTitleStyle: {
+          fontWeight: '700',
+          fontSize: t.typography.heading3.fontSize,
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{ href: null }}
       />
       <Tabs.Screen
+        name="activiteit"
+        options={{
+          title: 'Activiteit',
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Home',
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="profiel"
+        options={{
+          title: 'Profiel',
+          headerShown: false,
+        }}
+      />
+      {/* Groups stack kept for push navigation (settings, etc.) */}
+      <Tabs.Screen
         name="groups"
         options={{
-          title: 'Groepen',
+          href: null,
           headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="bill"
-        options={{
-          title: 'Rekening',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'Geschiedenis',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Instellingen',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
-          ),
         }}
       />
     </Tabs>

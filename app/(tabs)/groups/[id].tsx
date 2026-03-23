@@ -3,18 +3,17 @@ import {
   StyleSheet,
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
   Alert,
   Modal,
-  Pressable,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
-import { Colors, Brand } from '@/src/constants/Colors';
+import { getTheme, type Theme } from '@/src/theme';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { formatTimeAgo } from '@/src/hooks/useHistory';
@@ -23,12 +22,11 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Share } from 'react-native';
 
-const CATEGORY_COLORS = [Brand.cyan, Brand.magenta, Brand.blue, Brand.purple];
-
 export default function GroupScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const mode = useColorScheme();
+  const t = getTheme(mode);
+  const s = useMemo(() => createStyles(t, mode), [mode]);
   const router = useRouter();
   const { user } = useAuth();
   const {
@@ -198,8 +196,8 @@ export default function GroupScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, styles.center, { backgroundColor: colors.background }]} edges={['top']}>
-        <ActivityIndicator size="large" color={Brand.magenta} />
+      <SafeAreaView style={[s.container, s.center, { backgroundColor: t.colors.background.primary }]} edges={['top']}>
+        <ActivityIndicator size="large" color={t.brand.magenta} />
       </SafeAreaView>
     );
   }
@@ -207,55 +205,55 @@ export default function GroupScreen() {
   const me = members.find((m) => m.user_id === user?.id);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[s.container, { backgroundColor: t.colors.background.primary }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.groupHeader}>
+      <View style={s.groupHeader}>
         {(group as any)?.avatar_url ? (
-          <Image source={{ uri: (group as any).avatar_url }} style={styles.headerAvatar} />
+          <Image source={{ uri: (group as any).avatar_url }} style={s.headerAvatar} />
         ) : (
-          <View style={[styles.headerAvatar, { backgroundColor: colors.surfaceLight }]}>
-            <Text style={{ color: colors.textSecondary, fontSize: 16, fontWeight: '600' }}>
+          <View style={[s.headerAvatar, { backgroundColor: t.colors.surface.overlay }]}>
+            <Text style={{ color: t.colors.text.secondary, ...t.typography.bodyMedium }}>
               {group?.name?.[0]?.toUpperCase() ?? '?'}
             </Text>
           </View>
         )}
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{group?.name ?? ''}</Text>
+        <Text style={[s.headerTitle, { color: t.colors.text.primary }]}>{group?.name ?? ''}</Text>
       </View>
 
       <ScrollView>
         {/* Confirmation toast */}
         {showConfirmation && (
-          <View style={[styles.toast, { backgroundColor: Brand.cyan }]}>
-            <Text style={styles.toastText}>{confirmationText}</Text>
+          <View style={s.toast}>
+            <Text style={s.toastIcon}>{confirmationText.includes('Gekopieerd') ? '\u2705' : '\u2728'}</Text>
+            <Text style={s.toastText}>{confirmationText}</Text>
           </View>
         )}
 
         {/* Active toggle */}
-        <View style={styles.section}>
-          <TouchableOpacity
+        <View style={s.section}>
+          <Pressable
             style={[
-              styles.activeToggle,
+              s.activeToggle,
               {
-                backgroundColor: me?.is_active ? Brand.cyan + '20' : colors.surfaceLight,
-                borderColor: me?.is_active ? Brand.cyan : colors.border,
+                backgroundColor: me?.is_active ? t.brand.cyan + '20' : t.colors.surface.overlay,
               },
             ]}
             onPress={toggleActive}
           >
             <View style={[
-              styles.activeDotLarge,
-              { backgroundColor: me?.is_active ? Brand.cyan : colors.textSecondary },
+              s.activeDotLarge,
+              { backgroundColor: me?.is_active ? t.brand.cyan : t.colors.text.tertiary },
             ]} />
-            <Text style={[styles.activeText, { color: me?.is_active ? Brand.cyan : colors.textSecondary }]}>
+            <Text style={[s.activeText, { color: me?.is_active ? t.brand.cyan : t.colors.text.tertiary }]}>
               {me?.is_active ? 'Aanwezig' : 'Afwezig'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {/* Invite code */}
         {group && (
-          <TouchableOpacity
-            style={[styles.inviteBar, { backgroundColor: colors.card, borderColor: colors.border }]}
+          <Pressable
+            style={s.inviteBar}
             onPress={async () => {
               await Clipboard.setStringAsync(group.invite_code);
               setConfirmationText('Gekopieerd!');
@@ -264,202 +262,213 @@ export default function GroupScreen() {
               setTimeout(() => setShowConfirmation(false), 1500);
             }}
           >
-            <Text style={[styles.inviteLabel, { color: colors.textSecondary }]}>Uitnodigingscode:</Text>
-            <Text style={[styles.inviteCode, { color: colors.text }]}>{group.invite_code}</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>tap om te kopiëren</Text>
-              <TouchableOpacity
+            <Text style={[s.inviteLabel, { color: t.colors.text.tertiary }]}>Uitnodigingscode:</Text>
+            <Text style={[s.inviteCode, { color: t.colors.text.primary }]}>{group.invite_code}</Text>
+            <View style={{ flexDirection: 'row', gap: t.space[3], marginTop: t.space[1] }}>
+              <Text style={{ color: t.colors.text.tertiary, ...t.typography.overline }}>tap om te kopiëren</Text>
+              <Pressable
                 onPress={async (e) => {
                   e.stopPropagation();
                   await Share.share({ message: `Join mijn groep "${group.name}" op Streeps! Code: ${group.invite_code}` });
                 }}
               >
-                <Text style={{ color: Brand.cyan, fontSize: 11 }}>delen</Text>
-              </TouchableOpacity>
+                <Text style={{ color: t.colors.tint, ...t.typography.overline }}>delen</Text>
+              </Pressable>
             </View>
-          </TouchableOpacity>
+          </Pressable>
         )}
 
         {/* Category selection */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        <View style={s.section}>
+          <Text style={[s.sectionTitle, { color: t.colors.text.tertiary }]}>
             KIES CATEGORIE
           </Text>
-          <View style={styles.categoryGrid}>
-            {activeCategories.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.categoryCard,
-                  {
-                    backgroundColor: selectedCategory === cat
-                      ? CATEGORY_COLORS[(cat - 1) % 4] + '30'
-                      : colors.card,
-                    borderColor: selectedCategory === cat
-                      ? CATEGORY_COLORS[(cat - 1) % 4]
-                      : colors.border,
-                  },
-                ]}
-                onPress={() => setSelectedCategory(cat)}
-              >
-                <Text style={[styles.categoryLabel, { color: CATEGORY_COLORS[(cat - 1) % 4] }]}>
-                  {getCategoryName(cat)}
-                </Text>
-                <Text style={[styles.categoryPrice, { color: colors.text }]}>
-                  {(getCategoryPrice(cat) / 100).toFixed(2).replace('.', ',')}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.categoryGrid}>
+            {activeCategories.map((cat) => {
+              const catColor = t.categoryColors[(cat - 1) % 4];
+              const isSelected = selectedCategory === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  style={[
+                    s.categoryCard,
+                    {
+                      backgroundColor: isSelected
+                        ? catColor + '18'
+                        : t.colors.surface.raised,
+                      borderLeftColor: catColor,
+                      borderLeftWidth: 3,
+                    },
+                  ]}
+                  onPress={() => setSelectedCategory(cat)}
+                >
+                  <Text style={[s.categoryLabel, { color: catColor }]}>
+                    {getCategoryName(cat)}
+                  </Text>
+                  <Text style={[s.categoryPrice, { color: t.colors.text.primary }]}>
+                    {'\u20AC'} {(getCategoryPrice(cat) / 100).toFixed(2).replace('.', ',')}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
         {/* Add tally button */}
-        <TouchableOpacity
+        <Pressable
           style={[
-            styles.addButton,
-            { backgroundColor: selectedCategory ? Brand.magenta : colors.surfaceLight },
+            s.addButton,
+            {
+              backgroundColor: selectedCategory ? t.brand.magenta : t.colors.surface.overlay,
+              ...(selectedCategory ? t.glows.magenta : {}),
+            },
           ]}
           onPress={handleAddTally}
           disabled={!selectedCategory || adding}
         >
           <Text style={[
-            styles.addButtonText,
-            { color: selectedCategory ? '#fff' : colors.textSecondary },
+            s.addButtonText,
+            { color: selectedCategory ? '#fff' : t.colors.text.tertiary },
           ]}>
             {adding ? 'Even wachten...' : 'Streepje zetten!'}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
 
         {/* Drink list button */}
-        <TouchableOpacity
-          style={{ alignItems: 'center', marginBottom: 8 }}
+        <Pressable
+          style={{ alignItems: 'center', marginBottom: t.space[2] }}
           onPress={() => setShowDrinkList(true)}
         >
-          <Text style={{ color: Brand.cyan, fontSize: 14 }}>Bekijk drankjeslijst</Text>
-        </TouchableOpacity>
+          <Text style={{ color: t.colors.tint, ...t.typography.bodySm }}>Bekijk drankjeslijst</Text>
+        </Pressable>
 
         {/* Members — tap to open detail */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        <View style={s.section}>
+          <Text style={[s.sectionTitle, { color: t.colors.text.tertiary }]}>
             LEDEN
           </Text>
-          {members.map((member) => {
-            const name = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
-            const avatarUrl = member.profile?.avatar_url;
-            return (
-              <TouchableOpacity
-                key={member.id}
-                style={[styles.memberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setSelectedMemberId(member.user_id)}
-              >
-                <View style={styles.avatarContainer}>
-                  {avatarUrl ? (
-                    <Image source={{ uri: avatarUrl }} style={styles.memberAvatar} />
-                  ) : (
-                    <View style={[styles.memberAvatar, { backgroundColor: colors.surfaceLight }]}>
-                      <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '600' }}>
-                        {name[0]?.toUpperCase()}
+          <View style={s.membersCard}>
+            {members.map((member, index) => {
+              const name = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
+              const avatarUrl = member.profile?.avatar_url;
+              return (
+                <React.Fragment key={member.id}>
+                  {index > 0 && <View style={s.memberDivider} />}
+                  <Pressable
+                    style={s.memberRow}
+                    onPress={() => setSelectedMemberId(member.user_id)}
+                  >
+                    <View style={s.avatarContainer}>
+                      {avatarUrl ? (
+                        <Image source={{ uri: avatarUrl }} style={s.memberAvatar} />
+                      ) : (
+                        <View style={[s.memberAvatar, { backgroundColor: t.colors.surface.overlay }]}>
+                          <Text style={{ color: t.colors.text.secondary, ...t.typography.bodySm, fontWeight: t.fontWeights.semibold }}>
+                            {name[0]?.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      {member.is_active && (
+                        <View style={s.statusBadge}>
+                          <View style={s.statusDot} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[s.memberName, { color: t.colors.text.primary }]}>
+                      {name}
+                      {member.is_admin && ' (admin)'}
+                    </Text>
+                    <View style={s.memberTallies}>
+                      <Text style={[s.memberTallyCount, { color: t.colors.text.primary }]}>
+                        {tallyCounts[member.user_id] ?? 0}
                       </Text>
                     </View>
-                  )}
-                  {member.is_active && (
-                    <View style={styles.statusBadge}>
-                      <View style={styles.statusDot} />
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.memberName, { color: colors.text }]}>
-                  {name}
-                  {member.is_admin && ' (admin)'}
-                </Text>
-                <View style={[styles.memberTallies, { backgroundColor: colors.surfaceLight }]}>
-                  <Text style={[styles.memberTallyCount, { color: colors.text }]}>
-                    {tallyCounts[member.user_id] ?? 0}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                  </Pressable>
+                </React.Fragment>
+              );
+            })}
+          </View>
         </View>
 
         {/* Admin actions */}
         {isAdmin && (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: Brand.cyan, margin: 0, marginBottom: 8 }]}
+          <View style={s.section}>
+            <Pressable
+              style={[s.adminPillButton, { backgroundColor: t.brand.cyan }]}
               onPress={handleOpenSettlement}
               disabled={settling}
             >
-              <Text style={[styles.addButtonText, { color: '#1A1A2E' }]}>
+              <Text style={[s.adminPillButtonText, { color: t.colors.text.inverse }]}>
                 {settling ? 'Bezig...' : 'Afrekenen'}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.surfaceLight, margin: 0, marginBottom: 8 }]}
+            </Pressable>
+            <Pressable
+              style={[s.adminGhostButton]}
               onPress={handleOpenHistory}
             >
-              <Text style={[styles.addButtonText, { color: colors.text }]}>
+              <Text style={[s.adminGhostButtonText, { color: t.colors.text.secondary }]}>
                 Afrekening historie
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.surfaceLight, margin: 0 }]}
+            </Pressable>
+            <Pressable
+              style={[s.adminGhostButton]}
               onPress={() => router.push(`/groups/settings?id=${id}` as any)}
             >
-              <Text style={[styles.addButtonText, { color: colors.text }]}>
+              <Text style={[s.adminGhostButtonText, { color: t.colors.text.secondary }]}>
                 Groep instellingen
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: t.space[10] }} />
       </ScrollView>
 
       {/* Drink list modal */}
       <Modal visible={showDrinkList} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowDrinkList(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Drankjeslijst</Text>
+        <Pressable style={s.modalOverlay} onPress={() => setShowDrinkList(false)}>
+          <Pressable style={s.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={s.modalHandle} />
+            <Text style={[s.modalTitle, { color: t.colors.text.primary }]}>Drankjeslijst</Text>
             {drinks.length === 0 && (
-              <Text style={{ color: colors.textSecondary }}>Geen drankjes toegevoegd</Text>
+              <Text style={{ color: t.colors.text.secondary }}>Geen drankjes toegevoegd</Text>
             )}
-            {drinks.map((drink) => (
-              <View
-                key={drink.id}
-                style={[styles.memberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-              >
-                <Text style={{ fontSize: 20, marginRight: 10 }}>{drink.emoji ?? '🍺'}</Text>
-                <Text style={[{ color: colors.text, flex: 1, fontSize: 16 }]}>{drink.name}</Text>
-                <View style={[
-                  styles.catBadge,
-                  { backgroundColor: CATEGORY_COLORS[(drink.category - 1) % 4] + '20' },
-                ]}>
-                  <Text style={{ color: CATEGORY_COLORS[(drink.category - 1) % 4], fontSize: 12 }}>
-                    cat. {drink.category}
-                  </Text>
+            {drinks.map((drink) => {
+              const catColor = t.categoryColors[(drink.category - 1) % 4];
+              return (
+                <View
+                  key={drink.id}
+                  style={s.drinkRow}
+                >
+                  <Text style={{ fontSize: 20, marginRight: t.space[3] }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
+                  <Text style={{ color: t.colors.text.primary, flex: 1, ...t.typography.body }}>{drink.name}</Text>
+                  <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                    <Text style={{ color: catColor, ...t.typography.caption }}>
+                      cat. {drink.category}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </Pressable>
         </Pressable>
       </Modal>
 
       {/* Tally count modal */}
       <Modal visible={showTallyCount} transparent animationType="fade">
-        <View style={styles.centeredOverlay}>
-          <View style={[styles.tallyCountModal, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text, textAlign: 'center' }]}>
+        <View style={s.centeredOverlay}>
+          <View style={s.tallyCountModal}>
+            <Text style={[s.modalTitle, { color: t.colors.text.primary, textAlign: 'center' }]}>
               Hoeveel streepjes?
             </Text>
             {selectedCategory && (
-              <Text style={{ color: CATEGORY_COLORS[(selectedCategory - 1) % 4], textAlign: 'center', marginBottom: 16 }}>
+              <Text style={{ color: t.categoryColors[(selectedCategory - 1) % 4], textAlign: 'center', marginBottom: t.space[4], ...t.typography.bodyMedium }}>
                 {getCategoryName(selectedCategory)}
               </Text>
             )}
-            <View style={styles.counterRow}>
-              <TouchableOpacity
-                style={[styles.counterBtn, { backgroundColor: '#ff444420' }]}
+            <View style={s.counterRow}>
+              <Pressable
+                style={[s.counterBtn, { backgroundColor: t.semantic.errorBg }]}
                 onPress={() => {
                   if (tallyCount <= 1) {
                     setShowTallyCount(false);
@@ -468,33 +477,34 @@ export default function GroupScreen() {
                   }
                 }}
               >
-                <Text style={{ color: '#ff4444', fontSize: 24, fontWeight: '700' }}>−</Text>
-              </TouchableOpacity>
-              <Text style={[styles.counterValue, { color: colors.text }]}>{tallyCount}</Text>
-              <TouchableOpacity
-                style={[styles.counterBtn, { backgroundColor: Brand.cyan + '20' }]}
+                <Text style={{ color: t.semantic.error, ...t.typography.heading2 }}>{'\u2212'}</Text>
+              </Pressable>
+              <Text style={[s.counterValue, { color: t.colors.text.primary }]}>{tallyCount}</Text>
+              <Pressable
+                style={[s.counterBtn, { backgroundColor: t.brand.cyan + '20' }]}
                 onPress={() => setTallyCount((c) => Math.min(c + 1, 99))}
               >
-                <Text style={{ color: Brand.cyan, fontSize: 24, fontWeight: '700' }}>+</Text>
-              </TouchableOpacity>
+                <Text style={{ color: t.brand.cyan, ...t.typography.heading2 }}>+</Text>
+              </Pressable>
             </View>
-            <TouchableOpacity
-              style={[styles.acceptBtn, { backgroundColor: Brand.magenta }]}
+            <Pressable
+              style={[s.acceptBtn, { backgroundColor: t.brand.magenta, ...t.glows.magenta }]}
               onPress={handleConfirmTally}
             >
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Accepteren</Text>
-            </TouchableOpacity>
+              <Text style={{ color: '#fff', ...t.typography.bodyMedium }}>Accepteren</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
 
       {/* Member detail modal */}
       <Modal visible={!!selectedMemberData} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setSelectedMemberId(null)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={s.modalOverlay} onPress={() => setSelectedMemberId(null)}>
+          <Pressable style={s.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={s.modalHandle} />
             {selectedMemberData && (
               <ScrollView style={{ maxHeight: 500 }}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                <Text style={[s.modalTitle, { color: t.colors.text.primary }]}>
                   {selectedMemberData.member.user_id === user?.id
                     ? 'Jij'
                     : (selectedMemberData.member.profile?.full_name || 'Onbekend')}
@@ -502,32 +512,33 @@ export default function GroupScreen() {
                 </Text>
 
                 {/* Tally counts per category with remove button */}
-                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>STREEPJES</Text>
+                <Text style={[s.sectionTitle, { color: t.colors.text.tertiary }]}>STREEPJES</Text>
                 {activeCategories.map((cat) => {
                   const count = selectedMemberData.categoryCounts[cat] || 0;
                   const isRemoving = removeCategory === cat;
+                  const catColor = t.categoryColors[(cat - 1) % 4];
                   return (
-                    <View key={cat} style={{ marginBottom: 8 }}>
+                    <View key={cat} style={{ marginBottom: t.space[2] }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={[styles.catDot, { backgroundColor: CATEGORY_COLORS[(cat - 1) % 4] }]} />
-                        <Text style={{ color: CATEGORY_COLORS[(cat - 1) % 4], flex: 1 }}>
+                        <View style={[s.catDot, { backgroundColor: catColor }]} />
+                        <Text style={{ color: catColor, flex: 1, ...t.typography.body }}>
                           {getCategoryName(cat)}
                         </Text>
-                        <Text style={{ color: colors.text, fontWeight: '600', marginRight: 10 }}>{count}</Text>
+                        <Text style={{ color: t.colors.text.primary, fontWeight: t.fontWeights.semibold, marginRight: t.space[3] }}>{count}</Text>
                         {isAdmin && count > 0 && !isRemoving && (
-                          <TouchableOpacity
+                          <Pressable
                             onPress={() => handleStartRemove(cat, count)}
-                            style={{ padding: 4 }}
+                            style={{ padding: t.space[1] }}
                           >
-                            <Text style={{ color: '#ff4444', fontSize: 12 }}>verwijder</Text>
-                          </TouchableOpacity>
+                            <Text style={{ color: t.semantic.error, ...t.typography.caption }}>verwijder</Text>
+                          </Pressable>
                         )}
                       </View>
                       {isRemoving && (
-                        <View style={{ marginTop: 8, padding: 12, backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                            <TouchableOpacity
-                              style={[styles.counterBtnSmall, { backgroundColor: '#ff444420' }]}
+                        <View style={s.removePanel}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: t.space[4] }}>
+                            <Pressable
+                              style={[s.counterBtnSmall, { backgroundColor: t.semantic.errorBg }]}
                               onPress={() => {
                                 if (removeCount <= 1) {
                                   setRemoveCategory(null);
@@ -536,24 +547,24 @@ export default function GroupScreen() {
                                 }
                               }}
                             >
-                              <Text style={{ color: '#ff4444', fontSize: 20, fontWeight: '700' }}>−</Text>
-                            </TouchableOpacity>
-                            <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700', minWidth: 40, textAlign: 'center' }}>
+                              <Text style={{ color: t.semantic.error, ...t.typography.heading3 }}>{'\u2212'}</Text>
+                            </Pressable>
+                            <Text style={{ color: t.colors.text.primary, ...t.typography.tallySm, minWidth: 40, textAlign: 'center' }}>
                               {removeCount}
                             </Text>
-                            <TouchableOpacity
-                              style={[styles.counterBtnSmall, { backgroundColor: Brand.cyan + '20' }]}
+                            <Pressable
+                              style={[s.counterBtnSmall, { backgroundColor: t.brand.cyan + '20' }]}
                               onPress={() => setRemoveCount((c) => Math.min(c + 1, removableTallies.length))}
                             >
-                              <Text style={{ color: Brand.cyan, fontSize: 20, fontWeight: '700' }}>+</Text>
-                            </TouchableOpacity>
+                              <Text style={{ color: t.brand.cyan, ...t.typography.heading3 }}>+</Text>
+                            </Pressable>
                           </View>
-                          <TouchableOpacity
-                            style={{ backgroundColor: '#ff4444', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                          <Pressable
+                            style={s.removeConfirmBtn}
                             onPress={handleConfirmRemove}
                           >
-                            <Text style={{ color: '#fff', fontWeight: '600' }}>Verwijderen</Text>
-                          </TouchableOpacity>
+                            <Text style={{ color: '#fff', fontWeight: t.fontWeights.semibold }}>Verwijderen</Text>
+                          </Pressable>
                         </View>
                       )}
                     </View>
@@ -561,34 +572,34 @@ export default function GroupScreen() {
                 })}
 
                 {/* Tally history */}
-                <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 16 }]}>GESCHIEDENIS</Text>
+                <Text style={[s.sectionTitle, { color: t.colors.text.tertiary, marginTop: t.space[4] }]}>GESCHIEDENIS</Text>
                 {selectedMemberData.tallies.length === 0 && (
-                  <Text style={{ color: colors.textSecondary }}>Geen streepjes</Text>
+                  <Text style={{ color: t.colors.text.secondary }}>Geen streepjes</Text>
                 )}
-                {selectedMemberData.tallies.map((tally) => {
-                  const cat = (tally as any).category ?? 1;
-                  return (
-                    <View
-                      key={tally.id}
-                      style={[styles.memberRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    >
-                      <View style={[
-                        styles.catDot,
-                        { backgroundColor: CATEGORY_COLORS[(cat - 1) % 4] },
-                      ]} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: colors.text, fontSize: 14 }}>{getCategoryName(cat)}</Text>
-                        <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{formatTimeAgo(tally.created_at)}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
+                <View style={s.historyCard}>
+                  {selectedMemberData.tallies.map((tally, index) => {
+                    const cat = (tally as any).category ?? 1;
+                    const catColor = t.categoryColors[(cat - 1) % 4];
+                    return (
+                      <React.Fragment key={tally.id}>
+                        {index > 0 && <View style={s.memberDivider} />}
+                        <View style={s.historyRow}>
+                          <View style={[s.catDot, { backgroundColor: catColor }]} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: t.colors.text.primary, ...t.typography.bodySm }}>{getCategoryName(cat)}</Text>
+                            <Text style={{ color: t.colors.text.tertiary, ...t.typography.caption }}>{formatTimeAgo(tally.created_at)}</Text>
+                          </View>
+                        </View>
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
 
                 {/* Admin actions */}
                 {isAdmin && selectedMemberData.member.user_id !== user?.id && (
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                    <TouchableOpacity
-                      style={[styles.adminBtn, { backgroundColor: Brand.cyan + '20' }]}
+                  <View style={{ flexDirection: 'row', gap: t.space[2], marginTop: t.space[4] }}>
+                    <Pressable
+                      style={[s.adminActionBtn, { backgroundColor: t.brand.cyan + '20' }]}
                       onPress={() => {
                         const m = selectedMemberData.member;
                         Alert.alert(
@@ -601,12 +612,12 @@ export default function GroupScreen() {
                         );
                       }}
                     >
-                      <Text style={{ color: Brand.cyan, fontWeight: '600' }}>
+                      <Text style={{ color: t.brand.cyan, fontWeight: t.fontWeights.semibold }}>
                         {selectedMemberData.member.is_admin ? 'Admin verwijderen' : 'Admin maken'}
                       </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.adminBtn, { backgroundColor: '#ff444420' }]}
+                    </Pressable>
+                    <Pressable
+                      style={[s.adminActionBtn, { backgroundColor: t.semantic.errorBg }]}
                       onPress={() => {
                         const m = selectedMemberData.member;
                         Alert.alert(
@@ -623,8 +634,8 @@ export default function GroupScreen() {
                         );
                       }}
                     >
-                      <Text style={{ color: '#ff4444', fontWeight: '600' }}>Verwijderen</Text>
-                    </TouchableOpacity>
+                      <Text style={{ color: t.semantic.error, fontWeight: t.fontWeights.semibold }}>Verwijderen</Text>
+                    </Pressable>
                   </View>
                 )}
               </ScrollView>
@@ -636,56 +647,57 @@ export default function GroupScreen() {
 
       {/* Settlement modal */}
       <Modal visible={showSettlement} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowSettlement(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={s.modalOverlay} onPress={() => setShowSettlement(false)}>
+          <Pressable style={s.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={s.modalHandle} />
             <ScrollView style={{ maxHeight: 500 }}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Afrekenen</Text>
+              <Text style={[s.modalTitle, { color: t.colors.text.primary }]}>Afrekenen</Text>
 
               {/* Select all */}
-              <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', marginBottom: t.space[3] }}
                 onPress={toggleAllSettlement}
               >
-                <View style={[styles.checkbox, selectedForSettlement.size === unsettledMembers.length && styles.checkboxChecked]} />
-                <Text style={{ color: colors.text, fontWeight: '600' }}>Selecteer alles</Text>
-              </TouchableOpacity>
+                <View style={[s.checkbox, selectedForSettlement.size === unsettledMembers.length && s.checkboxChecked]} />
+                <Text style={{ color: t.colors.text.primary, fontWeight: t.fontWeights.semibold }}>Selecteer alles</Text>
+              </Pressable>
 
               {/* Per member */}
               {unsettledMembers.map((member) => {
                 const selected = selectedForSettlement.has(member.user_id);
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={member.user_id}
-                    style={[styles.settlementRow, { backgroundColor: colors.card, borderColor: selected ? Brand.cyan : colors.border }]}
+                    style={[s.settlementRow, { borderColor: selected ? t.brand.cyan : t.colors.border.default }]}
                     onPress={() => toggleSettlementMember(member.user_id)}
                   >
-                    <View style={[styles.checkbox, selected && styles.checkboxChecked]} />
+                    <View style={[s.checkbox, selected && s.checkboxChecked]} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.text, fontWeight: '600' }}>
+                      <Text style={{ color: t.colors.text.primary, fontWeight: t.fontWeights.semibold }}>
                         {member.user_id === user?.id ? 'Jij' : member.full_name}
                       </Text>
                       {activeCategories.map((cat) => {
                         const count = member.counts[cat] || 0;
                         if (count === 0) return null;
                         return (
-                          <Text key={cat} style={{ color: colors.textSecondary, fontSize: 12 }}>
+                          <Text key={cat} style={{ color: t.colors.text.secondary, ...t.typography.caption }}>
                             {getCategoryName(cat)}: {count}x
                           </Text>
                         );
                       })}
                     </View>
-                    <Text style={{ color: Brand.cyan, fontWeight: '700', fontSize: 16 }}>
-                      {(member.amount / 100).toFixed(2).replace('.', ',')}
+                    <Text style={{ ...t.typography.body, color: t.brand.cyan, fontWeight: t.fontWeights.bold }}>
+                      {'\u20AC'} {(member.amount / 100).toFixed(2).replace('.', ',')}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
 
               {/* Total */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 4 }}>
-                <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Totaal</Text>
-                <Text style={{ color: Brand.cyan, fontWeight: '700', fontSize: 16 }}>
-                  {(unsettledMembers
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: t.space[3], paddingHorizontal: t.space[1] }}>
+                <Text style={{ ...t.typography.body, color: t.colors.text.primary, fontWeight: t.fontWeights.bold }}>Totaal</Text>
+                <Text style={{ ...t.typography.body, color: t.brand.cyan, fontWeight: t.fontWeights.bold }}>
+                  {'\u20AC'} {(unsettledMembers
                     .filter((m) => selectedForSettlement.has(m.user_id))
                     .reduce((sum, m) => sum + m.amount, 0) / 100
                   ).toFixed(2).replace('.', ',')}
@@ -693,15 +705,15 @@ export default function GroupScreen() {
               </View>
 
               {/* Confirm */}
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: Brand.cyan, margin: 0, marginTop: 16 }]}
+              <Pressable
+                style={[s.settlementConfirmBtn, { backgroundColor: t.brand.cyan }]}
                 onPress={handleConfirmSettlement}
                 disabled={settling || selectedForSettlement.size === 0}
               >
-                <Text style={[styles.addButtonText, { color: '#1A1A2E' }]}>
+                <Text style={[s.addButtonText, { color: t.colors.text.inverse }]}>
                   {settling ? 'Bezig...' : 'Bevestigen'}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -709,30 +721,31 @@ export default function GroupScreen() {
 
       {/* Settlement history modal */}
       <Modal visible={showSettlementHistory} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowSettlementHistory(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={s.modalOverlay} onPress={() => setShowSettlementHistory(false)}>
+          <Pressable style={s.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={s.modalHandle} />
             <ScrollView style={{ maxHeight: 500 }}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Afrekening historie</Text>
+              <Text style={[s.modalTitle, { color: t.colors.text.primary }]}>Afrekening historie</Text>
               {history.length === 0 && (
-                <Text style={{ color: colors.textSecondary }}>Nog geen afrekeningen</Text>
+                <Text style={{ color: t.colors.text.secondary }}>Nog geen afrekeningen</Text>
               )}
               {history.map((settlement) => (
                 <View
                   key={settlement.id}
-                  style={[styles.settlementRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  style={s.settlementRow}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.text, fontWeight: '600' }}>
+                    <Text style={{ color: t.colors.text.primary, fontWeight: t.fontWeights.semibold }}>
                       {formatTimeAgo(settlement.created_at)}
                     </Text>
                     {settlement.lines.map((line) => (
-                      <Text key={line.user_id} style={{ color: colors.textSecondary, fontSize: 12 }}>
-                        {line.full_name}: {(line.amount / 100).toFixed(2).replace('.', ',')}
+                      <Text key={line.user_id} style={{ color: t.colors.text.secondary, ...t.typography.caption }}>
+                        {line.full_name}: {'\u20AC'} {(line.amount / 100).toFixed(2).replace('.', ',')}
                       </Text>
                     ))}
                   </View>
-                  <Text style={{ color: Brand.cyan, fontWeight: '700', fontSize: 16 }}>
-                    {(settlement.total_amount / 100).toFixed(2).replace('.', ',')}
+                  <Text style={{ ...t.typography.body, color: t.brand.cyan, fontWeight: t.fontWeights.bold }}>
+                    {'\u20AC'} {(settlement.total_amount / 100).toFixed(2).replace('.', ',')}
                   </Text>
                 </View>
               ))}
@@ -745,226 +758,361 @@ export default function GroupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { justifyContent: 'center', alignItems: 'center' },
-  groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  section: { padding: 16, paddingBottom: 0 },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  activeToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  activeDotLarge: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  activeText: { fontSize: 16, fontWeight: '600' },
-  inviteBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
-    marginTop: 8,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-  },
-  inviteLabel: { fontSize: 13 },
-  inviteCode: { fontSize: 16, fontWeight: '700', letterSpacing: 2 },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  categoryCard: {
-    flex: 1,
-    minWidth: '40%',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-  },
-  categoryLabel: { fontSize: 16, fontWeight: '700' },
-  categoryPrice: { fontSize: 14, marginTop: 4 },
-  addButton: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  addButtonText: { fontSize: 18, fontWeight: '700' },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  memberAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusBadge: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#1A1A2E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Brand.cyan,
-  },
-  catDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  catBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  memberName: { flex: 1, fontSize: 16 },
-  memberTallies: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  memberTallyCount: { fontSize: 16, fontWeight: '600' },
-  toast: {
-    position: 'absolute',
-    top: 10,
-    left: 20,
-    right: 20,
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  toastText: { color: '#1A1A2E', fontSize: 16, fontWeight: '600' },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    padding: 24,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16 },
-  counterBtnSmall: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#666',
-    marginRight: 12,
-  },
-  checkboxChecked: {
-    backgroundColor: Brand.cyan,
-    borderColor: Brand.cyan,
-  },
-  settlementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  adminBtn: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  centeredOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  tallyCountModal: {
-    margin: 40,
-    padding: 24,
-    borderRadius: 20,
-  },
-  counterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 24,
-    marginBottom: 20,
-  },
-  counterBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  counterValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    minWidth: 60,
-    textAlign: 'center',
-  },
-  acceptBtn: {
-    padding: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-});
+function createStyles(t: Theme, mode: 'light' | 'dark') {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    center: { justifyContent: 'center', alignItems: 'center' },
+    groupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: t.layout.screenPaddingH,
+      paddingVertical: t.space[3],
+      gap: t.space[3],
+    },
+    headerAvatar: {
+      width: t.components.avatar.sm.size,
+      height: t.components.avatar.sm.size,
+      borderRadius: t.components.avatar.sm.size / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      ...t.typography.heading2,
+    },
+    section: {
+      paddingHorizontal: t.layout.screenPaddingH,
+      paddingBottom: 0,
+      marginBottom: t.space[4],
+    },
+    sectionTitle: {
+      ...t.typography.overline,
+      marginBottom: t.space[3],
+    },
+    activeToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: t.space[3],
+      paddingHorizontal: t.space[5],
+      borderRadius: t.radius.full,
+    },
+    activeDotLarge: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: t.space[2],
+    },
+    activeText: {
+      ...t.typography.bodyMedium,
+    },
+    inviteBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginHorizontal: t.layout.screenPaddingH,
+      marginTop: t.space[2],
+      marginBottom: t.space[4],
+      padding: t.space[3],
+      borderRadius: t.radius.lg,
+      backgroundColor: t.colors.surface.raised,
+      gap: t.space[2],
+      ...t.shadows.sm,
+    },
+    inviteLabel: {
+      ...t.typography.caption,
+    },
+    inviteCode: {
+      ...t.typography.bodyMedium,
+      fontWeight: t.fontWeights.bold,
+      letterSpacing: 2,
+    },
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: t.space[3],
+    },
+    categoryCard: {
+      flex: 1,
+      minWidth: '40%',
+      alignItems: 'center',
+      padding: t.space[4],
+      borderRadius: t.radius.lg,
+      overflow: 'hidden',
+      ...t.shadows.sm,
+    },
+    categoryLabel: {
+      ...t.typography.bodyMedium,
+      fontWeight: t.fontWeights.bold,
+    },
+    categoryPrice: {
+      ...t.typography.bodySm,
+      marginTop: t.space[1],
+    },
+    addButton: {
+      marginHorizontal: t.layout.screenPaddingH,
+      marginBottom: t.space[3],
+      height: 56,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addButtonText: {
+      ...t.typography.heading3,
+      fontWeight: t.fontWeights.bold,
+    },
+    membersCard: {
+      backgroundColor: t.colors.surface.raised,
+      borderRadius: t.radius.lg,
+      overflow: 'hidden',
+      ...t.shadows.sm,
+    },
+    memberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: t.space[4],
+      paddingVertical: t.space[3],
+    },
+    memberDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: t.colors.border.default,
+      marginLeft: t.space[4] + t.components.avatar.sm.size + t.space[3],
+    },
+    avatarContainer: {
+      position: 'relative',
+      marginRight: t.space[3],
+    },
+    memberAvatar: {
+      width: t.components.avatar.sm.size,
+      height: t.components.avatar.sm.size,
+      borderRadius: t.components.avatar.sm.size / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusBadge: {
+      position: 'absolute',
+      bottom: -1,
+      right: -1,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: t.colors.surface.raised,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: t.brand.cyan,
+    },
+    catDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: t.space[3],
+    },
+    catBadge: {
+      paddingHorizontal: t.space[2],
+      paddingVertical: t.space[1],
+      borderRadius: t.radius.sm,
+    },
+    memberName: {
+      flex: 1,
+      ...t.typography.body,
+    },
+    memberTallies: {
+      backgroundColor: t.colors.surface.overlay,
+      paddingHorizontal: t.space[3],
+      paddingVertical: t.space[1],
+      borderRadius: t.radius.sm,
+    },
+    memberTallyCount: {
+      ...t.typography.bodyMedium,
+      fontWeight: t.fontWeights.semibold,
+    },
+    toast: {
+      position: 'absolute',
+      bottom: t.space[4],
+      left: t.layout.screenPaddingH,
+      right: t.layout.screenPaddingH,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: t.space[2],
+      paddingVertical: t.space[3],
+      paddingHorizontal: t.space[4],
+      borderRadius: t.radius.md,
+      backgroundColor: t.brand.cyan,
+      zIndex: t.zIndex.toast,
+      ...t.shadows.md,
+    },
+    toastIcon: {
+      fontSize: 18,
+    },
+    toastText: {
+      color: t.colors.text.inverse,
+      ...t.typography.bodyMedium,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: t.colors.scrim,
+    },
+    modalContent: {
+      backgroundColor: t.colors.surface.raised,
+      padding: t.components.modal.padding,
+      borderTopLeftRadius: t.components.modal.borderRadius,
+      borderTopRightRadius: t.components.modal.borderRadius,
+    },
+    modalHandle: {
+      width: t.components.modal.handleWidth,
+      height: t.components.modal.handleHeight,
+      borderRadius: t.components.modal.handleHeight / 2,
+      backgroundColor: t.colors.border.strong,
+      alignSelf: 'center',
+      marginBottom: t.space[4],
+    },
+    modalTitle: {
+      ...t.typography.heading2,
+      marginBottom: t.space[4],
+    },
+    drinkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: t.space[3],
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.colors.border.default,
+    },
+    counterBtnSmall: {
+      width: 40,
+      height: 40,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: t.radius.xs,
+      borderWidth: 2,
+      borderColor: t.colors.text.tertiary,
+      marginRight: t.space[3],
+    },
+    checkboxChecked: {
+      backgroundColor: t.brand.cyan,
+      borderColor: t.brand.cyan,
+    },
+    settlementRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: t.space[3],
+      borderRadius: t.radius.md,
+      borderWidth: 1,
+      borderColor: t.colors.border.default,
+      backgroundColor: t.colors.surface.default,
+      marginBottom: t.space[2],
+    },
+    settlementConfirmBtn: {
+      height: 56,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: t.space[4],
+    },
+    adminPillButton: {
+      height: 52,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: t.space[2],
+      ...t.shadows.sm,
+    },
+    adminPillButtonText: {
+      ...t.typography.bodyMedium,
+      fontWeight: t.fontWeights.bold,
+    },
+    adminGhostButton: {
+      height: 48,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: t.space[2],
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: t.colors.border.default,
+    },
+    adminGhostButtonText: {
+      ...t.typography.bodyMedium,
+    },
+    adminActionBtn: {
+      flex: 1,
+      padding: t.space[3],
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+    },
+    centeredOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      backgroundColor: t.colors.scrim,
+    },
+    tallyCountModal: {
+      marginHorizontal: t.space[10],
+      padding: t.space[6],
+      borderRadius: t.components.modal.borderRadius,
+      backgroundColor: t.colors.surface.raised,
+      ...t.shadows.lg,
+    },
+    counterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: t.space[6],
+      marginBottom: t.space[5],
+    },
+    counterBtn: {
+      width: 56,
+      height: 56,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    counterValue: {
+      ...t.typography.tally,
+      minWidth: 60,
+      textAlign: 'center',
+    },
+    acceptBtn: {
+      height: 52,
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    removePanel: {
+      marginTop: t.space[2],
+      padding: t.space[3],
+      backgroundColor: t.colors.surface.default,
+      borderRadius: t.radius.md,
+      borderWidth: 1,
+      borderColor: t.colors.border.default,
+    },
+    removeConfirmBtn: {
+      backgroundColor: t.semantic.error,
+      padding: t.space[3],
+      borderRadius: t.radius.full,
+      alignItems: 'center',
+      marginTop: t.space[2],
+    },
+    historyCard: {
+      backgroundColor: t.colors.surface.raised,
+      borderRadius: t.radius.lg,
+      overflow: 'hidden',
+      ...t.shadows.sm,
+    },
+    historyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: t.space[4],
+      paddingVertical: t.space[3],
+    },
+  });
+}
