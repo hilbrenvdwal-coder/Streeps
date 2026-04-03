@@ -1,17 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   Pressable,
-  Modal,
   TextInput,
   Image,
-  FlatList,
+  ScrollView,
   Alert,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  UIManager,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import type { Theme } from '@/src/theme';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const SPRING_LAYOUT = LayoutAnimation.create(
+  300,
+  LayoutAnimation.Types.easeInEaseOut,
+  LayoutAnimation.Properties.scaleXY,
+);
 
 interface Group {
   id: string;
@@ -28,220 +47,280 @@ interface Props {
   onCreate: (name: string) => Promise<any>;
   onJoin: (code: string) => Promise<any>;
   theme: Theme;
+  visible?: boolean;
+  onClose?: () => void;
+  hideBar?: boolean;
+  currentGroup?: { name: string; avatar_url?: string | null } | null;
+  activeCount?: number;
 }
 
-export default function GroupSelector({ groups, selectedId, onSelect, onCreate, onJoin, theme: t }: Props) {
-  const [open, setOpen] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
+export default function GroupSelector({
+  groups,
+  selectedId,
+  onSelect,
+  onCreate,
+  onJoin,
+  theme: t,
+  visible,
+  onClose,
+  hideBar,
+  currentGroup,
+  activeCount = 0,
+}: Props) {
+  const insets = useSafeAreaInsets();
+  const [showOpen, setShowOpen] = useState(false);
+
+  // Overlay animation
+  const scrimOpacity = useRef(new Animated.Value(0)).current;
+  const listAnim = useRef(new Animated.Value(0)).current;
+
+  // Inline create/join
+  const [inlineMode, setInlineMode] = useState<'none' | 'create' | 'join'>('none');
   const [newName, setNewName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
 
-  const selected = groups.find((g) => g.id === selectedId);
+  // Open overlay
+  useEffect(() => {
+    if (visible) {
+      setShowOpen(true);
+      setInlineMode('none');
+      scrimOpacity.setValue(0);
+      listAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(scrimOpacity, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.spring(listAnim, { toValue: 1, damping: 20, stiffness: 300, mass: 1, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const switchInlineMode = useCallback((mode: 'none' | 'create' | 'join') => {
+    LayoutAnimation.configureNext(SPRING_LAYOUT);
+    setInlineMode(mode);
+    if (mode !== 'none') {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } else {
+      setNewName('');
+      setJoinCode('');
+    }
+  }, []);
+
+  const handleClose = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(scrimOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(listAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+    ]).start(() => {
+      setInlineMode('none');
+      setNewName('');
+      setJoinCode('');
+      setShowOpen(false);
+      onClose?.();
+    });
+  }, [onClose]);
+
+  const handleSelect = useCallback((id: string) => {
+    onSelect(id);
+    handleClose();
+  }, [onSelect, handleClose]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     setSubmitting(true);
     const result = await onCreate(newName.trim());
     setSubmitting(false);
-    if (result && 'error' in result && result.error) {
-      Alert.alert('Fout', result.error as string);
-      return;
-    }
-    setShowCreate(false);
+    spinAnim.setValue(0);
+    if (result && 'error' in result && result.error) { Alert.alert('Fout', result.error as string); return; }
     setNewName('');
-    if (result && 'data' in result && result.data) {
-      onSelect(result.data.id);
-    }
+    setInlineMode('none');
+    if (result && 'data' in result && result.data) onSelect(result.data.id);
+    handleClose();
   };
 
   const handleJoin = async () => {
     if (!joinCode.trim()) return;
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     setSubmitting(true);
     const result = await onJoin(joinCode.trim());
     setSubmitting(false);
-    if (result.error) {
-      Alert.alert('Fout', result.error);
-    } else {
-      setShowJoin(false);
-      setJoinCode('');
-    }
+    spinAnim.setValue(0);
+    if (result.error) { Alert.alert('Fout', result.error); return; }
+    setJoinCode('');
+    setInlineMode('none');
+    handleClose();
   };
+
+  const otherGroups = groups.filter((g) => g.id !== selectedId);
+
+  const listStyle = {
+    opacity: listAnim,
+    transform: [{ translateY: listAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+  };
+
+  const isCreate = inlineMode === 'create';
+  const isJoin = inlineMode === 'join';
+  const isActive = inlineMode !== 'none';
 
   return (
     <>
-      {/* Selector bar */}
-      <Pressable
-        style={[styles.bar, { backgroundColor: t.colors.surface.raised }]}
-        onPress={() => setOpen(true)}
-      >
-        <Text style={[styles.barText, { color: selected ? t.colors.text.primary : t.colors.text.tertiary }]}>
-          {selected ? selected.name : 'Selecteer groep'}
-        </Text>
-        <Ionicons name="chevron-down" size={18} color={t.colors.text.tertiary} />
-      </Pressable>
+      {showOpen && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          {/* Frosted scrim */}
+          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]} pointerEvents="auto">
+            <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+            <View style={st.scrim} />
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} />
+          </Animated.View>
 
-      {/* Selection modal */}
-      <Modal visible={open} transparent animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-          <Pressable style={[styles.sheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[styles.handle, { backgroundColor: t.colors.border.strong }]} />
-            <Text style={[styles.sheetTitle, { color: t.colors.text.primary }]}>Kies groep</Text>
-
-            <FlatList
-              data={groups}
-              keyExtractor={(g) => g.id}
-              style={{ maxHeight: 300 }}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.groupRow,
-                    item.id === selectedId && { backgroundColor: t.brand.magenta + '12' },
-                  ]}
-                  onPress={() => { onSelect(item.id); setOpen(false); }}
-                >
-                  {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
-                  ) : (
-                    <View style={[styles.avatar, { backgroundColor: t.colors.surface.overlay }]}>
-                      <Text style={{ color: t.colors.text.secondary, fontSize: 16, fontWeight: '600' }}>
-                        {item.name[0]?.toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.groupName, { color: t.colors.text.primary }]}>{item.name}</Text>
-                    <Text style={{ color: t.colors.text.tertiary, fontSize: 12 }}>{item.member_count} leden</Text>
+          {/* Overlay card */}
+          <View style={[st.overlayCard, { top: insets.top + 13, marginHorizontal: 20 }]} pointerEvents="box-none">
+            {/* Header replica */}
+            <Pressable style={st.headerReplica} onPress={handleClose} pointerEvents="auto">
+              <View style={st.headerRow}>
+                {currentGroup?.avatar_url ? (
+                  <Image source={{ uri: currentGroup.avatar_url }} style={st.headerAvatar} />
+                ) : (
+                  <View style={[st.headerAvatar, st.headerAvatarFallback]}>
+                    <Text style={st.headerAvatarText}>{currentGroup?.name?.[0]?.toUpperCase() ?? '?'}</Text>
                   </View>
-                  {item.id === selectedId && (
-                    <Ionicons name="checkmark" size={20} color={t.brand.magenta} />
+                )}
+                <Text style={st.headerName} numberOfLines={1}>{currentGroup?.name ?? ''}</Text>
+                <Ionicons name="chevron-up" size={20} color="#848484" style={{ marginLeft: 8 }} />
+              </View>
+              <Text style={st.headerActive}>{activeCount} actief</Text>
+            </Pressable>
+
+            {/* Groups list */}
+            <Animated.View style={[st.groupsList, listStyle]} pointerEvents="auto">
+              <MaskedView
+                style={{ maxHeight: 300 }}
+                maskElement={
+                  <View style={{ flex: 1 }}>
+                    <LinearGradient colors={['transparent', '#000']} style={{ height: 20 }} />
+                    <View style={{ flex: 1, backgroundColor: '#000' }} />
+                    <LinearGradient colors={['#000', 'transparent']} style={{ height: 20 }} />
+                  </View>
+                }
+              >
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
+                  {otherGroups.map((group) => (
+                    <Pressable key={group.id} style={st.groupRow} onPress={() => handleSelect(group.id)}>
+                      {group.avatar_url ? (
+                        <Image source={{ uri: group.avatar_url }} style={st.groupAvatar} />
+                      ) : (
+                        <View style={[st.groupAvatar, st.groupAvatarFallback]}>
+                          <Text style={st.groupAvatarText}>{group.name[0]?.toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={st.groupName}>{group.name}</Text>
+                        <Text style={st.groupMeta}>{group.member_count} leden</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                  {otherGroups.length === 0 && (
+                    <Text style={st.emptyText}>Geen andere groepen</Text>
                   )}
-                </Pressable>
-              )}
-              ListEmptyComponent={
-                <Text style={{ color: t.colors.text.tertiary, textAlign: 'center', padding: 20 }}>
-                  Nog geen groepen
-                </Text>
-              }
-            />
+                </ScrollView>
+              </MaskedView>
 
-            {/* Actions */}
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: t.brand.magenta }]}
-                onPress={() => { setOpen(false); setShowCreate(true); }}
-              >
-                <Text style={styles.actionText}>+ Nieuwe groep</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: t.brand.cyan }]}
-                onPress={() => { setOpen(false); setShowJoin(true); }}
-              >
-                <Text style={[styles.actionText, { color: t.colors.text.inverse }]}>Deelnemen</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+              {/* ── Action row ── */}
+              <View style={st.actionRow}>
+                {/* Input field — always mounted, flex 0 or 1 */}
+                {isActive && (
+                  <View style={st.inlineInputWrap}>
+                    <TextInput
+                      ref={inputRef}
+                      style={st.inlineInput}
+                      placeholder={isCreate ? 'Groepsnaam' : 'Uitnodigingscode'}
+                      placeholderTextColor="#848484"
+                      value={isCreate ? newName : joinCode}
+                      onChangeText={isCreate ? setNewName : setJoinCode}
+                      autoCapitalize={isJoin ? 'none' : 'sentences'}
+                      returnKeyType="done"
+                      onSubmitEditing={isCreate ? handleCreate : handleJoin}
+                    />
+                  </View>
+                )}
 
-      {/* Create modal */}
-      <Modal visible={showCreate} transparent animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => { setShowCreate(false); setNewName(''); }}>
-          <Pressable style={[styles.sheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[styles.handle, { backgroundColor: t.colors.border.strong }]} />
-            <Text style={[styles.sheetTitle, { color: t.colors.text.primary }]}>Nieuwe groep</Text>
-            <View style={[styles.inputWrap, { backgroundColor: t.colors.surface.default }]}>
-              <TextInput
-                style={[styles.input, { color: t.colors.text.primary }]}
-                placeholder="Groepsnaam"
-                placeholderTextColor={t.colors.text.tertiary}
-                value={newName}
-                onChangeText={setNewName}
-                autoFocus
-              />
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable style={[styles.actionBtn, { backgroundColor: t.colors.surface.default }]} onPress={() => { setShowCreate(false); setNewName(''); }}>
-                <Text style={[styles.actionText, { color: t.colors.text.secondary }]}>Annuleren</Text>
-              </Pressable>
-              <Pressable style={[styles.actionBtn, { backgroundColor: t.brand.magenta }]} onPress={handleCreate} disabled={submitting}>
-                <Text style={styles.actionText}>{submitting ? 'Laden...' : 'Aanmaken'}</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+                {/* "Nieuwe groep" button — pill or circle */}
+                {(!isJoin) && (
+                  <Pressable
+                    style={isCreate
+                      ? [st.circleBtn, { backgroundColor: '#FF004D' }]
+                      : [st.actionBtn, { backgroundColor: '#FF004D' }]
+                    }
+                    onPress={isCreate ? handleCreate : () => switchInlineMode('create')}
+                    disabled={submitting && isCreate}
+                  >
+                    {isCreate ? (
+                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                        <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#FFFFFF" />
+                      </Animated.View>
+                    ) : (
+                      <Text style={st.actionText}>+ Nieuw</Text>
+                    )}
+                  </Pressable>
+                )}
 
-      {/* Join modal */}
-      <Modal visible={showJoin} transparent animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => { setShowJoin(false); setJoinCode(''); }}>
-          <Pressable style={[styles.sheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[styles.handle, { backgroundColor: t.colors.border.strong }]} />
-            <Text style={[styles.sheetTitle, { color: t.colors.text.primary }]}>Deelnemen aan groep</Text>
-            <View style={[styles.inputWrap, { backgroundColor: t.colors.surface.default }]}>
-              <TextInput
-                style={[styles.input, { color: t.colors.text.primary }]}
-                placeholder="Uitnodigingscode"
-                placeholderTextColor={t.colors.text.tertiary}
-                value={joinCode}
-                onChangeText={setJoinCode}
-                autoCapitalize="none"
-                autoFocus
-              />
-            </View>
-            <View style={styles.actionRow}>
-              <Pressable style={[styles.actionBtn, { backgroundColor: t.colors.surface.default }]} onPress={() => { setShowJoin(false); setJoinCode(''); }}>
-                <Text style={[styles.actionText, { color: t.colors.text.secondary }]}>Annuleren</Text>
-              </Pressable>
-              <Pressable style={[styles.actionBtn, { backgroundColor: t.brand.cyan }]} onPress={handleJoin} disabled={submitting}>
-                <Text style={[styles.actionText, { color: t.colors.text.inverse }]}>{submitting ? 'Laden...' : 'Deelnemen'}</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+                {/* "Deelnemen" button — pill or circle */}
+                {(!isCreate) && (
+                  <Pressable
+                    style={isJoin
+                      ? [st.circleBtn, { backgroundColor: '#00BEAE' }]
+                      : [st.actionBtn, { backgroundColor: '#00BEAE' }]
+                    }
+                    onPress={isJoin ? handleJoin : () => switchInlineMode('join')}
+                    disabled={submitting && isJoin}
+                  >
+                    {isJoin ? (
+                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                        <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#1A1A2E" />
+                      </Animated.View>
+                    ) : (
+                      <Text style={[st.actionText, { color: '#1A1A2E' }]}>Deelnemen</Text>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            </Animated.View>
+          </View>
+        </View>
+      )}
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    height: 50,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  barText: { fontSize: 16, fontWeight: '500' },
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  sheetTitle: { fontSize: 22, fontWeight: '600', marginBottom: 16 },
-  groupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  groupName: { fontSize: 16, fontWeight: '500' },
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
+const st = StyleSheet.create({
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
+  overlayCard: { position: 'absolute', left: 0, right: 0, zIndex: 10 },
+
+  // Header replica
+  headerReplica: { paddingHorizontal: 14 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerAvatar: { width: 66, height: 66, borderRadius: 33, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarFallback: { backgroundColor: '#F1F1F1' },
+  headerAvatarText: { color: '#333', fontSize: 24, fontWeight: '600' },
+  headerName: { fontFamily: 'Unbounded', fontSize: 32, fontWeight: '400', color: '#FFFFFF', flexShrink: 1 },
+  headerActive: { fontFamily: 'Unbounded', fontSize: 20, fontWeight: '400', color: '#FFFFFF', marginTop: 12, paddingLeft: 10 },
+
+  // Groups list
+  groupsList: { marginTop: 16, backgroundColor: 'rgba(78, 78, 78, 0.4)', borderRadius: 25, padding: 16, overflow: 'hidden' },
+  groupRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
+  groupAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  groupAvatarFallback: { backgroundColor: '#F1F1F1' },
+  groupAvatarText: { color: '#333', fontSize: 18, fontWeight: '600' },
+  groupName: { fontFamily: 'Unbounded', fontSize: 32, fontWeight: '400', color: '#FFFFFF' },
+  groupMeta: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 2 },
+  emptyText: { fontFamily: 'Unbounded', color: '#848484', textAlign: 'center', paddingVertical: 20, fontSize: 14 },
+
+  // Action row
+  actionRow: { flexDirection: 'row', gap: 12, marginTop: 8, alignItems: 'center' },
   actionBtn: {
     flex: 1,
     height: 48,
@@ -249,15 +328,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  inputWrap: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 8,
+  actionText: {
+    fontFamily: 'Unbounded',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  input: {
-    fontSize: 16,
-    paddingHorizontal: 16,
-    height: 52,
+
+  // Circle submit button
+  circleBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Inline input
+  inlineInputWrap: {
+    flex: 1,
+    height: 48,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(78, 78, 78, 0.4)',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  inlineInput: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#FFFFFF',
+    paddingHorizontal: 20,
+    height: 48,
   },
 });

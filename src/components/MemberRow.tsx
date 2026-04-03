@@ -35,7 +35,7 @@ export default function MemberRow({
         )}
         {isActive && (
           <View style={[styles.statusBadge, { backgroundColor: t.colors.surface.raised }]}>
-            <View style={[styles.statusDot, { backgroundColor: t.brand.cyan }]} />
+            <View style={[styles.statusDot, { backgroundColor: '#00FE96' }]} />
           </View>
         )}
       </View>
@@ -62,9 +62,9 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { position: 'relative', marginRight: 12 },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 9, height: 9, borderRadius: 4.5 },
   info: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '500' },
+  name: { fontFamily: 'Unbounded', fontSize: 20, fontWeight: '400', color: '#FFFFFF' },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,

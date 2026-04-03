@@ -1,96 +1,209 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useColorScheme } from '@/components/useColorScheme';
+import { AuroraPresetView, AURORA_COLORS } from '@/src/components/AuroraBackground';
+import CategoryRow from '@/src/components/CategoryRow';
+import CounterControl from '@/src/components/CounterControl';
+import GroupSelector from '@/src/components/GroupSelector';
+import SettingsOverlay from '@/src/components/SettingsOverlay';
+import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { supabase } from '@/src/lib/supabase';
+import { useGroupDetail } from '@/src/hooks/useGroupDetail';
+import { useGroups } from '@/src/hooks/useGroups';
+import { formatTimeAgo } from '@/src/hooks/useHistory';
+import { useSettlements } from '@/src/hooks/useSettlements';
+import { getTheme } from '@/src/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  Pressable,
-  ScrollView,
   ActivityIndicator,
   Alert,
-  Modal,
+  Animated,
+  Easing,
   Image,
+  LayoutAnimation,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
-import { Share } from 'react-native';
-import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, type Theme } from '@/src/theme';
-import { useGroups } from '@/src/hooks/useGroups';
-import { useGroupDetail } from '@/src/hooks/useGroupDetail';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { useSettlements } from '@/src/hooks/useSettlements';
-import { formatTimeAgo } from '@/src/hooks/useHistory';
-import GroupSelector from '@/src/components/GroupSelector';
-import CounterControl from '@/src/components/CounterControl';
-import CategoryRow from '@/src/components/CategoryRow';
-import MemberRow from '@/src/components/MemberRow';
-import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
+
+// ── SlideModal: frosted scrim + content slides ──
+function SlideModal({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
+  const [show, setShow] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const slideY = useRef(new Animated.Value(300)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setShow(true);
+      overlayOpacity.setValue(0);
+      slideY.setValue(300);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(slideY, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+    } else if (show) {
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+        Animated.timing(slideY, { toValue: 300, duration: 250, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]).start(() => setShow(false));
+    }
+  }, [visible]);
+
+  if (!show) return null;
+
+  return (
+    <Modal visible transparent animationType="none">
+      <Pressable style={{ flex: 1 }} onPress={onClose}>
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: overlayOpacity }]}>
+          <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+          <View style={styles.modalOverlay} />
+        </Animated.View>
+        <View style={{ flex: 1 }} />
+        <Animated.View style={{ transform: [{ translateY: slideY }] }}>
+          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            {children}
+          </Pressable>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(opacity, { toValue: 1, duration: 200, delay: index * 40, useNativeDriver: true }).start();
+  }, []);
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
+}
 
 const STORAGE_KEY = 'streeps_selected_group';
 
 export default function HomeScreen() {
   const mode = useColorScheme();
   const t = getTheme(mode);
-  const s = useMemo(() => createStyles(t), [mode]);
-  const router = useRouter();
+  const s = useMemo(() => styles, []);
+  const insets = useSafeAreaInsets();
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const { user } = useAuth();
-  const { groups, loading: groupsLoading, createGroup, joinGroup, refresh: refreshGroups } = useGroups();
+  const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
+  const { groups, loading: groupsLoading, createGroup, joinGroup } = useGroups();
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
-  // Persist selected group
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((id) => {
-      if (id) setSelectedGroupId(id);
-    });
+    AsyncStorage.getItem(STORAGE_KEY).then((id) => { if (id) setSelectedGroupId(id); });
   }, []);
 
   useEffect(() => {
-    if (selectedGroupId) {
-      AsyncStorage.setItem(STORAGE_KEY, selectedGroupId);
-    }
+    if (selectedGroupId) AsyncStorage.setItem(STORAGE_KEY, selectedGroupId);
   }, [selectedGroupId]);
 
-  // Auto-select first group if none selected
   useEffect(() => {
-    if (!selectedGroupId && groups.length > 0) {
-      setSelectedGroupId(groups[0].id);
-    }
+    if (!selectedGroupId && groups.length > 0) setSelectedGroupId(groups[0].id);
   }, [groups, selectedGroupId]);
 
   const {
-    group,
-    members,
-    drinks,
-    tallyCounts,
-    recentTallies,
-    loading: detailLoading,
-    isAdmin,
-    addTally,
-    toggleActive,
-    removeTally,
-    toggleAdmin,
-    removeMember,
+    group, members, drinks, tallyCounts, tallyCategoryCounts, recentTallies, credits,
+    loading: detailLoading, isAdmin, addTally, addTallyForMember, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
+    updateGroupPrices, updateGroupName, addDrink, removeDrink, deleteGroup, regenerateInviteCode, refresh: refreshGroup,
   } = useGroupDetail(selectedGroupId ?? '');
+
+  // Auto-activate user in selected group
+  const myMember = members.find((m) => m.user_id === user?.id);
+  useEffect(() => {
+    if (!user || !selectedGroupId || !myMember) return;
+    if (!myMember.is_active) activateMe();
+  }, [selectedGroupId, myMember?.is_active]);
 
   const { settling, getUnsettledTallies, createSettlement, fetchHistory, history } = useSettlements(selectedGroupId ?? '');
 
   // Tally flow state
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(1);
   const [tallyCount, setTallyCount] = useState(1);
   const [showVerification, setShowVerification] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [confirmationText, setConfirmationText] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Toast feedback
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    toastOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(3000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setToast(null));
+  };
+
+  // Content fade-in on data load
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (group) {
+      Animated.timing(contentOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    } else {
+      contentOpacity.setValue(0);
+    }
+  }, [!!group]);
+
+  // Reset opacity immediately when switching groups
+  useEffect(() => {
+    contentOpacity.setValue(0);
+  }, [selectedGroupId]);
 
   // Member detail modal
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [showDrinkList, setShowDrinkList] = useState(false);
+  const [showAllDrinks, setShowAllDrinks] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+
+  // Group selector modal
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Avatar preview
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
+  const avatarRef = useRef<View>(null);
+  const avatarPreviewAnim = useRef(new Animated.Value(0)).current;
+  const [avatarOrigin, setAvatarOrigin] = useState({ x: 0, y: 0, size: 66 });
+
+  const handleAvatarPress = () => {
+    avatarRef.current?.measureInWindow((x, y, w, h) => {
+      setAvatarOrigin({ x: x + w / 2, y: y + h / 2, size: w });
+      setShowAvatarPreview(true);
+      avatarPreviewAnim.setValue(0);
+      Animated.spring(avatarPreviewAnim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
+    });
+  };
+
+  const handleAvatarClose = () => {
+    Animated.timing(avatarPreviewAnim, { toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }).start(() => {
+      setShowAvatarPreview(false);
+    });
+  };
 
   // Settlement modals
   const [showSettlement, setShowSettlement] = useState(false);
@@ -98,14 +211,53 @@ export default function HomeScreen() {
   const [selectedForSettlement, setSelectedForSettlement] = useState<Set<string>>(new Set());
   const [showSettlementHistory, setShowSettlementHistory] = useState(false);
 
-  // Remove tally state for member detail
-  const [removeCategory, setRemoveCategory] = useState<number | null>(null);
-  const [removeCount, setRemoveCount] = useState(1);
+  // Remove tally state
+  // View profile state
+  const [sharedGroups, setSharedGroups] = useState<any[]>([]);
+  const [friendshipStatus, setFriendshipStatus] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const selectMember = useCallback((memberId: string | null) => {
+    setSharedGroups([]);
+    setFriendshipStatus(null);
+    setSelectedMemberId(memberId);
+  }, []);
+  const [memberAvatarOrigin, setMemberAvatarOrigin] = useState({ x: 0, y: 0, size: 45 });
+  const memberAvatarRefs = useRef<Record<string, View | null>>({}).current;
+
+  // Clear stale avatar refs when group changes
+  useEffect(() => {
+    Object.keys(memberAvatarRefs).forEach(k => delete memberAvatarRefs[k]);
+  }, [selectedGroupId]);
+
+  const profileAnim = useRef(new Animated.Value(0)).current;
+  const profileSwipeX = useRef(new Animated.Value(0)).current;
+  const closeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const profilePan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) => gs.dx > 10 && gs.moveX < 40 && Math.abs(gs.dy) < 20,
+      onPanResponderMove: (_, gs) => { if (gs.dx > 0) profileSwipeX.setValue(gs.dx); },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx > 80) {
+          closeProfile();
+        } else {
+          Animated.spring(profileSwipeX, { toValue: 0, damping: 20, stiffness: 300, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   const activeCategories = useMemo(() => {
     const catsWithDrinks = new Set(drinks.map((d) => d.category));
     return ([1, 2, 3, 4] as const).filter((cat) => catsWithDrinks.has(cat));
   }, [drinks]);
+
+  // Auto-select first active category when categories load or selected one disappears
+  useEffect(() => {
+    if (activeCategories.length > 0 && (selectedCategory === null || !activeCategories.includes(selectedCategory as any))) {
+      setSelectedCategory(activeCategories[0]);
+    }
+  }, [activeCategories]);
 
   const getCategoryName = (cat: number) => {
     if (!group) return `Categorie ${cat}`;
@@ -130,53 +282,101 @@ export default function HomeScreen() {
   };
 
   const handleCategoryTap = (cat: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(cat);
-    setTallyCount(1);
-    setShowVerification(true);
   };
 
   const handleConfirmTally = async () => {
-    if (!selectedCategory || tallyCount < 1) {
-      setShowVerification(false);
-      return;
-    }
+    if (!selectedCategory || tallyCount < 1) { setShowVerification(false); return; }
+    const count = tallyCount;
+    const catName = getCategoryName(selectedCategory);
     setShowVerification(false);
     setAdding(true);
-    const inserts = Array.from({ length: tallyCount }, () => addTally(selectedCategory as 1 | 2 | 3 | 4));
-    await Promise.all(inserts);
+    try {
+      await addTally(selectedCategory as 1 | 2 | 3 | 4, count);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${count}× ${catName} toegevoegd`);
+      setTallyCount(1);
+    } catch {
+      showToast('Kon streepje niet opslaan, probeer opnieuw', 'error');
+    }
     setAdding(false);
-    setConfirmationText(tallyCount === 1 ? 'Streepje gezet!' : `${tallyCount} streepjes gezet!`);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowConfirmation(true);
-    setTimeout(() => setShowConfirmation(false), 2000);
-    setSelectedCategory(null);
   };
 
-  // Member detail data
+  const handleCounterSubmit = () => {
+    if (!selectedCategory || tallyCount < 1) return;
+    setShowVerification(true);
+  };
+
   const selectedMemberData = useMemo(() => {
     if (!selectedMemberId) return null;
     const member = members.find((m) => m.user_id === selectedMemberId);
     if (!member) return null;
-    const tallies = recentTallies.filter((t) => t.user_id === selectedMemberId);
+    const tallies = recentTallies.filter((tt) => tt.user_id === selectedMemberId);
     const categoryCounts: Record<number, number> = {};
-    tallies.forEach((t) => {
-      const cat = (t as any).category ?? 1;
-      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-    });
+    tallies.forEach((tt) => { const cat = (tt as any).category ?? 1; categoryCounts[cat] = (categoryCounts[cat] || 0) + 1; });
     return { member, tallies, categoryCounts };
   }, [selectedMemberId, members, recentTallies]);
 
-  const removableTallies = useMemo(() => {
-    if (!selectedMemberData || !removeCategory) return [];
-    return selectedMemberData.tallies.filter((t) => (t as any).category === removeCategory);
-  }, [selectedMemberData, removeCategory]);
+  // Fetch shared groups and friendship when member selected
+  useEffect(() => {
+    // Clear stale data immediately on any member change
+    setSharedGroups([]);
+    setFriendshipStatus(null);
 
-  const handleConfirmRemove = async () => {
-    if (!removeCategory || removeCount < 1) { setRemoveCategory(null); return; }
-    const toRemove = removableTallies.slice(0, removeCount);
-    await Promise.all(toRemove.map((t) => removeTally(t.id)));
-    setRemoveCategory(null);
+    if (!selectedMemberId || !user || selectedMemberId === user.id) return;
+
+    let cancelled = false;
+
+    // Shared groups
+    supabase.from('group_members').select('group_id').eq('user_id', selectedMemberId)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const theirGroupIds = data.map((d: any) => d.group_id);
+        setSharedGroups(groups.filter((g) => theirGroupIds.includes(g.id)));
+      });
+    // Friendship status
+    supabase.from('friendships').select('*')
+      .or(`and(user_id.eq.${user.id},friend_id.eq.${selectedMemberId}),and(user_id.eq.${selectedMemberId},friend_id.eq.${user.id})`)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setFriendshipStatus(data?.status ?? null);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedMemberId]);
+
+  const handleAddFriend = async () => {
+    if (!user || !selectedMemberId) return;
+    await supabase.from('friendships').insert({ user_id: user.id, friend_id: selectedMemberId });
+    setFriendshipStatus('pending');
   };
+
+  // Open/close profile with animation
+  useEffect(() => {
+    if (selectedMemberData) {
+      setShowProfile(true);
+      profileAnim.setValue(0);
+      profileSwipeX.setValue(0);
+      Animated.spring(profileAnim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
+    }
+  }, [selectedMemberId]);
+
+  const closeProfile = useCallback(() => {
+    const anim = Animated.parallel([
+      Animated.timing(profileAnim, { toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(profileSwipeX, { toValue: SCREEN_W, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+    ]);
+    closeAnimRef.current = anim;
+    anim.start(({ finished }) => {
+      closeAnimRef.current = null;
+      if (finished) {
+        setShowProfile(false);
+        setSelectedMemberId(null);
+      }
+    });
+  }, []);
 
   const handleOpenSettlement = async () => {
     if (!group) return;
@@ -197,613 +397,952 @@ export default function HomeScreen() {
     setTimeout(() => setShowConfirmation(false), 2000);
   };
 
-  const me = members.find((m) => m.user_id === user?.id);
+  // ════════════════════════════════════════════════════════════
+  // RENDER — pixel-exact from Home_fixed_v3.svg
+  // ════════════════════════════════════════════════════════════
 
   if (groupsLoading) {
     return (
-      <SafeAreaView style={[s.container, s.center]} edges={['top']}>
-        <ActivityIndicator size="large" color={t.brand.magenta} />
-      </SafeAreaView>
+      <View style={[s.container, s.center]}>
+        <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
+        <ActivityIndicator size="large" color="#FF0085" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <ScrollView contentContainerStyle={s.content}>
-        {/* Group Selector */}
-        <GroupSelector
-          groups={groups}
-          selectedId={selectedGroupId}
-          onSelect={setSelectedGroupId}
-          onCreate={createGroup}
-          onJoin={joinGroup}
-          theme={t}
-        />
+    <View style={s.container}>
+      <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
-        {/* Show group content only when group is selected and loaded */}
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={s.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => { setRefreshing(true); await refreshGroup(); setRefreshing(false); }}
+            tintColor="#FFFFFF"
+            colors={['#FFFFFF']}
+          />
+        }
+      >
+
+        {/* Status bar spacer */}
+        <View style={{ height: insets.top }} />
+
+        {/* Header aurora — scrolls with content, behind everything */}
+        <View style={[s.headerAurora, { top: 0 }]} pointerEvents="none">
+          <AuroraPresetView preset="header" animated />
+        </View>
+
         {selectedGroupId && group ? (
-          <>
-            {/* Group card */}
-            <View style={s.groupCard}>
-              {(group as any)?.avatar_url ? (
-                <Image source={{ uri: (group as any).avatar_url }} style={s.groupAvatar} />
-              ) : (
-                <View style={[s.groupAvatar, { backgroundColor: t.colors.surface.overlay }]}>
-                  <Text style={{ color: t.colors.text.secondary, fontSize: 20, fontWeight: '600' }}>
-                    {group?.name?.[0]?.toUpperCase() ?? '?'}
-                  </Text>
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={[s.groupName, { color: t.colors.text.primary }]}>{group.name}</Text>
-                <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
-                  <Text style={{ color: t.colors.text.tertiary, fontSize: 14 }}>
-                    {members.filter((m) => m.is_active).length} actief
-                  </Text>
-                  <Text style={{ color: t.colors.text.tertiary, fontSize: 14 }}>
-                    {members.length} leden
-                  </Text>
-                </View>
-              </View>
+          <Animated.View style={{ opacity: contentOpacity }}>
+            {/* ── Group Header ── SVG: Groepheader + Group 13 (expand icon) */}
+            <View style={s.groupHeader}>
+              <Pressable style={s.groupTopRow} onPress={() => setShowGroupSelector(true)}>
+                <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined}>
+                  <View ref={avatarRef} collapsable={false}>
+                    {(group as any)?.avatar_url ? (
+                      <Image source={{ uri: (group as any).avatar_url }} style={s.avatar} />
+                    ) : (
+                      <View style={[s.avatar, s.avatarFallback]}>
+                        <Text style={s.avatarText}>{group.name?.[0]?.toUpperCase() ?? '?'}</Text>
+                      </View>
+                    )}
+                  </View>
+                </Pressable>
+                <Text style={s.groupName} numberOfLines={1}>{group.name}</Text>
+              </Pressable>
+              {/* SVG Group 13: radial glow + up/down arrows — positioned right */}
+              <Pressable onPress={() => setShowGroupSelector(true)} hitSlop={12} style={s.expandBtn}>
+                <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
+                  <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
+                  <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
+                </Svg>
+              </Pressable>
+              <Text style={s.activeCount}>
+                {members.filter((m) => m.is_active).length} actief
+              </Text>
             </View>
 
-            {/* Active toggle */}
-            <Pressable
-              style={[s.activeToggle, { backgroundColor: me?.is_active ? t.brand.cyan + '20' : t.colors.surface.overlay }]}
-              onPress={toggleActive}
-            >
-              <View style={[s.activeDot, { backgroundColor: me?.is_active ? t.brand.cyan : t.colors.text.tertiary }]} />
-              <Text style={{ color: me?.is_active ? t.brand.cyan : t.colors.text.tertiary, fontSize: 16, fontWeight: '500' }}>
-                {me?.is_active ? 'Aanwezig' : 'Afwezig'}
-              </Text>
-            </Pressable>
-
-            {/* Counter */}
-            <View style={s.section}>
+            {/* ── Counter ── SVG node Counter: minus(19,190) display(158,190) plus(245,190) */}
+            <View style={s.counterWrap}>
               <CounterControl
                 value={tallyCount}
-                onIncrement={() => setTallyCount((c) => Math.min(c + 1, 99))}
-                onDecrement={() => setTallyCount((c) => Math.max(c - 1, 1))}
-                theme={t}
+                onIncrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
+                onDecrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 1)); }}
+                onSubmit={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+                auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
               />
+              {selectedCategory && credits[selectedCategory] > 0 && (
+                <View style={s.creditBadge}>
+                  <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
+                </View>
+              )}
+              {tallyCount > 1 && (
+                <Text style={s.submitHint}>Tik om te bevestigen</Text>
+              )}
             </View>
 
-            {/* Category rows */}
-            <View style={s.section}>
+            {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
+            <View style={s.categories}>
               {activeCategories.map((cat) => (
                 <CategoryRow
                   key={cat}
                   name={getCategoryName(cat)}
                   price={getCategoryPrice(cat)}
                   color={t.categoryColors[(cat - 1) % 4]}
+                  categoryIndex={cat}
                   selected={selectedCategory === cat}
                   onPress={() => handleCategoryTap(cat)}
-                  theme={t}
                 />
               ))}
             </View>
 
-            {/* Info section */}
-            <View style={s.section}>
-              <Text style={[s.sectionTitle, { color: t.colors.text.primary }]}>Info</Text>
-
-              {/* Invite code */}
-              {group && (
-                <Pressable
-                  style={[s.infoCard, { backgroundColor: t.colors.surface.raised }]}
-                  onPress={async () => {
-                    await Clipboard.setStringAsync(group.invite_code);
-                    setConfirmationText('Gekopieerd!');
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    setShowConfirmation(true);
-                    setTimeout(() => setShowConfirmation(false), 1500);
-                  }}
-                >
-                  <Text style={{ color: t.colors.text.tertiary, fontSize: 12 }}>Uitnodigingscode:</Text>
-                  <Text style={{ color: t.colors.text.primary, fontSize: 18, fontWeight: '700', letterSpacing: 2 }}>
-                    {group.invite_code}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-                    <Text style={{ color: t.colors.text.tertiary, fontSize: 11, textTransform: 'uppercase' }}>
-                      tap om te kopiëren
-                    </Text>
-                    <Pressable onPress={async (e) => {
-                      e.stopPropagation();
-                      await Share.share({ message: `Join mijn groep "${group.name}" op Streeps! Code: ${group.invite_code}` });
-                    }}>
-                      <Text style={{ color: t.colors.tint, fontSize: 11, textTransform: 'uppercase' }}>delen</Text>
-                    </Pressable>
-                  </View>
-                </Pressable>
-              )}
-
-              {/* Drink list button */}
-              <Pressable
-                style={[s.infoCard, { backgroundColor: t.colors.surface.raised, marginTop: 8 }]}
-                onPress={() => setShowDrinkList(true)}
-              >
-                <Text style={{ color: t.colors.text.primary, fontSize: 16, fontWeight: '500' }}>Drankenlijst</Text>
-                <Ionicons name="chevron-forward" size={16} color={t.colors.text.tertiary} />
-              </Pressable>
-            </View>
-
-            {/* Members */}
-            <View style={s.section}>
-              <Text style={[s.sectionTitle, { color: t.colors.text.primary }]}>Leden</Text>
-              <View style={[s.membersCard, { backgroundColor: t.colors.surface.raised }]}>
-                {members.slice(0, showMembers ? members.length : 3).map((member, index) => {
-                  const name = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
+            {/* ── Leden ── */}
+            <View style={s.ledenSection}>
+              <View style={[s.auroraFull, { top: 0 }]} pointerEvents="none">
+                <AuroraPresetView preset="leden" animated gentle />
+              </View>
+              <View style={s.ledenHeader}>
+                <Text style={s.ledenTitle}>Leden</Text>
+                <Text style={s.ledenCount}>{members.length} leden</Text>
+              </View>
+              <View key={selectedGroupId} style={s.ledenList}>
+                {members.slice(0, showMembers ? members.length : 4).map((member, i) => {
+                  const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
                   return (
-                    <React.Fragment key={member.id}>
-                      {index > 0 && <View style={[s.divider, { backgroundColor: t.colors.border.default }]} />}
-                      <MemberRow
-                        name={name}
-                        avatarUrl={member.profile?.avatar_url}
-                        isActive={member.is_active}
-                        isAdmin={member.is_admin}
-                        tallyCount={tallyCounts[member.user_id] ?? 0}
-                        theme={t}
-                        onPress={() => setSelectedMemberId(member.user_id)}
-                      />
-                    </React.Fragment>
+                    <StaggerItem key={member.id} index={i}>
+                    <Pressable style={s.lidRow} onPress={() => {
+                      if (closeAnimRef.current) {
+                        closeAnimRef.current.stop();
+                        closeAnimRef.current = null;
+                      }
+                      const ref = memberAvatarRefs[member.user_id];
+                      if (ref) {
+                        ref.measureInWindow((x, y, w, h) => {
+                          setMemberAvatarOrigin({ x: x + w / 2, y: y + h / 2, size: w });
+                          selectMember(member.user_id);
+                        });
+                      } else {
+                        selectMember(member.user_id);
+                      }
+                    }}>
+                      <View ref={(r) => { memberAvatarRefs[member.user_id] = r; }} collapsable={false} style={s.lidAvatarWrap}>
+                        {member.profile?.avatar_url ? (
+                          <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} />
+                        ) : (
+                          <View style={[s.lidAvatar, s.lidAvatarFallback]}>
+                            <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
+                          </View>
+                        )}
+                        {member.is_active && (
+                          <View style={s.onlineBadge}>
+                            <View style={s.onlineDot} />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={s.lidName}>{mName}</Text>
+                      {member.is_admin && <Ionicons name="shield" size={14} color="#00BEAE" style={{ marginLeft: 6 }} />}
+                    </Pressable>
+                    </StaggerItem>
                   );
                 })}
               </View>
-              {members.length > 3 && (
-                <Pressable onPress={() => setShowMembers(!showMembers)} style={{ paddingVertical: 12 }}>
-                  <Text style={{ color: t.colors.text.tertiary, fontSize: 14, textAlign: 'center' }}>
-                    {showMembers ? 'Minder tonen' : `Bekijk meer (${members.length - 3})`}
-                  </Text>
+              {members.length > 4 && (
+                <Pressable onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowMembers(!showMembers); }} style={s.bekijkMeer}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={s.bekijkMeerText}>
+                      {showMembers ? 'Minder tonen' : 'Meer tonen'}
+                    </Text>
+                    <Ionicons name={showMembers ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
+                  </View>
                 </Pressable>
               )}
             </View>
 
-            {/* Admin actions */}
+            {/* ── Drankenlijst ── */}
+            {drinks.length === 0 && isAdmin && (
+              <Pressable style={s.emptyState} onPress={() => setShowSettings(true)}>
+                <Text style={s.emptyStateText}>Nog geen drankjes — tik om toe te voegen</Text>
+              </Pressable>
+            )}
+            {drinks.length > 0 && (
+              <View style={s.drankenlijstSection}>
+                <View style={s.auroraFull} pointerEvents="none">
+                  <AuroraPresetView preset="drankenlijst" animated gentle />
+                </View>
+                <View style={s.drankenlijstHeader}>
+                  <Text style={s.drankenlijstTitle}>Drankenlijst</Text>
+                  <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
+                </View>
+                <View style={s.drankenlijstList}>
+                  {drinks.slice(0, showAllDrinks ? drinks.length : 4).map((drink, i) => {
+                    const catColor = t.categoryColors[(drink.category - 1) % 4];
+                    return (
+                      <StaggerItem key={drink.id} index={i}>
+                        <View style={s.drinkRow}>
+                          <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
+                          <Text style={s.drinkName}>{drink.name}</Text>
+                          <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                            <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                          </View>
+                        </View>
+                      </StaggerItem>
+                    );
+                  })}
+                </View>
+                {drinks.length > 4 && (
+                  <Pressable onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowAllDrinks(!showAllDrinks); }} style={s.bekijkMeer}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={s.bekijkMeerText}>
+                        {showAllDrinks ? 'Minder tonen' : 'Meer tonen'}
+                      </Text>
+                      <Ionicons name={showAllDrinks ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
+                    </View>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* ── Admin actions ── */}
             {isAdmin && (
-              <View style={s.section}>
-                <Pressable
-                  style={[s.adminBtn, { backgroundColor: t.brand.cyan }]}
-                  onPress={handleOpenSettlement}
-                  disabled={settling}
-                >
-                  <Text style={{ color: t.colors.text.inverse, fontSize: 16, fontWeight: '700' }}>
-                    {settling ? 'Bezig...' : 'Afrekenen'}
-                  </Text>
+              <View style={s.adminSection}>
+                <Pressable style={s.adminBtn} onPress={handleOpenSettlement} disabled={settling}>
+                  <Text style={s.adminBtnText}>{settling ? 'Bezig...' : 'Afrekenen'}</Text>
                 </Pressable>
-                <Pressable
-                  style={[s.ghostBtn, { borderColor: t.colors.border.default }]}
-                  onPress={async () => { await fetchHistory(); setShowSettlementHistory(true); }}
-                >
-                  <Text style={{ color: t.colors.text.secondary, fontSize: 16, fontWeight: '500' }}>
-                    Afrekening historie
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[s.ghostBtn, { borderColor: t.colors.border.default }]}
-                  onPress={() => router.push(`/groups/settings?id=${selectedGroupId}` as any)}
-                >
-                  <Text style={{ color: t.colors.text.secondary, fontSize: 16, fontWeight: '500' }}>
-                    Groep instellingen
-                  </Text>
+                <Pressable style={s.ghostBtn} onPress={async () => { await fetchHistory(); setShowSettlementHistory(true); }}>
+                  <Text style={s.ghostBtnText}>Afrekening historie</Text>
                 </Pressable>
               </View>
             )}
 
-            <View style={{ height: 40 }} />
-          </>
+            {/* ── Meer opties (progressive disclosure) ── */}
+            <Pressable onPress={() => { LayoutAnimation.configureNext({ duration: 300, create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity }, update: { type: LayoutAnimation.Types.easeInEaseOut }, delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity } }); setShowMoreOptions(!showMoreOptions); if (!showMoreOptions) setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }} style={s.moreOptionsToggle}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={s.moreOptionsText}>Meer opties</Text>
+                <Ionicons name={showMoreOptions ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
+              </View>
+            </Pressable>
+            {showMoreOptions && (
+              <>
+                {isAdmin && (
+                  <Pressable
+                    style={s.settingsBtn}
+                    onPress={() => setShowSettings(true)}
+                  >
+                    <Text style={s.settingsBtnText}>Instellingen</Text>
+                  </Pressable>
+                )}
+                <Pressable
+                  style={s.leaveBtn}
+                  onPress={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [
+                    { text: 'Annuleren', style: 'cancel' },
+                    { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } },
+                  ])}
+                >
+                  <Text style={s.leaveBtnText}>Uitstappen</Text>
+                </Pressable>
+              </>
+            )}
+
+            <View style={{ height: 90 + insets.bottom }} />
+          </Animated.View>
         ) : selectedGroupId && detailLoading ? (
-          <View style={s.center}>
-            <ActivityIndicator size="large" color={t.brand.magenta} />
+          <View style={[s.center, { paddingTop: 80 }]}>
+            <ActivityIndicator size="large" color="#FF0085" />
           </View>
         ) : !selectedGroupId ? (
-          <View style={[s.center, { paddingTop: 80 }]}>
-            <Text style={{ color: t.colors.text.primary, fontSize: 22, fontWeight: '600', marginBottom: 8 }}>
-              Welkom bij Streeps!
-            </Text>
-            <Text style={{ color: t.colors.text.tertiary, fontSize: 16, textAlign: 'center' }}>
-              Maak een groep aan of neem deel via de selector hierboven.
-            </Text>
+          <View style={s.welcomeWrap}>
+            <Text style={s.welcomeTitle}>Welkom.</Text>
+            <Text style={s.welcomeSub}>Klaar om gas te geven?</Text>
+            <View style={s.welcomeActions}>
+              <Pressable style={s.welcomeBtn} onPress={() => { setShowGroupSelector(true); /* will trigger create */ }}>
+                <Text style={s.welcomeBtnText}>+ Nieuwe groep</Text>
+              </Pressable>
+              <Pressable style={s.welcomeBtnOutline} onPress={() => { setShowGroupSelector(true); /* will trigger join */ }}>
+                <Text style={s.welcomeBtnOutlineText}>Deelnemen</Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
       </ScrollView>
 
-      {/* Confirmation toast */}
-      {showConfirmation && (
-        <View style={s.toast}>
-          <Text style={s.toastIcon}>{confirmationText.includes('Gekopieerd') ? '\u2705' : '\u2728'}</Text>
-          <Text style={s.toastText}>{confirmationText}</Text>
+      {/* ── Avatar preview overlay ── */}
+      {showAvatarPreview && group && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: avatarPreviewAnim }]} pointerEvents="auto">
+            <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+            <View style={s.avatarPreviewScrim} />
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={handleAvatarClose} />
+          </Animated.View>
+          <Animated.View
+            style={[s.avatarPreviewWrap, {
+              top: SCREEN_H / 2 - 100,
+              left: SCREEN_W / 2 - 100,
+              opacity: avatarPreviewAnim,
+              transform: [
+                { translateX: avatarPreviewAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [avatarOrigin.x - SCREEN_W / 2, 0],
+                })},
+                { translateY: avatarPreviewAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [avatarOrigin.y - SCREEN_H / 2, 0],
+                })},
+                { scale: avatarPreviewAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [avatarOrigin.size / 200, 1],
+                })},
+              ],
+            }]}
+            pointerEvents="none"
+          >
+            {(group as any)?.avatar_url ? (
+              <Image source={{ uri: (group as any).avatar_url }} style={s.avatarPreviewImg} />
+            ) : (
+              <View style={[s.avatarPreviewImg, s.avatarFallback]}>
+                <Text style={s.avatarPreviewText}>{group.name?.[0]?.toUpperCase() ?? '?'}</Text>
+              </View>
+            )}
+          </Animated.View>
         </View>
       )}
 
-      {/* Streepjes Verificatie Modal */}
+      {/* ── Group Selector (modal only, no bar) ── */}
+      <GroupSelector
+        groups={groups}
+        selectedId={selectedGroupId}
+        onSelect={setSelectedGroupId}
+        onCreate={createGroup}
+        onJoin={joinGroup}
+        theme={t}
+        hideBar
+        visible={showGroupSelector}
+        onClose={() => setShowGroupSelector(false)}
+        currentGroup={group}
+        activeCount={members.filter((m) => m.is_active).length}
+      />
+
+      {/* ── Settings overlay ── */}
+      {selectedGroupId && group && (
+        <SettingsOverlay
+          visible={showSettings}
+          onClose={() => setShowSettings(false)}
+          group={group}
+          groupId={selectedGroupId}
+          members={members}
+          drinks={drinks}
+          currentUserId={user?.id}
+          theme={t}
+          categoryColors={t.categoryColors}
+          updateGroupPrices={updateGroupPrices}
+          updateGroupName={updateGroupName}
+          addDrink={addDrink}
+          removeDrink={removeDrink}
+          toggleAdmin={toggleAdmin}
+          removeMember={removeMember}
+          regenerateInviteCode={regenerateInviteCode}
+          deleteGroup={async () => { await deleteGroup(); setSelectedGroupId(null); }}
+          leaveGroup={async () => { await leaveGroup(); setSelectedGroupId(null); }}
+          removeOwnAdmin={removeOwnAdmin}
+          isAdmin={isAdmin}
+          refresh={refreshGroup}
+          tallyCounts={tallyCategoryCounts}
+          recentTallies={recentTallies}
+          addTally={addTallyForMember}
+          removeTally={removeTally}
+          activeCategories={activeCategories as number[]}
+          getCategoryName={getCategoryName}
+        />
+      )}
+
+
+      {/* ── Toast ── */}
+      {toast && (
+        <Animated.View style={[s.toast, { bottom: 90 + insets.bottom, opacity: toastOpacity, backgroundColor: toast.type === 'error' ? '#EB5466' : '#00BEAE' }]}>
+          <Ionicons name={toast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} size={20} color="#0F0F1E" />
+          <Text style={s.toastText}>{toast.message}</Text>
+        </Animated.View>
+      )}
+
+      {/* ── Verificatie Modal ── */}
       <StreepjesVerificatieModal
         visible={showVerification}
         count={tallyCount}
         categoryName={selectedCategory ? getCategoryName(selectedCategory) : ''}
-        categoryColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : t.brand.cyan}
+        categoryColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : '#00BEAE'}
+        credit={selectedCategory ? (credits[selectedCategory] || 0) : 0}
         onConfirm={handleConfirmTally}
         onCancel={() => setShowVerification(false)}
-        theme={t}
       />
 
-      {/* Drink list modal */}
-      <Modal visible={showDrinkList} transparent animationType="slide">
-        <Pressable style={s.modalOverlay} onPress={() => setShowDrinkList(false)}>
-          <Pressable style={[s.modalSheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[s.modalHandle, { backgroundColor: t.colors.border.strong }]} />
-            <Text style={{ ...t.typography.heading2, color: t.colors.text.primary, marginBottom: 16 }}>Drankjeslijst</Text>
-            {drinks.length === 0 && <Text style={{ color: t.colors.text.secondary }}>Geen drankjes toegevoegd</Text>}
-            {drinks.map((drink) => {
-              const catColor = t.categoryColors[(drink.category - 1) % 4];
-              return (
-                <View key={drink.id} style={s.drinkRow}>
-                  <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
-                  <Text style={{ color: t.colors.text.primary, flex: 1, fontSize: 16 }}>{drink.name}</Text>
-                  <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
-                    <Text style={{ color: catColor, fontSize: 12 }}>cat. {drink.category}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* ── View Profile overlay ── */}
+      {showProfile && selectedMemberData && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none" {...profilePan.panHandlers}>
+          {/* Frosted scrim with fade */}
+          <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: profileAnim }]} pointerEvents="auto">
+            <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+            <View style={s.profileScrim} />
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={closeProfile} />
+          </Animated.View>
 
-      {/* Member detail modal */}
-      <Modal visible={!!selectedMemberData} transparent animationType="slide">
-        <Pressable style={s.modalOverlay} onPress={() => setSelectedMemberId(null)}>
-          <Pressable style={[s.modalSheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[s.modalHandle, { backgroundColor: t.colors.border.strong }]} />
-            {selectedMemberData && (
-              <ScrollView style={{ maxHeight: 500 }}>
-                <Text style={{ ...t.typography.heading2, color: t.colors.text.primary, marginBottom: 16 }}>
-                  {selectedMemberData.member.user_id === user?.id
-                    ? 'Jij'
-                    : (selectedMemberData.member.profile?.full_name || 'Onbekend')}
-                  {selectedMemberData.member.is_admin && ' (admin)'}
-                </Text>
+          {/* Content slides in from right + follows swipe */}
+          <Animated.View
+            style={[s.profileContent, {
+              opacity: profileAnim,
+              transform: [
+                { translateX: Animated.add(
+                  profileSwipeX,
+                  profileAnim.interpolate({ inputRange: [0, 1], outputRange: [60, 0] })
+                )},
+              ],
+            }]}
+            pointerEvents="box-none"
+          >
+            {/* Back button */}
+            <Pressable style={[s.profileBackBtn, { top: insets.top + 8 }]} onPress={closeProfile} pointerEvents="auto">
+              <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+            </Pressable>
 
-                <Text style={{ ...t.typography.overline, color: t.colors.text.tertiary, marginBottom: 12 }}>STREEPJES</Text>
-                {activeCategories.map((cat) => {
-                  const count = selectedMemberData.categoryCounts[cat] || 0;
-                  const catColor = t.categoryColors[(cat - 1) % 4];
-                  const isRemoving = removeCategory === cat;
-                  return (
-                    <View key={cat} style={{ marginBottom: 8 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={[s.catDot, { backgroundColor: catColor }]} />
-                        <Text style={{ color: catColor, flex: 1, fontSize: 16 }}>{getCategoryName(cat)}</Text>
-                        <Text style={{ color: t.colors.text.primary, fontWeight: '600', marginRight: 12 }}>{count}</Text>
-                        {isAdmin && count > 0 && !isRemoving && (
-                          <Pressable onPress={() => { setRemoveCount(1); setRemoveCategory(cat); }} style={{ padding: 4 }}>
-                            <Text style={{ color: t.semantic.error, fontSize: 12 }}>verwijder</Text>
-                          </Pressable>
-                        )}
-                      </View>
-                      {isRemoving && (
-                        <View style={[s.removePanel, { backgroundColor: t.colors.surface.default, borderColor: t.colors.border.default }]}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                            <Pressable
-                              style={[s.counterBtnSm, { backgroundColor: t.semantic.errorBg }]}
-                              onPress={() => { removeCount <= 1 ? setRemoveCategory(null) : setRemoveCount((c) => c - 1); }}
-                            >
-                              <Text style={{ color: t.semantic.error, fontSize: 18, fontWeight: '600' }}>{'\u2212'}</Text>
-                            </Pressable>
-                            <Text style={{ color: t.colors.text.primary, fontSize: 28, fontWeight: '700', minWidth: 40, textAlign: 'center' }}>{removeCount}</Text>
-                            <Pressable
-                              style={[s.counterBtnSm, { backgroundColor: t.brand.cyan + '20' }]}
-                              onPress={() => setRemoveCount((c) => Math.min(c + 1, removableTallies.length))}
-                            >
-                              <Text style={{ color: t.brand.cyan, fontSize: 18, fontWeight: '600' }}>+</Text>
-                            </Pressable>
-                          </View>
-                          <Pressable style={[s.removeConfirmBtn, { backgroundColor: t.semantic.error }]} onPress={handleConfirmRemove}>
-                            <Text style={{ color: '#fff', fontWeight: '600' }}>Verwijderen</Text>
-                          </Pressable>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-
-                {/* Tally history */}
-                <Text style={{ ...t.typography.overline, color: t.colors.text.tertiary, marginTop: 16, marginBottom: 12 }}>GESCHIEDENIS</Text>
-                {selectedMemberData.tallies.length === 0 && <Text style={{ color: t.colors.text.secondary }}>Geen streepjes</Text>}
-                {selectedMemberData.tallies.map((tally, index) => {
-                  const cat = (tally as any).category ?? 1;
-                  const catColor = t.categoryColors[(cat - 1) % 4];
-                  return (
-                    <React.Fragment key={tally.id}>
-                      {index > 0 && <View style={{ height: 1, backgroundColor: t.colors.border.default, marginLeft: 22 }} />}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }}>
-                        <View style={[s.catDot, { backgroundColor: catColor }]} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: t.colors.text.primary, fontSize: 14 }}>{getCategoryName(cat)}</Text>
-                          <Text style={{ color: t.colors.text.tertiary, fontSize: 12 }}>{formatTimeAgo(tally.created_at)}</Text>
-                        </View>
-                      </View>
-                    </React.Fragment>
-                  );
-                })}
-
-                {/* Admin actions */}
-                {isAdmin && selectedMemberData.member.user_id !== user?.id && (
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                    <Pressable
-                      style={[s.memberActionBtn, { backgroundColor: t.brand.cyan + '20' }]}
-                      onPress={() => {
-                        const m = selectedMemberData.member;
-                        Alert.alert(
-                          m.is_admin ? 'Admin verwijderen' : 'Admin maken',
-                          `${m.profile?.full_name || 'Onbekend'} ${m.is_admin ? 'is dan geen admin meer' : 'wordt admin'}`,
-                          [{ text: 'Annuleren', style: 'cancel' }, { text: 'Ja', onPress: () => toggleAdmin(m.user_id) }]
-                        );
-                      }}
-                    >
-                      <Text style={{ color: t.brand.cyan, fontWeight: '600' }}>
-                        {selectedMemberData.member.is_admin ? 'Admin verwijderen' : 'Admin maken'}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={[s.memberActionBtn, { backgroundColor: t.semantic.errorBg }]}
-                      onPress={() => {
-                        const m = selectedMemberData.member;
-                        Alert.alert('Lid verwijderen', `${m.profile?.full_name || 'Onbekend'} uit de groep verwijderen?`, [
-                          { text: 'Annuleren', style: 'cancel' },
-                          { text: 'Verwijderen', style: 'destructive', onPress: () => { removeMember(m.user_id); setSelectedMemberId(null); } },
-                        ]);
-                      }}
-                    >
-                      <Text style={{ color: t.semantic.error, fontWeight: '600' }}>Verwijderen</Text>
-                    </Pressable>
+            <ScrollView contentContainerStyle={s.profileScroll} showsVerticalScrollIndicator={false} pointerEvents="auto">
+              {/* Avatar animates from list position to center */}
+              <Animated.View style={{
+                transform: [
+                  { translateX: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.x - SCREEN_W / 2, 0] }) },
+                  { translateY: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.y - 200, 0] }) },
+                  { scale: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.size / 160, 1] }) },
+                ],
+              }}>
+                {selectedMemberData.member.profile?.avatar_url ? (
+                  <Image source={{ uri: selectedMemberData.member.profile.avatar_url }} style={s.profileAvatar} />
+                ) : (
+                  <View style={[s.profileAvatar, s.avatarFallback]}>
+                    <Text style={s.profileAvatarText}>
+                      {(selectedMemberData.member.user_id === user?.id ? 'Jij' : (selectedMemberData.member.profile?.full_name || '?'))[0]?.toUpperCase()}
+                    </Text>
                   </View>
                 )}
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Settlement modal */}
-      <Modal visible={showSettlement} transparent animationType="slide">
-        <Pressable style={s.modalOverlay} onPress={() => setShowSettlement(false)}>
-          <Pressable style={[s.modalSheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[s.modalHandle, { backgroundColor: t.colors.border.strong }]} />
-            <ScrollView style={{ maxHeight: 500 }}>
-              <Text style={{ ...t.typography.heading2, color: t.colors.text.primary, marginBottom: 16 }}>Afrekenen</Text>
-
-              <Pressable
-                style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
-                onPress={() => {
-                  if (selectedForSettlement.size === unsettledMembers.length) setSelectedForSettlement(new Set());
-                  else setSelectedForSettlement(new Set(unsettledMembers.map((m) => m.user_id)));
-                }}
-              >
-                <View style={[s.checkbox, selectedForSettlement.size === unsettledMembers.length && s.checkboxChecked]} />
-                <Text style={{ color: t.colors.text.primary, fontWeight: '600' }}>Selecteer alles</Text>
-              </Pressable>
-
-              {unsettledMembers.map((member) => {
-                const selected = selectedForSettlement.has(member.user_id);
-                return (
-                  <Pressable
-                    key={member.user_id}
-                    style={[s.settlementRow, { borderColor: selected ? t.brand.cyan : t.colors.border.default, backgroundColor: t.colors.surface.default }]}
-                    onPress={() => {
-                      setSelectedForSettlement((prev) => {
-                        const next = new Set(prev);
-                        next.has(member.user_id) ? next.delete(member.user_id) : next.add(member.user_id);
-                        return next;
-                      });
-                    }}
-                  >
-                    <View style={[s.checkbox, selected && s.checkboxChecked]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: t.colors.text.primary, fontWeight: '600' }}>
-                        {member.user_id === user?.id ? 'Jij' : member.full_name}
-                      </Text>
-                      {activeCategories.map((cat) => {
-                        const count = member.counts[cat] || 0;
-                        if (count === 0) return null;
-                        return (
-                          <Text key={cat} style={{ color: t.colors.text.secondary, fontSize: 12 }}>
-                            {getCategoryName(cat)}: {count}x
-                          </Text>
-                        );
-                      })}
-                    </View>
-                    <Text style={{ fontSize: 16, color: t.brand.cyan, fontWeight: '700' }}>
-                      {'\u20AC'} {(member.amount / 100).toFixed(2).replace('.', ',')}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 4 }}>
-                <Text style={{ fontSize: 16, color: t.colors.text.primary, fontWeight: '700' }}>Totaal</Text>
-                <Text style={{ fontSize: 16, color: t.brand.cyan, fontWeight: '700' }}>
-                  {'\u20AC'} {(unsettledMembers.filter((m) => selectedForSettlement.has(m.user_id)).reduce((sum, m) => sum + m.amount, 0) / 100).toFixed(2).replace('.', ',')}
-                </Text>
-              </View>
-
-              <Pressable
-                style={[s.adminBtn, { backgroundColor: t.brand.cyan, marginTop: 16 }]}
-                onPress={handleConfirmSettlement}
-                disabled={settling || selectedForSettlement.size === 0}
-              >
-                <Text style={{ color: t.colors.text.inverse, fontSize: 16, fontWeight: '700' }}>
-                  {settling ? 'Bezig...' : 'Bevestigen'}
-                </Text>
-              </Pressable>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Settlement history modal */}
-      <Modal visible={showSettlementHistory} transparent animationType="slide">
-        <Pressable style={s.modalOverlay} onPress={() => setShowSettlementHistory(false)}>
-          <Pressable style={[s.modalSheet, { backgroundColor: t.colors.surface.raised }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[s.modalHandle, { backgroundColor: t.colors.border.strong }]} />
-            <ScrollView style={{ maxHeight: 500 }}>
-              <Text style={{ ...t.typography.heading2, color: t.colors.text.primary, marginBottom: 16 }}>Afrekening historie</Text>
-              {history.length === 0 && <Text style={{ color: t.colors.text.secondary }}>Nog geen afrekeningen</Text>}
-              {history.map((settlement) => (
-                <View key={settlement.id} style={[s.settlementRow, { borderColor: t.colors.border.default, backgroundColor: t.colors.surface.default }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: t.colors.text.primary, fontWeight: '600' }}>{formatTimeAgo(settlement.created_at)}</Text>
-                    {settlement.lines.map((line: any) => (
-                      <Text key={line.user_id} style={{ color: t.colors.text.secondary, fontSize: 12 }}>
-                        {line.full_name}: {'\u20AC'} {(line.amount / 100).toFixed(2).replace('.', ',')}
-                      </Text>
+              </Animated.View>
+              {/* Name */}
+              <Text style={s.profileName}>
+                {selectedMemberData.member.user_id === user?.id ? 'Jij' : (selectedMemberData.member.profile?.full_name || 'Onbekend')}
+              </Text>
+              {/* Active badge */}
+              {selectedMemberData.member.is_active && (
+                <View style={s.profileActiveBadge}>
+                  <View style={s.profileActiveDot} />
+                  <Text style={s.profileActiveText}>Actief</Text>
+                </View>
+              )}
+              {/* Shared groups */}
+              {sharedGroups.length > 0 && (
+                <>
+                  <Text style={s.profileSectionHeader}>GEDEELDE GROEPEN</Text>
+                  <View style={s.profileCard}>
+                    {sharedGroups.map((g, i) => (
+                      <React.Fragment key={g.id}>
+                        {i > 0 && <View style={s.profileDivider} />}
+                        <View style={s.profileGroupRow}>
+                          <Text style={s.profileGroupName}>{g.name}</Text>
+                        </View>
+                      </React.Fragment>
                     ))}
                   </View>
-                  <Text style={{ fontSize: 16, color: t.brand.cyan, fontWeight: '700' }}>
-                    {'\u20AC'} {(settlement.total_amount / 100).toFixed(2).replace('.', ',')}
-                  </Text>
-                </View>
-              ))}
+                </>
+              )}
+              {/* Message button */}
+              {selectedMemberData.member.user_id !== user?.id && (
+                <Pressable style={s.profileMessageBtn} onPress={async () => {
+                  if (!user) return;
+                  const { startDM } = await import('@/src/hooks/useChat');
+                  const convId = await startDM(selectedMemberData.member.user_id, user.id);
+                  setSelectedMemberId(null);
+                  router.push({ pathname: '/(tabs)/chat', params: { openDmUserId: selectedMemberData.member.user_id, openDmName: selectedMemberData.profile?.full_name || '', openDmConvId: convId, openDmAvatar: selectedMemberData.profile?.avatar_url || '' } });
+                }}>
+                  <Ionicons name="chatbubble-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={s.profileMessageBtnText}>Stuur bericht</Text>
+                </Pressable>
+              )}
+              {/* Friend button */}
+              {selectedMemberData.member.user_id !== user?.id && (
+                friendshipStatus === 'accepted' ? (
+                  <View style={s.profileFriendBadge}>
+                    <Ionicons name="checkmark-circle" size={18} color="#00BEAE" />
+                    <Text style={s.profileFriendBadgeText}>Vrienden</Text>
+                  </View>
+                ) : friendshipStatus === 'pending' ? (
+                  <View style={s.profileFriendBadge}>
+                    <Ionicons name="time-outline" size={18} color="#848484" />
+                    <Text style={[s.profileFriendBadgeText, { color: '#848484' }]}>Verzoek verstuurd</Text>
+                  </View>
+                ) : (
+                  <Pressable style={s.profileFriendBtn} onPress={handleAddFriend}>
+                    <Text style={s.profileFriendBtnText}>Voeg toe als vriend</Text>
+                  </Pressable>
+                )
+              )}
             </ScrollView>
+          </Animated.View>
+        </View>
+      )}
+
+      {/* ── Settlement modal ── */}
+      <SlideModal visible={showSettlement} onClose={() => setShowSettlement(false)}>
+        <ScrollView style={{ maxHeight: 500 }}>
+          <Text style={s.modalTitle}>Afrekenen</Text>
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
+            onPress={() => {
+              if (selectedForSettlement.size === unsettledMembers.length) setSelectedForSettlement(new Set());
+              else setSelectedForSettlement(new Set(unsettledMembers.map((m) => m.user_id)));
+            }}>
+            <View style={[s.checkbox, selectedForSettlement.size === unsettledMembers.length && s.checkboxChecked]} />
+            <Text style={{ fontFamily: 'Unbounded', color: '#fff', fontSize: 14, fontWeight: '400' }}>Selecteer alles</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </SafeAreaView>
+          {unsettledMembers.map((member) => {
+            const selected = selectedForSettlement.has(member.user_id);
+            return (
+              <Pressable key={member.user_id} style={[s.settlementRow, selected && { backgroundColor: 'rgba(0, 217, 163, 0.08)' }]}
+                onPress={() => { setSelectedForSettlement((prev) => { const next = new Set(prev); next.has(member.user_id) ? next.delete(member.user_id) : next.add(member.user_id); return next; }); }}>
+                <View style={[s.checkbox, selected && s.checkboxChecked]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'Unbounded', color: '#fff', fontSize: 14, fontWeight: '400' }}>{member.user_id === user?.id ? 'Jij' : member.full_name}</Text>
+                  {activeCategories.map((cat) => { const count = member.counts[cat] || 0; if (!count) return null; return (<Text key={cat} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>{getCategoryName(cat)}: {count}x</Text>); })}
+                </View>
+                <Text style={{ fontFamily: 'Unbounded', fontSize: 16, color: '#00BEAE', fontWeight: '600' }}>{'\u20AC'} {(member.amount / 100).toFixed(2).replace('.', ',')}</Text>
+              </Pressable>
+            );
+          })}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, paddingHorizontal: 4 }}>
+            <Text style={{ fontFamily: 'Unbounded', fontSize: 16, color: '#fff', fontWeight: '400' }}>Totaal</Text>
+            <Text style={{ fontFamily: 'Unbounded', fontSize: 16, color: '#00BEAE', fontWeight: '600' }}>
+              {'\u20AC'} {(unsettledMembers.filter((m) => selectedForSettlement.has(m.user_id)).reduce((sum, m) => sum + m.amount, 0) / 100).toFixed(2).replace('.', ',')}
+            </Text>
+          </View>
+          <Pressable style={[s.adminBtn, { marginTop: 16 }]} onPress={handleConfirmSettlement} disabled={settling || selectedForSettlement.size === 0}>
+            <Text style={s.adminBtnText}>{settling ? 'Bezig...' : 'Bevestigen'}</Text>
+          </Pressable>
+        </ScrollView>
+      </SlideModal>
+
+      {/* ── Settlement history modal ── */}
+      <SlideModal visible={showSettlementHistory} onClose={() => setShowSettlementHistory(false)}>
+        <ScrollView style={{ maxHeight: 500 }}>
+          <Text style={s.modalTitle}>Afrekening historie</Text>
+          {history.length === 0 && <Text style={s.modalEmpty}>Nog geen afrekeningen</Text>}
+          {history.map((settlement) => (
+            <View key={settlement.id} style={s.settlementRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: 'Unbounded', color: '#fff', fontSize: 14, fontWeight: '400' }}>{formatTimeAgo(settlement.created_at)}</Text>
+                {settlement.lines.map((line: any) => (
+                  <Text key={line.user_id} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>
+                    {line.full_name}: {'\u20AC'} {(line.amount / 100).toFixed(2).replace('.', ',')}
+                  </Text>
+                ))}
+              </View>
+              <Text style={{ fontFamily: 'Unbounded', fontSize: 16, color: '#00BEAE', fontWeight: '600' }}>
+                {'\u20AC'} {(settlement.total_amount / 100).toFixed(2).replace('.', ',')}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+      </SlideModal>
+    </View>
   );
 }
 
-function createStyles(t: Theme) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: t.colors.background.primary },
-    center: { justifyContent: 'center', alignItems: 'center' },
-    content: { padding: 20 },
+// ════════════════════════════════════════════════════════════
+// STYLES — pixel-exact from Home_fixed_v3.svg
+// ════════════════════════════════════════════════════════════
 
-    // Group card
-    groupCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: t.colors.surface.raised,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
-      gap: 12,
-    },
-    groupAvatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    groupName: { fontSize: 20, fontWeight: '700' },
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  center: { justifyContent: 'center', alignItems: 'center' },
 
-    // Active toggle
-    activeToggle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 9999,
-      marginBottom: 16,
-    },
-    activeDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  // ── Header aurora ── scrolls with content, positioned behind
+  headerAurora: {
+    position: 'absolute',
+    left: -20,
+    zIndex: 0,
+  },
 
-    section: { marginBottom: 20 },
-    sectionTitle: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
+  // ── Scroll content ──
+  scroll: { paddingHorizontal: 20 },
 
-    // Info card
-    infoCard: {
-      borderRadius: 16,
-      padding: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
+  // ── Group Selector ── SVG: top area
+  selectorWrap: { marginTop: 8 },
 
-    // Members
-    membersCard: { borderRadius: 16, overflow: 'hidden' },
-    divider: { height: 1, marginLeft: 68 },
+  // ── Group Header ── SVG node Groepheader
+  groupHeader: {
+    marginTop: 12,
+    marginBottom: 24,
+    paddingHorizontal: 14,
+  },
+  groupTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallback: { backgroundColor: '#F1F1F1' },
 
-    // Admin
-    adminBtn: {
-      height: 52,
-      borderRadius: 9999,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 8,
-    },
-    ghostBtn: {
-      height: 48,
-      borderRadius: 9999,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 8,
-      borderWidth: 1,
-    },
+  // Avatar preview overlay
+  avatarPreviewScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
+  avatarPreviewWrap: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+  },
+  avatarPreviewImg: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  avatarPreviewText: { color: '#333', fontSize: 64, fontWeight: '600' },
 
-    // Toast
-    toast: {
-      position: 'absolute',
-      bottom: 100,
-      left: 20,
-      right: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 12,
-      backgroundColor: t.brand.cyan,
-      ...t.shadows.md,
-    },
-    toastIcon: { fontSize: 18 },
-    toastText: { color: t.colors.text.inverse, fontSize: 16, fontWeight: '500' },
+  // View Profile overlay
+  profileScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
+  profileContent: { flex: 1 },
+  profileBackBtn: { position: 'absolute', left: 16, zIndex: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  profileScroll: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 120, paddingBottom: 60 },
+  profileAvatar: { width: 160, height: 160, borderRadius: 80, alignItems: 'center', justifyContent: 'center' },
+  profileAvatarText: { color: '#333', fontSize: 48, fontWeight: '600' },
+  profileName: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: '400', color: '#FFFFFF', marginTop: 20, textAlign: 'center' },
+  profileActiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  profileActiveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#00FE96' },
+  profileActiveText: { fontFamily: 'Unbounded', fontSize: 13, color: '#00FE96' },
+  profileSectionHeader: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 32, marginBottom: 8, alignSelf: 'flex-start' },
+  profileCard: { width: '100%', backgroundColor: 'rgba(78, 78, 78, 0.3)', borderRadius: 25, overflow: 'hidden' },
+  profileDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginLeft: 16 },
+  profileGroupRow: { paddingHorizontal: 20, paddingVertical: 14 },
+  profileGroupName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
+  profileMessageBtn: { marginTop: 24, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' },
+  profileMessageBtnText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
+  profileFriendBtn: { marginTop: 12, height: 50, borderRadius: 25, backgroundColor: '#FF0085', alignItems: 'center', justifyContent: 'center', width: '100%' },
+  profileFriendBtnText: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  profileFriendBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 32 },
+  profileFriendBadgeText: { fontFamily: 'Unbounded', fontSize: 14, color: '#00BEAE' },
+  avatarText: { color: '#333', fontSize: 24, fontWeight: '600' },
+  expandBtn: {
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    width: 45,
+    height: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandGlow: {
+    position: 'absolute',
+    width: 41,
+    height: 41,
+    borderRadius: 20.5,
+    overflow: 'hidden',
+  },
+  groupName: {
+    fontFamily: 'Unbounded',
+    fontSize: 32,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    flexShrink: 1,
+  },
+  activeCount: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    marginTop: 12,
+    paddingLeft: 10,
+  },
 
-    // Modal shared
-    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: t.colors.scrim },
-    modalSheet: {
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      padding: 20,
-      paddingBottom: 40,
-    },
-    modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  // ── Counter ── SVG node Counter
+  counterWrap: { marginBottom: 24, alignItems: 'center' },
+  creditBadge: { position: 'absolute', top: -8, right: '50%', marginRight: -45, backgroundColor: 'rgba(0,217,163,0.2)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  creditText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', fontWeight: '600' },
 
-    drinkRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: t.colors.border.default,
-    },
-    catBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    catDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+  // ── Categories ── SVG: 350×50 rows, 9px gap
+  categories: { marginBottom: 24, paddingHorizontal: 10 },
 
-    // Member detail
-    counterBtnSm: { width: 40, height: 40, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
-    removePanel: { marginTop: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
-    removeConfirmBtn: { padding: 12, borderRadius: 9999, alignItems: 'center', marginTop: 8 },
-    memberActionBtn: { flex: 1, padding: 12, borderRadius: 9999, alignItems: 'center' },
+  // ── Section Title ── SVG node 122:106
+  sectionTitle: {
+    fontFamily: 'Unbounded',
+    fontSize: 32,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    marginBottom: 16,
+    paddingLeft: 20,
+  },
 
-    // Settlement
-    checkbox: {
-      width: 20,
-      height: 20,
-      borderRadius: 4,
-      borderWidth: 2,
-      borderColor: t.colors.text.tertiary,
-      marginRight: 12,
-    },
-    checkboxChecked: { backgroundColor: t.brand.cyan, borderColor: t.brand.cyan },
-    settlementRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      marginBottom: 8,
-    },
-  });
-}
+  // ── Aurora positioning: aurora is 420px, parent is 390px → offset -15 to center
+  auroraFull: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: -15,   // (390 - 420) / 2
+    width: 420,
+  },
+
+  // ── Drankenlijst ── expandable section (same pattern as leden)
+  drankenlijstSection: {
+    marginBottom: 24,
+    marginHorizontal: -20,
+  },
+  drankenlijstHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 20,
+    zIndex: 1,
+  },
+  drankenlijstTitle: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+  },
+  drankenlijstCount: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    opacity: 0.5,
+  },
+  drankenlijstList: {
+    paddingTop: 20,
+    paddingHorizontal: 40,
+    zIndex: 1,
+  },
+
+  // ── Leden ── SVG node Ledenlijst: 389×345
+  ledenSection: {
+    marginTop: 24,
+    marginBottom: 24,
+    marginHorizontal: -20,
+  },
+  ledenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 20,
+    zIndex: 1,
+  },
+  ledenTitle: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+  },
+  ledenCount: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    opacity: 0.5,
+  },
+  ledenList: {
+    paddingTop: 20,
+    paddingHorizontal: 40,
+    zIndex: 1,
+  },
+  lidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  lidAvatarWrap: { position: 'relative', marginRight: 16 },
+  lidAvatar: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lidAvatarFallback: { backgroundColor: '#F1F1F1' },
+  lidAvatarText: { color: '#333', fontSize: 14, fontWeight: '600' },
+  onlineBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onlineDot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#00FE96' },
+  lidName: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+  },
+  bekijkMeer: { minHeight: 44, justifyContent: 'center', paddingLeft: 64, zIndex: 1 },
+  bekijkMeerText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#848484',
+  },
+
+  // ── Admin ──
+  adminSection: { marginTop: 24, paddingHorizontal: 0 },
+  adminBtn: {
+    height: 52,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    backgroundColor: '#00BEAE',
+  },
+  adminBtnText: { fontFamily: 'Unbounded', color: '#0F0F1E', fontSize: 16, fontWeight: '700' },
+  ghostBtn: {
+    height: 48,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#2D2D44',
+  },
+  ghostBtnText: { fontFamily: 'Unbounded', color: '#A0A0B8', fontSize: 16, fontWeight: '500' },
+
+  // ── Settings button ──
+  settingsBtn: {
+    marginHorizontal: 0,
+    marginTop: 24,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(78, 78, 78, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#FFFFFF',
+  },
+
+  // ── Leave group ── same style as profiel logout button
+  leaveBtn: {
+    marginHorizontal: 0,
+    marginTop: 16,
+    marginBottom: 16,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(235, 84, 102, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(235, 84, 102, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#EB5466',
+  },
+
+  // ── Welcome ──
+  welcomeWrap: { paddingTop: 80, alignItems: 'center', paddingHorizontal: 20 },
+  welcomeTitle: { fontFamily: 'Unbounded', color: '#FFFFFF', fontSize: 24, fontWeight: '400', marginBottom: 8 },
+  welcomeSub: { fontFamily: 'Unbounded', color: '#848484', fontSize: 14, fontWeight: '400' },
+  welcomeActions: { flexDirection: 'row', gap: 12, marginTop: 32, width: '100%' },
+  welcomeBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FF0085',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  welcomeBtnText: { fontFamily: 'Unbounded', color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  welcomeBtnOutline: {
+    flex: 1,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(78, 78, 78, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  welcomeBtnOutlineText: { fontFamily: 'Unbounded', color: '#FFFFFF', fontSize: 14, fontWeight: '400' },
+
+  // ── Toast ──
+  toast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#00BEAE',
+  },
+  toastText: { fontFamily: 'Unbounded', color: '#0F0F1E', fontSize: 14, fontWeight: '500' },
+
+  // ── Empty state ──
+  emptyState: { paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center' },
+  emptyStateText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', textAlign: 'center' },
+
+  // ── Submit hint ──
+  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 4, textAlign: 'center' },
+
+  // ── Meer opties toggle ──
+  moreOptionsToggle: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 24 },
+  moreOptionsText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484' },
+
+  // ── Modal shared ──
+  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
+  modalSheet: {
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 24,
+    paddingBottom: 40,
+    backgroundColor: 'rgba(21, 21, 21, 0.95)',
+  },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16, backgroundColor: 'rgba(255,255,255,0.15)' },
+  modalTitle: { fontFamily: 'Unbounded', fontSize: 22, fontWeight: '400', color: '#FFFFFF', marginBottom: 16 },
+  modalOverline: { fontFamily: 'Unbounded', fontSize: 11, fontWeight: '600', letterSpacing: 1, color: '#848484', marginBottom: 12 },
+  modalEmpty: { fontFamily: 'Unbounded', color: '#848484', fontSize: 14 },
+
+  // ── Drink list ──
+  drinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2D2D44',
+  },
+  drinkName: { fontFamily: 'Unbounded', color: '#FFFFFF', flex: 1, fontSize: 16 },
+  catBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  catDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+
+  // ── Member detail ──
+  counterBtnSm: { width: 40, height: 40, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  removePanel: { marginTop: 8, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: '#1A1A2E', borderColor: '#2D2D44' },
+  removeConfirmBtn: { padding: 12, borderRadius: 9999, alignItems: 'center', marginTop: 8 },
+  memberActionBtn: { flex: 1, padding: 12, borderRadius: 9999, alignItems: 'center' },
+
+  // ── Settlement ──
+  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#848484', marginRight: 12 },
+  checkboxChecked: { backgroundColor: '#00BEAE', borderColor: '#00BEAE' },
+  settlementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 25,
+    backgroundColor: 'rgba(78, 78, 78, 0.2)',
+    marginBottom: 8,
+  },
+});

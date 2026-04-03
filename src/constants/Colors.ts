@@ -1,10 +1,10 @@
 // Brand colors extracted from Streeps logo
 export const Brand = {
   magenta: '#E91E8C',
-  cyan: '#00D9A3',
+  cyan: '#00BEAE',
   blue: '#4A6CF7',
   purple: '#8B5CF6',
-  gradient: ['#E91E8C', '#8B5CF6', '#4A6CF7', '#00D9A3'] as const,
+  gradient: ['#E91E8C', '#8B5CF6', '#4A6CF7', '#00BEAE'] as const,
 };
 
 export const Colors = {

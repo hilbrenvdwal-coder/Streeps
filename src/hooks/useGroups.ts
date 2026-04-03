@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { getOrCreateGroupChat } from './useChat';
 import type { Group } from '../types/database';
 
 interface GroupWithStats extends Group {
@@ -132,6 +133,13 @@ export function useGroups() {
       console.error('Error adding drinks:', drinksError.message);
     }
 
+    // Auto-create group chat with creator as first member
+    try {
+      await getOrCreateGroupChat(group.id, [user.id]);
+    } catch (e) {
+      console.error('Error creating group chat:', e);
+    }
+
     await fetchGroups();
     return { data: group, error: null };
   };
@@ -164,6 +172,13 @@ export function useGroups() {
     });
 
     if (joinError) return { error: 'Kon niet deelnemen' };
+
+    // Auto-add new member to group chat (RPC handles member insertion)
+    try {
+      await getOrCreateGroupChat(group.id, [user.id]);
+    } catch (e) {
+      console.error('Error joining group chat:', e);
+    }
 
     await fetchGroups();
     return { error: null };

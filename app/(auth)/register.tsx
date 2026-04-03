@@ -3,6 +3,7 @@ import {
   StyleSheet,
   View,
   Text,
+  TextInput,
   Pressable,
   Image,
   KeyboardAvoidingView,
@@ -16,23 +17,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
-import AuroraBackground from '@/src/components/AuroraBackground';
-import PillInput from '@/src/components/PillInput';
-import PillButton from '@/src/components/PillButton';
-import { brand } from '@/src/theme';
+import AuroraLogin from '@/src/components/AuroraLogin';
+
+/**
+ * Register screen — exact Figma node 78:12 (390×844)
+ *
+ * Differences from login:
+ * - Different aurora (856×787 at different position)
+ * - Subtitle: "Voer uw gegevens in." (no heading!)
+ * - 3 inputs: Email, Wachtwoord, Wachtwoord herhalen
+ * - Button: 218×25 (wider), "Stuur e-mail verificatie"
+ * - No social login, no bottom link
+ * - No naam field (comes later in onboarding)
+ */
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
 
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordHidden, setPasswordHidden] = useState(true);
+  const [confirmHidden, setConfirmHidden] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!fullName || !email || !password || !confirmPassword) {
+    if (!email || !password || !confirmPassword) {
       Alert.alert('Vul alle velden in');
       return;
     }
@@ -64,7 +75,8 @@ export default function RegisterScreen() {
     if (!confirmed) return;
 
     setLoading(true);
-    const { error } = await signUp(normalizedEmail, password, fullName);
+    // signUp without name — name comes later in onboarding
+    const { error } = await signUp(normalizedEmail, password, '');
     setLoading(false);
     if (error) {
       Alert.alert('Fout', error.message);
@@ -76,78 +88,85 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <AuroraBackground />
+    <View style={s.root}>
+      <AuroraLogin variant="register" />
       <StatusBar style="light" />
-      <SafeAreaView style={styles.flex}>
+      <SafeAreaView style={s.flex}>
         {/* Back button */}
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#A0A0B8" />
+        <Pressable onPress={() => router.back()} style={s.backBtn}>
+          <Ionicons name="chevron-back" size={24} color="#848484" />
         </Pressable>
 
         <KeyboardAvoidingView
-          style={styles.flex}
+          style={s.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <ScrollView
-            contentContainerStyle={styles.scroll}
+            contentContainerStyle={s.scroll}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Logo + Branding */}
-            <View style={styles.hero}>
-              <View style={styles.logoContainer}>
-                <Image
-                  source={require('../../logo_dark.png')}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              </View>
-              <Text style={styles.title}>Account aanmaken</Text>
-              <Text style={styles.subtitle}>Vul je gegevens in</Text>
+            {/* Logo — same as login */}
+            <View style={s.logoWrap}>
+              <Image
+                source={require('../../logo_dark.png')}
+                style={s.logo}
+                resizeMode="contain"
+              />
             </View>
 
-            {/* Inputs */}
-            <View style={styles.inputGroup}>
-              <PillInput
-                placeholder="Volledige naam"
-                value={fullName}
-                onChangeText={setFullName}
-              />
-              <PillInput
+            {/* Subtitle only — no heading per Figma */}
+            <Text style={s.subtitle}>Voer uw gegevens in.</Text>
+
+            {/* Email */}
+            <View style={s.inputWrap}>
+              <TextInput
+                style={s.inputText}
                 placeholder="Email"
+                placeholderTextColor="#848484"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
-              <PillInput
-                placeholder="Wachtwoord"
-                value={password}
-                onChangeText={setPassword}
-                isPassword
-              />
-              <PillInput
-                placeholder="Wachtwoord herhalen"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                isPassword
-              />
             </View>
 
-            {/* Register Button */}
-            <PillButton
-              title={loading ? 'Laden...' : 'Stuur e-mail verificatie'}
+            {/* Wachtwoord */}
+            <View style={s.inputWrap}>
+              <TextInput
+                style={s.inputText}
+                placeholder="Wachtwoord"
+                placeholderTextColor="#737373"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={passwordHidden}
+              />
+              <Pressable onPress={() => setPasswordHidden((h) => !h)} style={s.eyeBtn} hitSlop={8}>
+                <Ionicons name={passwordHidden ? 'eye-off-outline' : 'eye-outline'} size={16} color="#848484" />
+              </Pressable>
+            </View>
+
+            {/* Wachtwoord herhalen */}
+            <View style={s.inputWrap}>
+              <TextInput
+                style={s.inputText}
+                placeholder="Wachtwoord herhalen"
+                placeholderTextColor="#737373"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={confirmHidden}
+              />
+              <Pressable onPress={() => setConfirmHidden((h) => !h)} style={s.eyeBtn} hitSlop={8}>
+                <Ionicons name={confirmHidden ? 'eye-off-outline' : 'eye-outline'} size={16} color="#848484" />
+              </Pressable>
+            </View>
+
+            {/* Button — 218×25, wider than login */}
+            <Pressable
+              style={[s.btn, loading && { opacity: 0.4 }]}
               onPress={handleRegister}
               disabled={loading}
-              color={brand.magenta}
-            />
-
-            {/* Login link */}
-            <Pressable onPress={() => router.back()} style={styles.link}>
-              <Text style={styles.linkText}>
-                Al een account?{' '}
-                <Text style={styles.linkAccent}>Inloggen</Text>
-              </Text>
+            >
+              <Text style={s.btnText}>{loading ? 'Laden...' : 'Stuur e-mail verificatie'}</Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -156,8 +175,8 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0F0F1E' },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0E0D1C' },
   flex: { flex: 1 },
   backBtn: {
     position: 'absolute',
@@ -173,42 +192,84 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 56,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
 
-  // Hero
-  hero: { alignItems: 'center', marginBottom: 40 },
-  logoContainer: {
+  // Logo
+  logoWrap: {
+    alignSelf: 'center',
     width: 94,
     height: 94,
-    borderRadius: 20,
+    borderRadius: 21,
     overflow: 'hidden',
-    marginBottom: 24,
+    marginBottom: 20,
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(0,0,0,0.25)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 4 },
+      android: { elevation: 4 },
+      default: {},
+    }),
   },
   logo: { width: 94, height: 94 },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
+
+  // Figma: only subtitle, no heading
   subtitle: {
-    fontSize: 16,
-    color: '#A0A0B8',
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#D9D9D9',
     textAlign: 'center',
-    marginTop: 8,
+    lineHeight: 16,
+    marginBottom: 30,
   },
 
-  // Inputs
-  inputGroup: { gap: 14, marginBottom: 20 },
-
-  // Link
-  link: {
+  // Inputs — same as login
+  inputWrap: {
+    width: 278,
+    height: 50,
+    backgroundColor: '#F1F1F1',
+    borderRadius: 25,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    minHeight: 44,
-    justifyContent: 'center',
+    paddingLeft: 26,
+    paddingRight: 18,
+    marginBottom: 23,
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(0,0,0,0.25)', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 10 },
+      android: { elevation: 4 },
+      default: {},
+    }),
   },
-  linkText: { fontSize: 14, color: '#666680' },
-  linkAccent: { color: '#E91E8C', fontWeight: '600' },
+  inputText: {
+    flex: 1,
+    fontFamily: 'Unbounded',
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#1A1A2E',
+    height: 50,
+  },
+  eyeBtn: { marginLeft: 8 },
+
+  // Button — 218×25, wider than login's 144
+  btn: {
+    alignSelf: 'center',
+    width: 218,
+    height: 25,
+    borderRadius: 25,
+    backgroundColor: '#FF0085',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 7,
+    ...Platform.select({
+      ios: { shadowColor: '#FF0085', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6.8 },
+      android: { elevation: 3 },
+      default: {},
+    }),
+  },
+  btnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#F1F1F1',
+    lineHeight: 15,
+  },
 });

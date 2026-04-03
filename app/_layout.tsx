@@ -17,6 +17,11 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    Unbounded: require('@expo-google-fonts/unbounded/400Regular/Unbounded_400Regular.ttf'),
+    'Unbounded-Medium': require('@expo-google-fonts/unbounded/500Medium/Unbounded_500Medium.ttf'),
+    'Unbounded-SemiBold': require('@expo-google-fonts/unbounded/600SemiBold/Unbounded_600SemiBold.ttf'),
+    'Unbounded-Bold': require('@expo-google-fonts/unbounded/700Bold/Unbounded_700Bold.ttf'),
+    'Unbounded-ExtraBold': require('@expo-google-fonts/unbounded/800ExtraBold/Unbounded_800ExtraBold.ttf'),
   });
 
   useEffect(() => {

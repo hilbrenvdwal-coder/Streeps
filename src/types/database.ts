@@ -83,3 +83,56 @@ export interface SettlementLine {
   tally_count_4: number;
   paid: boolean;
 }
+
+// Chat
+export interface Conversation {
+  id: string;
+  type: 'dm' | 'group';
+  group_id: string | null;
+  created_at: string;
+}
+
+export interface ConversationMember {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  joined_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  content: string;
+  message_type?: 'text' | 'gift';
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export interface MessageReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  reaction: string;
+  created_at: string;
+}
+
+export interface TallyGift {
+  id: string;
+  group_id: string;
+  giver_id: string;
+  recipient_id: string;
+  category: number;
+  quantity: number;
+  redeemed: number;
+  conversation_id: string | null;
+  created_at: string;
+}
+
+export interface Friendship {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  status: 'pending' | 'accepted';
+  created_at: string;
+}

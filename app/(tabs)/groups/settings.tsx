@@ -18,7 +18,7 @@ import { getTheme, type Theme } from '@/src/theme';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
-import * as ImagePicker from 'expo-image-picker';
+import CameraModal from '@/src/components/CameraModal';
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,7 +30,7 @@ export default function GroupSettingsScreen() {
   const {
     group, drinks, isAdmin,
     updateGroupPrices, addDrink, removeDrink, updateGroupName,
-    deleteGroup, leaveGroup, regenerateInviteCode, refresh,
+    deleteGroup, leaveGroup, removeOwnAdmin, regenerateInviteCode, refresh,
   } = useGroupDetail(id);
 
   const [groupName, setGroupName] = useState('');
@@ -47,6 +47,7 @@ export default function GroupSettingsScreen() {
   const [newDrinkCategory, setNewDrinkCategory] = useState('1');
   const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null);
   const [uploadingGroupAvatar, setUploadingGroupAvatar] = useState(false);
+  const [cameraVisible, setCameraVisible] = useState(false);
 
   useEffect(() => {
     if (group) {
@@ -65,8 +66,8 @@ export default function GroupSettingsScreen() {
 
   const handleSaveAll = async () => {
     if (isAdmin) {
-      if (groupName.trim()) await updateGroupName(groupName.trim());
       await updateGroupPrices({
+        ...(groupName.trim() ? { name: groupName.trim() } : {}),
         price_category_1: parseInt(price1) || 150,
         price_category_2: parseInt(price2) || 300,
         price_category_3: price3 ? parseInt(price3) : null,
@@ -77,7 +78,6 @@ export default function GroupSettingsScreen() {
         name_category_4: catName4.trim() || 'Categorie 4',
       });
     }
-    await refresh();
     router.back();
   };
 
@@ -117,19 +117,23 @@ export default function GroupSettingsScreen() {
     ]);
   };
 
-  const handlePickGroupAvatar = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5,
-    });
-    if (result.canceled || !result.assets[0]) return;
+  const handleRemoveAdmin = () => {
+    Alert.alert('Admin afstaan', 'Weet je zeker dat je je admin-rechten wilt afstaan?', [
+      { text: 'Annuleren', style: 'cancel' },
+      { text: 'Afstaan', style: 'destructive', onPress: async () => { await removeOwnAdmin(); refresh(); } },
+    ]);
+  };
+
+  const handleOpenCamera = () => setCameraVisible(true);
+
+  const handleImageCaptured = async (uri: string, mimeType?: string) => {
     setUploadingGroupAvatar(true);
-    const asset = result.assets[0];
-    const ext = asset.uri.split('.').pop() ?? 'jpg';
+    const ext = uri.split('.').pop() ?? 'jpg';
     const path = `groups/${id}/avatar.${ext}`;
-    const response = await fetch(asset.uri);
+    const response = await fetch(uri);
     const blob = await response.blob();
     const arrayBuffer = await new Response(blob).arrayBuffer();
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (uploadError) { Alert.alert('Upload mislukt', uploadError.message); setUploadingGroupAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
     const publicUrl = urlData.publicUrl + '?t=' + Date.now();
@@ -163,7 +167,7 @@ export default function GroupSettingsScreen() {
       <ScrollView contentContainerStyle={s.content}>
         {/* Group avatar */}
         {isAdmin && (
-          <Pressable style={s.avatarSection} onPress={handlePickGroupAvatar} disabled={uploadingGroupAvatar}>
+          <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingGroupAvatar}>
             {groupAvatarUrl ? (
               <Image source={{ uri: groupAvatarUrl }} style={s.avatar} />
             ) : (
@@ -316,6 +320,13 @@ export default function GroupSettingsScreen() {
         {/* Danger zone */}
         <Text style={s.dangerHeader}>GEVARENZONE</Text>
         <View style={s.card}>
+          {isAdmin && (
+            <Pressable style={s.dangerRow} onPress={handleRemoveAdmin}>
+              <Ionicons name="shield-outline" size={20} color={t.semantic.error} style={s.inputIcon} />
+              <Text style={s.dangerText}>Admin afstaan</Text>
+            </Pressable>
+          )}
+          {isAdmin && <View style={s.divider} />}
           <Pressable style={s.dangerRow} onPress={handleLeaveGroup}>
             <Ionicons name="exit-outline" size={20} color={t.semantic.error} style={s.inputIcon} />
             <Text style={s.dangerText}>Groep verlaten</Text>
@@ -333,6 +344,12 @@ export default function GroupSettingsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <CameraModal
+        visible={cameraVisible}
+        onClose={() => setCameraVisible(false)}
+        onImageCaptured={handleImageCaptured}
+      />
     </SafeAreaView>
   );
 }

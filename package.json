@@ -4,15 +4,21 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^2.1.0",
+    "@expo-google-fonts/unbounded": "^0.4.1",
+    "@expo/vector-icons": "^15.1.1",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-navigation/native": "^7.0.14",
+    "@shopify/react-native-skia": "2.2.12",
     "@supabase/supabase-js": "^2.99.3",
+    "base64-arraybuffer": "^1.0.2",
     "expo": "~54.0.0",
+    "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-file-system": "~19.0.21",
@@ -25,6 +31,7 @@
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
+    "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -32,12 +39,14 @@
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "^15.12.1",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
     "expo-mcp": "~0.2.1",
+    "sharp": "^0.34.5",
     "typescript": "~5.9.2"
   },
   "private": true

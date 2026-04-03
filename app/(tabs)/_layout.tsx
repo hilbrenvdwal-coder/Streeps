@@ -1,16 +1,34 @@
-import React from 'react';
+import React, { createContext, useContext, useRef } from 'react';
+import { Animated } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme } from '@/src/theme';
 import CustomNavBar from '@/src/components/CustomNavBar';
 
+const NavBarAnimContext = createContext<Animated.Value>(new Animated.Value(0));
+export const useNavBarAnim = () => useContext(NavBarAnimContext);
+
 export default function TabLayout() {
   const mode = useColorScheme();
   const t = getTheme(mode);
+  const navBarAnim = useRef(new Animated.Value(0)).current;
 
   return (
+    <NavBarAnimContext.Provider value={navBarAnim}>
     <Tabs
-      tabBar={(props) => <CustomNavBar {...props} />}
+      tabBar={(props) => (
+        <Animated.View
+          style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
+            transform: [{ translateY: navBarAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 120],
+            })}],
+          }}
+        >
+          <CustomNavBar {...props} />
+        </Animated.View>
+      )}
       screenOptions={{
         headerStyle: {
           backgroundColor: t.colors.background.primary,
@@ -43,8 +61,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="profiel"
+        options={{ href: null, headerShown: false }}
+      />
+      <Tabs.Screen
+        name="chat"
         options={{
-          title: 'Profiel',
+          title: 'Berichten',
           headerShown: false,
         }}
       />
@@ -57,5 +79,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </NavBarAnimContext.Provider>
   );
 }

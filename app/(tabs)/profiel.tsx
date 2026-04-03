@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Image, Dimensions, Animated, Easing } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -8,15 +10,23 @@ import { getTheme, type Theme } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
-import * as ImagePicker from 'expo-image-picker';
+import { AuroraPresetView } from '@/src/components/AuroraBackground';
+import CameraModal from '@/src/components/CameraModal';
+
+const SCREEN_W = Dimensions.get('window').width;
+const DESIGN_W = 390;
+const s = (v: number) => (v / DESIGN_W) * SCREEN_W;
+
+const PROFIEL_AURORA_COLORS = ['#FF0085', '#00BEAE', '#F1F1F1', '#00FE96'];
 
 export default function ProfielScreen() {
   const mode = useColorScheme();
   const t = getTheme(mode);
-  const s = useMemo(() => createStyles(t, mode), [mode]);
+  const styles = useMemo(() => createStyles(t), [mode]);
   const { user, signOut } = useAuth();
   const { preference, setPreference } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState('');
@@ -24,21 +34,24 @@ export default function ProfielScreen() {
   const [saving, setSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cameraVisible, setCameraVisible] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from('profiles')
-      .select('name_changed_at, avatar_url')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          setNameChangedAt(data.name_changed_at);
-          setAvatarUrl(data.avatar_url);
-        }
-      });
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      supabase
+        .from('profiles')
+        .select('name_changed_at, avatar_url')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setNameChangedAt(data.name_changed_at);
+            setAvatarUrl(data.avatar_url);
+          }
+        });
+    }, [user])
+  );
 
   const canChangeName = () => {
     if (!nameChangedAt) return true;
@@ -83,22 +96,17 @@ export default function ProfielScreen() {
     setSaving(false);
   };
 
-  const handlePickAvatar = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
-    if (result.canceled || !result.assets[0] || !user) return;
+  const handleOpenCamera = () => setCameraVisible(true);
+
+  const handleImageCaptured = async (uri: string, mimeType?: string) => {
+    if (!user) return;
     setUploadingAvatar(true);
-    const asset = result.assets[0];
-    const ext = asset.uri.split('.').pop() ?? 'jpg';
+    const ext = uri.split('.').pop() ?? 'jpg';
     const path = `${user.id}/avatar.${ext}`;
-    const response = await fetch(asset.uri);
+    const response = await fetch(uri);
     const blob = await response.blob();
     const arrayBuffer = await new Response(blob).arrayBuffer();
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: asset.mimeType ?? 'image/jpeg', upsert: true });
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (uploadError) { Alert.alert('Upload mislukt', uploadError.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
     const publicUrl = urlData.publicUrl + '?t=' + Date.now();
@@ -120,147 +128,345 @@ export default function ProfielScreen() {
     { key: 'dark' as const, label: 'Donker' },
   ];
 
-  return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <ScrollView contentContainerStyle={s.content}>
-        {/* Header */}
-        <Text style={[s.headerTitle, { color: t.colors.text.primary }]}>Profiel</Text>
+  // Animated segmented indicator
+  const segLayouts = useRef<{ x: number; w: number }[]>([]).current;
+  const segX = useRef(new Animated.Value(0)).current;
+  const segW = useRef(new Animated.Value(0)).current;
+  const segReady = useRef(false);
 
-        {/* Avatar hero */}
-        <Pressable style={s.avatarSection} onPress={handlePickAvatar} disabled={uploadingAvatar}>
+  const activeSegIndex = themeOptions.findIndex((o) => o.key === preference);
+
+  const onSegLayout = useCallback((index: number, x: number, w: number) => {
+    segLayouts[index] = { x, w };
+    if (segLayouts.filter(Boolean).length === themeOptions.length && !segReady.current) {
+      segReady.current = true;
+      const cur = segLayouts[activeSegIndex] ?? segLayouts[0];
+      segX.setValue(cur.x);
+      segW.setValue(cur.w);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!segReady.current) return;
+    const target = segLayouts[activeSegIndex];
+    if (!target) return;
+    const ease = { duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false };
+    Animated.timing(segX, { toValue: target.x, ...ease }).start();
+    Animated.timing(segW, { toValue: target.w, ...ease }).start();
+  }, [activeSegIndex]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Status bar spacer */}
+        <View style={{ height: insets.top }} />
+
+        {/* Header aurora — scrolls with content, behind everything */}
+        <View style={styles.auroraWrap} pointerEvents="none">
+          <AuroraPresetView preset="header" colors={PROFIEL_AURORA_COLORS} animated />
+        </View>
+
+        {/* Title */}
+        <Text style={styles.title}>Profiel</Text>
+
+        {/* Avatar + info header */}
+        <Pressable style={styles.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={s.avatar} />
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
-            <View style={[s.avatar, { backgroundColor: t.colors.surface.overlay }]}>
-              <Text style={{ fontSize: 32, fontWeight: '600', color: t.colors.text.secondary }}>
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarInitial}>
                 {(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase()}
               </Text>
             </View>
           )}
-          <Text style={{ color: t.colors.tint, fontSize: 12, marginTop: 8 }}>
-            {uploadingAvatar ? 'Uploaden...' : 'Foto wijzigen'}
-          </Text>
-          <Text style={{ ...t.typography.heading3, color: t.colors.text.primary, marginTop: 12 }}>
-            {user?.user_metadata?.full_name || '-'}
-          </Text>
-          <Text style={{ color: t.colors.text.tertiary, fontSize: 14, marginTop: 2 }}>
-            {user?.email || ''}
+          <Text style={styles.fotoWijzigen}>
+            {uploadingAvatar ? 'Uploaden...' : 'Foto Wijzigen'}
           </Text>
         </Pressable>
 
-        {/* Profile Section */}
-        <Text style={s.sectionHeader}>PROFIEL</Text>
-        <View style={[s.card, { backgroundColor: t.colors.surface.raised }]}>
+        {/* Name display */}
+        <Text style={styles.displayName}>
+          {user?.user_metadata?.full_name || '-'}
+        </Text>
+
+        {/* ── PROFIEL section ── */}
+        <Text style={styles.sectionHeader}>PROFIEL</Text>
+        <View style={styles.card}>
           {editingName ? (
-            <View style={s.editRow}>
-              <Ionicons name="person-outline" size={20} color={t.colors.text.tertiary} style={s.rowIcon} />
+            <View style={styles.row}>
+              <Ionicons name="person-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
               <TextInput
-                style={[s.editInput, { color: t.colors.text.primary }]}
+                style={styles.editInput}
                 value={newName}
                 onChangeText={setNewName}
                 autoFocus
                 placeholder="Naam"
-                placeholderTextColor={t.colors.text.tertiary}
+                placeholderTextColor="#848484"
               />
-              <Pressable onPress={handleSaveName} disabled={saving} style={s.editBtn}>
-                <Text style={{ color: t.colors.tint, fontSize: 14, fontWeight: '600' }}>{saving ? '...' : 'Opslaan'}</Text>
+              <Pressable onPress={handleSaveName} disabled={saving} style={styles.editBtn}>
+                <Text style={styles.editBtnText}>{saving ? '...' : 'Opslaan'}</Text>
               </Pressable>
-              <Pressable onPress={() => setEditingName(false)} style={s.editBtn}>
-                <Text style={{ color: t.colors.text.tertiary, fontSize: 14 }}>Annuleren</Text>
+              <Pressable onPress={() => setEditingName(false)} style={styles.editBtn}>
+                <Text style={styles.editCancelText}>Annuleren</Text>
               </Pressable>
             </View>
           ) : (
-            <Pressable style={s.row} onPress={handleStartEdit}>
-              <Ionicons name="person-outline" size={20} color={t.colors.text.tertiary} style={s.rowIcon} />
-              <Text style={[s.rowLabel, { color: t.colors.text.primary }]}>Naam</Text>
-              <Text style={{ color: t.colors.text.tertiary, fontSize: 14, marginRight: 4 }}>{user?.user_metadata?.full_name || '-'}</Text>
-              <Ionicons name="chevron-forward" size={16} color={t.colors.text.tertiary} />
+            <Pressable style={styles.row} onPress={handleStartEdit}>
+              <Ionicons name="person-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
+              <Text style={styles.rowLabel}>Naam</Text>
+              <Text style={styles.rowValue}>{user?.user_metadata?.full_name || '-'}</Text>
             </Pressable>
           )}
           {!canChangeName() && !editingName && (
-            <Text style={{ color: t.colors.text.tertiary, fontSize: 12, paddingHorizontal: 48, paddingBottom: 8 }}>
+            <Text style={styles.nameWarning}>
               Nog {daysUntilChange()} dagen tot je je naam weer kunt wijzigen
             </Text>
           )}
-          <View style={[s.divider, { backgroundColor: t.colors.border.default }]} />
-          <View style={s.row}>
-            <Ionicons name="mail-outline" size={20} color={t.colors.text.tertiary} style={s.rowIcon} />
-            <Text style={[s.rowLabel, { color: t.colors.text.primary }]}>E-mail</Text>
-            <Text style={{ color: t.colors.text.tertiary, fontSize: 14 }}>{user?.email || '-'}</Text>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Ionicons name="mail-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
+            <Text style={styles.rowLabel}>E-mail</Text>
+            <Text style={styles.rowValue} numberOfLines={1}>{user?.email || '-'}</Text>
           </View>
         </View>
 
-        {/* Display Section */}
-        <Text style={s.sectionHeader}>WEERGAVE</Text>
-        <View style={[s.card, { backgroundColor: t.colors.surface.raised }]}>
-          <View style={s.row}>
-            <Ionicons name="color-palette-outline" size={20} color={t.colors.text.tertiary} style={s.rowIcon} />
-            <Text style={[s.rowLabel, { color: t.colors.text.primary }]}>Thema</Text>
-            <View style={[s.segmented, { backgroundColor: t.colors.surface.default }]}>
-              {themeOptions.map((opt) => (
+        {/* ── WEERGAVE section ── */}
+        <Text style={styles.sectionHeader}>WEERGAVE</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Ionicons name="color-palette-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
+            <Text style={styles.rowLabel}>Thema</Text>
+            <View style={styles.segmented}>
+              <Animated.View style={[styles.segIndicator, { left: segX, width: segW }]} />
+              {themeOptions.map((opt, i) => (
                 <Pressable
                   key={opt.key}
-                  style={[s.segmentBtn, preference === opt.key && [s.segmentActive, { backgroundColor: t.colors.tint + '20' }]]}
+                  style={styles.segmentBtn}
                   onPress={() => setPreference(opt.key)}
+                  onLayout={(e) => onSegLayout(i, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
                 >
-                  <Text style={[s.segmentText, { color: t.colors.text.tertiary }, preference === opt.key && { color: t.colors.tint, fontWeight: '600' }]}>
+                  <Text style={[styles.segmentText, preference === opt.key && styles.segmentActiveText]}>
                     {opt.label}
                   </Text>
                 </Pressable>
               ))}
             </View>
           </View>
-          <View style={[s.divider, { backgroundColor: t.colors.border.default }]} />
-          <View style={s.row}>
-            <Ionicons name="information-circle-outline" size={20} color={t.colors.text.tertiary} style={s.rowIcon} />
-            <Text style={[s.rowLabel, { color: t.colors.text.primary }]}>Versie</Text>
-            <Text style={{ color: t.colors.text.tertiary, fontSize: 14 }}>1.0.0</Text>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
+            <Text style={styles.rowLabel}>Versie</Text>
+            <Text style={styles.rowValue}>1.0.0</Text>
           </View>
         </View>
 
-        {/* Logout */}
-        <Pressable style={[s.logoutBtn, { backgroundColor: t.colors.surface.raised }]} onPress={handleSignOut}>
-          <Text style={{ color: t.semantic.error, fontSize: 16, fontWeight: '500' }}>Uitloggen</Text>
+        {/* ── Uitloggen ── */}
+        <Pressable style={styles.logoutBtn} onPress={handleSignOut}>
+          <Text style={styles.logoutText}>Uitloggen</Text>
         </Pressable>
       </ScrollView>
-    </SafeAreaView>
+
+      <CameraModal
+        visible={cameraVisible}
+        onClose={() => setCameraVisible(false)}
+        onImageCaptured={handleImageCaptured}
+      />
+    </View>
   );
 }
 
-function createStyles(t: Theme, mode: 'light' | 'dark') {
+function createStyles(t: Theme) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: t.colors.background.primary },
-    content: { paddingBottom: 40 },
-
-    headerTitle: { fontSize: 32, fontWeight: '700', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 4 },
-
-    avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 16 },
-    avatar: { width: 80, height: 80, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
-
-    sectionHeader: {
-      fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase',
-      color: t.colors.text.tertiary, marginLeft: 28, marginTop: 24, marginBottom: 8,
+    content: {
+      paddingBottom: 120,
     },
 
-    card: { borderRadius: 16, marginHorizontal: 24, overflow: 'hidden' },
+    // Aurora — same framing as home tab
+    auroraWrap: {
+      position: 'absolute',
+      left: -20,
+      top: 0,
+      zIndex: 0,
+    },
 
-    row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
-    rowIcon: { marginRight: 12, width: 20 },
-    rowLabel: { fontSize: 16, flex: 1 },
-    divider: { height: 1, marginLeft: 48 },
+    // Title
+    title: {
+      fontFamily: 'Unbounded',
+      fontSize: 24,
+      fontWeight: '400',
+      color: '#FFFFFF',
+      paddingHorizontal: s(21),
+      paddingTop: s(10),
+    },
 
-    editRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
-    editInput: { flex: 1, fontSize: 16, marginRight: 8 },
-    editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+    // Avatar hero
+    avatarSection: {
+      alignItems: 'center',
+      marginTop: s(30),
+    },
+    avatar: {
+      width: s(105),
+      height: s(105),
+      borderRadius: 9999,
+    },
+    avatarPlaceholder: {
+      backgroundColor: '#D9D9D9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitial: {
+      fontFamily: 'Unbounded',
+      fontSize: 36,
+      fontWeight: '600',
+      color: '#333',
+    },
+    fotoWijzigen: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      color: '#00BEAE',
+      marginTop: s(12),
+    },
 
-    segmented: { flexDirection: 'row', borderRadius: 8, padding: 2 },
-    segmentBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-    segmentActive: {},
-    segmentText: { fontSize: 12, fontWeight: '500' },
+    // Display name
+    displayName: {
+      fontFamily: 'Unbounded',
+      fontSize: 24,
+      fontWeight: '400',
+      color: '#FFFFFF',
+      textAlign: 'center',
+      marginTop: s(16),
+      paddingHorizontal: s(20),
+    },
 
+    // Section header
+    sectionHeader: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      fontWeight: '400',
+      color: '#848484',
+      marginLeft: s(22),
+      marginTop: s(28),
+      marginBottom: s(8),
+    },
+
+    // Card
+    card: {
+      marginHorizontal: s(23),
+      borderRadius: 25,
+      backgroundColor: 'rgba(78, 78, 78, 0.2)',
+      overflow: 'hidden',
+    },
+
+    // Row
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: s(16),
+      minHeight: s(55),
+    },
+    rowIcon: {
+      marginRight: s(12),
+      width: 20,
+    },
+    rowLabel: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      fontWeight: '400',
+      color: '#FFFFFF',
+      flex: 1,
+    },
+    rowValue: {
+      fontFamily: 'Unbounded',
+      fontSize: 12,
+      fontWeight: '400',
+      color: '#848484',
+      flexShrink: 1,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: 'rgba(78, 78, 78, 0.3)',
+      marginLeft: s(48),
+    },
+
+    // Edit name
+    editInput: {
+      fontFamily: 'Unbounded',
+      flex: 1,
+      fontSize: 14,
+      color: '#FFFFFF',
+      marginRight: 8,
+    },
+    editBtn: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    editBtnText: {
+      fontFamily: 'Unbounded',
+      color: '#00BEAE',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    editCancelText: {
+      fontFamily: 'Unbounded',
+      color: '#848484',
+      fontSize: 12,
+    },
+    nameWarning: {
+      fontFamily: 'Unbounded',
+      color: '#848484',
+      fontSize: 11,
+      paddingHorizontal: s(74),
+      paddingBottom: s(8),
+    },
+
+    // Theme segmented
+    segmented: {
+      flexDirection: 'row',
+      borderRadius: 8,
+      backgroundColor: 'rgba(78, 78, 78, 0.3)',
+      padding: 2,
+    },
+    segIndicator: {
+      position: 'absolute',
+      top: 2,
+      bottom: 2,
+      borderRadius: 6,
+      backgroundColor: 'rgba(0, 190, 174, 0.2)',
+    },
+    segmentBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 6,
+    },
+    segmentText: {
+      fontFamily: 'Unbounded',
+      fontSize: 11,
+      fontWeight: '400',
+      color: '#848484',
+    },
+    segmentActiveText: {
+      color: '#00BEAE',
+      fontWeight: '600',
+    },
+
+    // Logout
     logoutBtn: {
-      marginHorizontal: 24, marginTop: 32, height: 52, borderRadius: 16,
-      alignItems: 'center', justifyContent: 'center',
+      marginHorizontal: s(24),
+      marginTop: s(28),
+      height: s(50),
+      borderRadius: 25,
+      backgroundColor: 'rgba(78, 78, 78, 0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoutText: {
+      fontFamily: 'Unbounded',
+      fontSize: 16,
+      fontWeight: '400',
+      color: '#EB5466',
     },
   });
 }

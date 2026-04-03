@@ -13,6 +13,8 @@ export function useGroupDetail(groupId: string) {
   const [members, setMembers] = useState<(GroupMember & { profile: Profile })[]>([]);
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [tallyCounts, setTallyCounts] = useState<Record<string, number>>({});
+  const [tallyCategoryCounts, setTallyCategoryCounts] = useState<Record<string, Record<number, number>>>({});
+  const [credits, setCredits] = useState<Record<number, number>>({});
   const [recentTallies, setRecentTallies] = useState<TallyWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -57,6 +59,16 @@ export function useGroupDetail(groupId: string) {
         ...t,
         user_name: t.profile?.full_name ?? 'Onbekend',
       })));
+
+      // Compute tallyCategoryCounts from tallies data
+      const catCounts: Record<string, Record<number, number>> = {};
+      talliesData.forEach((t: any) => {
+        const uid = t.user_id as string;
+        const cat = (t.category ?? 1) as number;
+        if (!catCounts[uid]) catCounts[uid] = {};
+        catCounts[uid][cat] = (catCounts[uid][cat] || 0) + 1;
+      });
+      setTallyCategoryCounts(catCounts);
     }
 
     // Get tally counts per member
@@ -76,6 +88,9 @@ export function useGroupDetail(groupId: string) {
       );
       setTallyCounts(counts);
     }
+
+    // Compute credits (empty for now — no credits table in database yet)
+    setCredits({});
 
     setLoading(false);
   }, [user, groupId]);
@@ -261,15 +276,61 @@ export function useGroupDetail(groupId: string) {
       .eq('id', groupId);
   };
 
+  const addTallyForMember = async (userId: string, drinkId: string) => {
+    if (!user) return;
+    // Find the drink to get its category
+    const drink = drinks.find((d) => d.id === drinkId);
+    if (!drink) return;
+
+    await supabase.from('tallies').insert({
+      group_id: groupId,
+      user_id: userId,
+      category: drink.category,
+      added_by: user.id,
+    });
+  };
+
+  const activateMe = async () => {
+    if (!user) return;
+
+    // Deactivate all other groups first
+    await supabase
+      .from('group_members')
+      .update({ is_active: false })
+      .eq('user_id', user.id)
+      .neq('group_id', groupId);
+
+    // Activate in this group
+    await supabase
+      .from('group_members')
+      .update({ is_active: true })
+      .eq('group_id', groupId)
+      .eq('user_id', user.id);
+  };
+
+  const removeOwnAdmin = async () => {
+    if (!user) return;
+    await supabase
+      .from('group_members')
+      .update({ is_admin: false })
+      .eq('group_id', groupId)
+      .eq('user_id', user.id);
+  };
+
   return {
     group,
     members,
     drinks,
     tallyCounts,
+    tallyCategoryCounts,
     recentTallies,
+    credits,
     loading,
     isAdmin,
     addTally,
+    addTallyForMember,
+    activateMe,
+    removeOwnAdmin,
     toggleActive,
     removeTally,
     toggleAdmin,

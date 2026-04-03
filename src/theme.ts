@@ -13,12 +13,16 @@ import { Platform } from 'react-native';
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
-  magenta: '#E91E8C',
-  cyan: '#00D9A3',
-  green: '#00FE96',
+  magenta: '#FF004D',
+  streepsRed: '#FF0085',   // Figma --streepsred: buttons, nav pill
+  cyan: '#00BEAE',
+  green: '#00FE96',        // Figma --streepsgreen: confirmation
   blue: '#4A6CF7',
   purple: '#8B5CF6',
-  gradient: ['#E91E8C', '#8B5CF6', '#4A6CF7', '#00D9A3'] as const,
+  streepsWhite: '#F1F1F1', // Figma --streepswhite: input bg, text on dark
+  inactive: '#848484',     // Figma --inactivewords: placeholder, inactive
+  gradient: ['#E91E8C', '#8B5CF6', '#4A6CF7', '#00BEAE'] as const,
+  bg: { from: '#0E0D1C', to: '#3D3D3D' } as const, // Screen background gradient
 } as const;
 
 // ─── Aurora Background Stops ─────────────────────────────────────────────────
@@ -370,14 +374,15 @@ export const components = {
     labelSize: typography.caption.fontSize,
   },
   navBar: {
-    height: 72,
-    pillWidth: 56,
-    pillHeight: 40,
-    iconSize: 24,
+    height: 77,
+    pillWidth: 80,
+    pillHeight: 50,
+    pillRadius: 44,
+    iconSize: 32,
   },
   counter: {
     size: 73,
-    borderRadius: 16,
+    borderRadius: 25,
   },
   card: {
     padding: space[4],
