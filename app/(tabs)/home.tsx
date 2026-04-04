@@ -606,7 +606,7 @@ export default function HomeScreen() {
             )}
 
             {/* ── Meer opties (progressive disclosure) ── */}
-            <Pressable onPress={() => { LayoutAnimation.configureNext({ duration: 300, create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity }, update: { type: LayoutAnimation.Types.easeInEaseOut }, delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity } }); setShowMoreOptions(!showMoreOptions); if (!showMoreOptions) setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }} style={s.moreOptionsToggle}>
+            <Pressable onPress={() => { LayoutAnimation.configureNext({ duration: 350, create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.scaleY, springDamping: 0.7 }, update: { type: LayoutAnimation.Types.easeInEaseOut }, delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.scaleY } }); setShowMoreOptions(!showMoreOptions); if (!showMoreOptions) setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }} style={s.moreOptionsToggle}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={s.moreOptionsText}>Meer opties</Text>
                 <Ionicons name={showMoreOptions ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
