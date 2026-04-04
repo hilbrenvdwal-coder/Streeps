@@ -159,20 +159,15 @@ export default function HomeScreen() {
     ]).start(() => setToast(null));
   };
 
-  // Content fade-in on data load
+  // Content fade-in on data load (triggers on group switch + initial load)
   const contentOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (group) {
+    if (group && group.id === selectedGroupId) {
       Animated.timing(contentOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     } else {
       contentOpacity.setValue(0);
     }
-  }, [!!group]);
-
-  // Reset opacity immediately when switching groups
-  useEffect(() => {
-    contentOpacity.setValue(0);
-  }, [selectedGroupId]);
+  }, [group?.id, selectedGroupId]);
 
   // Member detail modal
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
