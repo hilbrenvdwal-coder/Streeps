@@ -391,10 +391,8 @@ export default function HomeScreen() {
     if (!group || selectedForSettlement.size === 0) return;
     await createSettlement(group, Array.from(selectedForSettlement));
     setShowSettlement(false);
-    setConfirmationText('Afrekening gemaakt!');
+    showToast('Afrekening gemaakt!', 'success');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowConfirmation(true);
-    setTimeout(() => setShowConfirmation(false), 2000);
   };
 
   // ════════════════════════════════════════════════════════════
