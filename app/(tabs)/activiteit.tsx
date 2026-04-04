@@ -24,6 +24,7 @@ import { supabase } from '@/src/lib/supabase';
 import { useHistory, formatTimeAgo } from '@/src/hooks/useHistory';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import * as Haptics from 'expo-haptics';
+import { AnimatedCard } from '@/src/components/AnimatedCard';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
@@ -286,6 +287,7 @@ export default function ActiviteitScreen() {
                 ? `Gedoneerd aan ${item.gift_other_name}`
                 : `Categorie ${item.category}${item.removed ? ' (verwijderd)' : ''}`;
               return (
+                <AnimatedCard index={index} enabled={index < 15}>
                 <View style={[
                   styles.historyItem,
                   index === 0 && { borderTopLeftRadius: 25, borderTopRightRadius: 25 },
@@ -309,6 +311,7 @@ export default function ActiviteitScreen() {
                     <Text style={styles.historyCount}>{item.count ?? item.gift_quantity}</Text>
                   )}
                 </View>
+                </AnimatedCard>
               );
             }}
           />

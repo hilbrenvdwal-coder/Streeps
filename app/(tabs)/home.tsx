@@ -3,6 +3,7 @@ import { AuroraPresetView, AURORA_COLORS } from '@/src/components/AuroraBackgrou
 import CategoryRow from '@/src/components/CategoryRow';
 import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
+import { AnimatedCard } from '@/src/components/AnimatedCard';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
 import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -89,13 +90,7 @@ function SlideModal({ visible, onClose, children }: { visible: boolean; onClose:
   );
 }
 
-function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(opacity, { toValue: 1, duration: 200, delay: index * 40, useNativeDriver: true }).start();
-  }, []);
-  return <Animated.View style={{ opacity }}>{children}</Animated.View>;
-}
+// StaggerItem replaced by AnimatedCard from src/components/AnimatedCard.tsx
 
 const STORAGE_KEY = 'streeps_selected_group';
 
@@ -505,7 +500,7 @@ export default function HomeScreen() {
                 {members.slice(0, showMembers ? members.length : 4).map((member, i) => {
                   const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
                   return (
-                    <StaggerItem key={member.id} index={i}>
+                    <AnimatedCard key={member.id} index={i}>
                     <Pressable style={s.lidRow} onPress={() => {
                       if (closeAnimRef.current) {
                         closeAnimRef.current.stop();
@@ -538,7 +533,7 @@ export default function HomeScreen() {
                       <Text style={s.lidName}>{mName}</Text>
                       {member.is_admin && <Ionicons name="shield" size={14} color="#00BEAE" style={{ marginLeft: 6 }} />}
                     </Pressable>
-                    </StaggerItem>
+                    </AnimatedCard>
                   );
                 })}
               </View>
@@ -573,7 +568,7 @@ export default function HomeScreen() {
                   {drinks.slice(0, showAllDrinks ? drinks.length : 4).map((drink, i) => {
                     const catColor = t.categoryColors[(drink.category - 1) % 4];
                     return (
-                      <StaggerItem key={drink.id} index={i}>
+                      <AnimatedCard key={drink.id} index={i}>
                         <View style={s.drinkRow}>
                           <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
                           <Text style={s.drinkName}>{drink.name}</Text>
@@ -581,7 +576,7 @@ export default function HomeScreen() {
                             <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
                           </View>
                         </View>
-                      </StaggerItem>
+                      </AnimatedCard>
                     );
                   })}
                 </View>

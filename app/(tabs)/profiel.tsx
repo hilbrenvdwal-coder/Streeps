@@ -12,6 +12,7 @@ import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import CameraModal from '@/src/components/CameraModal';
+import { AnimatedCard } from '@/src/components/AnimatedCard';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
@@ -193,6 +194,7 @@ export default function ProfielScreen() {
         </Text>
 
         {/* ── PROFIEL section ── */}
+        <AnimatedCard index={0}>
         <Text style={styles.sectionHeader}>PROFIEL</Text>
         <View style={styles.card}>
           {editingName ? (
@@ -232,8 +234,10 @@ export default function ProfielScreen() {
             <Text style={styles.rowValue} numberOfLines={1}>{user?.email || '-'}</Text>
           </View>
         </View>
+        </AnimatedCard>
 
         {/* ── WEERGAVE section ── */}
+        <AnimatedCard index={1}>
         <Text style={styles.sectionHeader}>WEERGAVE</Text>
         <View style={styles.card}>
           <View style={styles.row}>
@@ -262,11 +266,14 @@ export default function ProfielScreen() {
             <Text style={styles.rowValue}>1.0.0</Text>
           </View>
         </View>
+        </AnimatedCard>
 
         {/* ── Uitloggen ── */}
+        <AnimatedCard index={2}>
         <Pressable style={styles.logoutBtn} onPress={handleSignOut}>
           <Text style={styles.logoutText}>Uitloggen</Text>
         </Pressable>
+        </AnimatedCard>
       </ScrollView>
 
       <CameraModal
