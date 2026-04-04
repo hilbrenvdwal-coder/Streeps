@@ -23,6 +23,7 @@ import Svg, { Path, G } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
+import { AnimatedCard } from '@/src/components/AnimatedCard';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -2991,6 +2992,7 @@ export default function ChatScreen() {
               </View>
             }
             renderItem={({ item, index }) => (
+              <AnimatedCard index={index} enabled={index < 15}>
               <Pressable
                 style={cs.convRow}
                 onPress={() => openChat(item)}
@@ -3019,6 +3021,7 @@ export default function ChatScreen() {
                   </View>
                 </View>
               </Pressable>
+              </AnimatedCard>
             )}
           />
         </FadeMask>
