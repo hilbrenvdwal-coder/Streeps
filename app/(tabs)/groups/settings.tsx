@@ -19,6 +19,7 @@ import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
 import CameraModal from '@/src/components/CameraModal';
+import * as Haptics from 'expo-haptics';
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -285,14 +286,37 @@ export default function GroupSettingsScreen() {
                   value={newDrinkEmoji}
                   onChangeText={setNewDrinkEmoji}
                 />
-                <TextInput
-                  style={[s.inputText, { width: 100, textAlign: 'center' }]}
-                  placeholder="Cat (1-4)"
-                  placeholderTextColor={t.colors.text.tertiary}
-                  value={newDrinkCategory}
-                  onChangeText={setNewDrinkCategory}
-                  keyboardType="numeric"
-                />
+              </View>
+              <View style={s.divider} />
+              <View style={s.categoryPickerRow} onStartShouldSetResponder={() => true}>
+                <Text style={s.categoryPickerLabel}>Categorie</Text>
+                <View style={s.categoryPickerDots}>
+                  {[1, 2, 3, 4].map((cat) => {
+                    const isSelected = newDrinkCategory === String(cat);
+                    return (
+                      <Pressable
+                        key={cat}
+                        onPress={() => {
+                          setNewDrinkCategory(String(cat));
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        hitSlop={8}
+                        style={[
+                          s.categoryPickerDot,
+                          {
+                            backgroundColor: t.categoryColors[cat - 1],
+                            opacity: isSelected ? 1 : 0.4,
+                            transform: [{ scale: isSelected ? 1.2 : 1 }],
+                          },
+                          isSelected && {
+                            borderWidth: 2,
+                            borderColor: t.colors.text.primary,
+                          },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
               </View>
             </View>
             <Pressable style={s.addBtn} onPress={handleAddDrink}>
@@ -503,5 +527,30 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
       minHeight: 52,
     },
     dangerText: { ...t.typography.body, color: t.semantic.error, flex: 1 },
+
+    // Category picker
+    categoryPickerRow: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      paddingHorizontal: 16,
+      height: 52,
+    },
+    categoryPickerLabel: {
+      ...t.typography.body,
+      color: t.colors.text.tertiary,
+      marginRight: 16,
+    },
+    categoryPickerDots: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 12,
+      flex: 1,
+      justifyContent: 'flex-end' as const,
+    },
+    categoryPickerDot: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+    },
   });
 }
