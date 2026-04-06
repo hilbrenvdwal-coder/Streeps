@@ -1,0 +1,39 @@
+<svg width="390" height="844" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Activiteit" clip-path="url(#clip0_251_493)">
+<rect width="390" height="844" fill="url(#paint0_linear_251_493)"/>
+<g id="scroll" clip-path="url(#clip1_251_493)">
+<g id="Vector" filter="url(#filter0_f_251_493)">
+<path d="M394.534 -44.169C412.706 7.31607 331.171 75.9734 212.42 109.181C93.6693 142.389 -17.3287 127.573 -35.501 76.0878C-53.6732 24.6027 27.8618 -44.0546 146.613 -77.2626C265.363 -110.471 376.361 -95.6541 394.534 -44.169Z" fill="#FF0015"/>
+<path d="M353.578 -32.716C367.105 5.60745 298.994 58.788 201.449 86.066C103.904 113.344 13.8621 104.39 0.335411 66.0664C-13.1913 27.7429 54.9192 -25.4376 152.465 -52.7157C250.01 -79.9937 340.051 -71.0395 353.578 -32.716Z" fill="#FF00F5"/>
+<path d="M313.339 -24.5438C321.4 -1.70458 273.308 32.0866 205.922 50.9308C138.535 69.775 77.3728 66.5364 69.3114 43.6972C61.25 20.8579 109.342 -12.9332 176.729 -31.7775C244.115 -50.6217 305.278 -47.3831 313.339 -24.5438Z" fill="#F1F1F1"/>
+<path d="M255.319 -8.31872C259.281 2.90736 232.314 20.4472 195.087 30.8577C157.86 41.2681 124.469 40.6069 120.506 29.3809C116.544 18.1548 143.511 0.614919 180.738 -9.79553C217.965 -20.206 251.356 -19.5448 255.319 -8.31872Z" fill="#FF00F5"/>
+</g>
+<text id="Activiteit_2" fill="white" style="white-space: pre" xml:space="preserve" font-family="Unbounded" font-size="24" letter-spacing="0em"><tspan x="21" y="54">Activiteit</tspan></text>
+<g id="Keuze">
+<g id="Group 18">
+<rect id="Rectangle 12" x="25" y="90" width="343" height="50" rx="25" fill="#4E4E4E" fill-opacity="0.4"/>
+<rect id="Geschiedenis" x="30" y="95" width="160" height="40" rx="20" fill="#FF004D" fill-opacity="0.19"/>
+<text id="Geschiedenis_2" fill="#FF004D" style="white-space: pre" xml:space="preserve" font-family="Unbounded" font-size="14" font-weight="500" letter-spacing="0em"><tspan x="52" y="120.75">Geschiedenis</tspan></text>
+<text id="Rekening" fill="#848484" style="white-space: pre" xml:space="preserve" font-family="Unbounded" font-size="14" font-weight="500" letter-spacing="0em"><tspan x="251" y="120.75">Rekening</tspan></text>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<filter id="filter0_f_251_493" x="-138.034" y="-194.985" width="635.102" height="421.889" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="50" result="effect1_foregroundBlur_251_493"/>
+</filter>
+<linearGradient id="paint0_linear_251_493" x1="195" y1="-272" x2="195" y2="844" gradientUnits="userSpaceOnUse">
+<stop stop-color="#0E0D1C"/>
+<stop offset="1" stop-color="#202020"/>
+</linearGradient>
+<clipPath id="clip0_251_493">
+<rect width="390" height="844" fill="white"/>
+</clipPath>
+<clipPath id="clip1_251_493">
+<rect width="390" height="844" fill="white"/>
+</clipPath>
+</defs>
+</svg>

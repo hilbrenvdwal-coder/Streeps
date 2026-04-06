@@ -1,0 +1,728 @@
+{
+  "components": {
+    "Group 14": {
+      "maskId": "mask0_71_41",
+      "mask": {
+        "x": -20.0,
+        "y": 570.0,
+        "width": 420.0,
+        "height": 120.0
+      },
+      "shape": {
+        "x": -3.0,
+        "y": 574.5,
+        "width": 598.95,
+        "height": 109.5
+      },
+      "viewBox": {
+        "width": 598.95,
+        "height": 109.5
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "path",
+          "id": "path_1",
+          "fill": "#00FE96",
+          "centerX": 170.78,
+          "centerY": -10.71,
+          "radiusX": 236.73,
+          "radiusY": 69.43,
+          "rotation": 0,
+          "bbox": {
+            "x": -68.9483,
+            "y": 494.366,
+            "width": 473.4603,
+            "height": 138.856
+          },
+          "relativeCenter": {
+            "xPercent": 0.2851,
+            "yPercent": -0.0978
+          }
+        },
+        {
+          "index": 2,
+          "type": "path",
+          "id": "path_2",
+          "fill": "#FF00F5",
+          "centerX": 168.05,
+          "centerY": -10.77,
+          "radiusX": 193.88,
+          "radiusY": 51.9,
+          "rotation": 0,
+          "bbox": {
+            "x": -28.8289,
+            "y": 511.827,
+            "width": 387.7629,
+            "height": 103.80799999999999
+          },
+          "relativeCenter": {
+            "xPercent": 0.2806,
+            "yPercent": -0.0983
+          }
+        },
+        {
+          "index": 3,
+          "type": "path",
+          "id": "path_3",
+          "fill": "#FF0085",
+          "centerX": 256.55,
+          "centerY": 34.21,
+          "radiusX": 133.37,
+          "radiusY": 30.82,
+          "rotation": 0,
+          "bbox": {
+            "x": 120.175,
+            "y": 577.895,
+            "width": 266.74399999999997,
+            "height": 61.638000000000034
+          },
+          "relativeCenter": {
+            "xPercent": 0.4283,
+            "yPercent": 0.3125
+          }
+        },
+        {
+          "index": 4,
+          "type": "path",
+          "id": "path_4",
+          "fill": "#00FE96",
+          "centerX": 180.38,
+          "centerY": -12.48,
+          "radiusX": 73.5,
+          "radiusY": 15.42,
+          "rotation": 0,
+          "bbox": {
+            "x": 103.883,
+            "y": 546.608,
+            "width": 147.0,
+            "height": 30.83400000000006
+          },
+          "relativeCenter": {
+            "xPercent": 0.3012,
+            "yPercent": -0.1139
+          }
+        }
+      ]
+    },
+    "Group 7": {
+      "maskId": "mask1_71_41",
+      "mask": {
+        "x": 5.0,
+        "y": 452.0,
+        "width": 380.0,
+        "height": 80.0
+      },
+      "shape": {
+        "x": 20.0,
+        "y": 467.0,
+        "width": 350.0,
+        "height": 50.0
+      },
+      "viewBox": {
+        "width": 350.0,
+        "height": 50.0
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "ellipse",
+          "id": "ellipse_1",
+          "fill": "#F1F1F1",
+          "original": {
+            "cx": 104.586,
+            "cy": 25.3199,
+            "rx": 104.586,
+            "ry": 25.3199
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 -3 473.453)",
+          "centerX": 93.96,
+          "centerY": 17.5,
+          "radiusX": 104.59,
+          "radiusY": 25.32,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2685,
+            "yPercent": 0.3499
+          }
+        },
+        {
+          "index": 2,
+          "type": "ellipse",
+          "id": "ellipse_2",
+          "fill": "#FF00F5",
+          "original": {
+            "cx": 85.9095,
+            "cy": 18.8471,
+            "rx": 85.9095,
+            "ry": 18.8471
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 17.6443 477.231)",
+          "centerX": 92.72,
+          "centerY": 17.62,
+          "radiusX": 85.91,
+          "radiusY": 18.85,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2649,
+            "yPercent": 0.3525
+          }
+        },
+        {
+          "index": 3,
+          "type": "ellipse",
+          "id": "ellipse_3",
+          "fill": "#00BEAE",
+          "original": {
+            "cx": 59.3481,
+            "cy": 11.2321,
+            "rx": 59.3481,
+            "ry": 11.2321
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 54.9961 479.633)",
+          "centerX": 99.77,
+          "centerY": 16.2,
+          "radiusX": 59.35,
+          "radiusY": 11.23,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.285,
+            "yPercent": 0.3241
+          }
+        },
+        {
+          "index": 4,
+          "type": "ellipse",
+          "id": "ellipse_4",
+          "fill": "#00FE96",
+          "original": {
+            "cx": 32.7867,
+            "cy": 5.52088,
+            "rx": 32.7867,
+            "ry": 5.52088
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 82.6826 481.99)",
+          "centerX": 98.12,
+          "centerY": 16.37,
+          "radiusX": 32.79,
+          "radiusY": 5.52,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2803,
+            "yPercent": 0.3275
+          }
+        }
+      ]
+    },
+    "Group 7_2": {
+      "maskId": "mask2_71_41",
+      "mask": {
+        "x": 5.0,
+        "y": 393.0,
+        "width": 380.0,
+        "height": 80.0
+      },
+      "shape": {
+        "x": 20.0,
+        "y": 408.0,
+        "width": 350.0,
+        "height": 50.0
+      },
+      "viewBox": {
+        "width": 350.0,
+        "height": 50.0
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "ellipse",
+          "id": "ellipse_1",
+          "fill": "#816C00",
+          "original": {
+            "cx": 131.002,
+            "cy": 36.5175,
+            "rx": 131.002,
+            "ry": 36.5175
+          },
+          "transform": "matrix(0.999973 -0.00740262 0.426463 0.904505 -31.1467 409.94)",
+          "centerX": 95.43,
+          "centerY": 34.0,
+          "radiusX": 131.0,
+          "radiusY": 36.52,
+          "rotation": -0.42,
+          "relativeCenter": {
+            "xPercent": 0.2726,
+            "yPercent": 0.68
+          }
+        },
+        {
+          "index": 2,
+          "type": "ellipse",
+          "id": "ellipse_2",
+          "fill": "#FCD145",
+          "original": {
+            "cx": 107.609,
+            "cy": 27.1822,
+            "rx": 107.609,
+            "ry": 27.1822
+          },
+          "transform": "matrix(0.999973 -0.00740262 0.426463 0.904505 -6 412.593)",
+          "centerX": 93.2,
+          "centerY": 28.38,
+          "radiusX": 107.61,
+          "radiusY": 27.18,
+          "rotation": -0.42,
+          "relativeCenter": {
+            "xPercent": 0.2663,
+            "yPercent": 0.5677
+          }
+        },
+        {
+          "index": 3,
+          "type": "ellipse",
+          "id": "ellipse_3",
+          "fill": "#FF00F5",
+          "original": {
+            "cx": 74.3386,
+            "cy": 16.1995,
+            "rx": 74.3386,
+            "ry": 16.1995
+          },
+          "transform": "matrix(0.999973 -0.00740262 0.426463 0.904505 41.5094 426.847)",
+          "centerX": 102.75,
+          "centerY": 32.95,
+          "radiusX": 74.34,
+          "radiusY": 16.2,
+          "rotation": -0.42,
+          "relativeCenter": {
+            "xPercent": 0.2936,
+            "yPercent": 0.659
+          }
+        },
+        {
+          "index": 4,
+          "type": "ellipse",
+          "id": "ellipse_4",
+          "fill": "#3D3D3D",
+          "original": {
+            "cx": 41.0682,
+            "cy": 7.96246,
+            "rx": 41.0682,
+            "ry": 7.96246
+          },
+          "transform": "matrix(0.999973 -0.00740262 0.426463 0.904505 76.2125 434.066)",
+          "centerX": 100.68,
+          "centerY": 32.96,
+          "radiusX": 41.07,
+          "radiusY": 7.96,
+          "rotation": -0.42,
+          "relativeCenter": {
+            "xPercent": 0.2876,
+            "yPercent": 0.6593
+          }
+        }
+      ]
+    },
+    "Group 7_3": {
+      "maskId": "mask3_71_41",
+      "mask": {
+        "x": 5.0,
+        "y": 334.0,
+        "width": 380.0,
+        "height": 80.0
+      },
+      "shape": {
+        "x": 20.0,
+        "y": 349.0,
+        "width": 350.0,
+        "height": 50.0
+      },
+      "viewBox": {
+        "width": 350.0,
+        "height": 50.0
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "ellipse",
+          "id": "ellipse_1",
+          "fill": "#FF0085",
+          "original": {
+            "cx": 132.564,
+            "cy": 36.9399,
+            "rx": 132.564,
+            "ry": 36.9399
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 -49 349.192)",
+          "centerX": 81.73,
+          "centerY": 18.36,
+          "radiusX": 132.56,
+          "radiusY": 36.94,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2335,
+            "yPercent": 0.3671
+          }
+        },
+        {
+          "index": 2,
+          "type": "ellipse",
+          "id": "ellipse_2",
+          "fill": "#FF00F5",
+          "original": {
+            "cx": 108.892,
+            "cy": 27.4966,
+            "rx": 108.892,
+            "ry": 27.4966
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 -22.2003 355.046)",
+          "centerX": 80.16,
+          "centerY": 18.52,
+          "radiusX": 108.89,
+          "radiusY": 27.5,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.229,
+            "yPercent": 0.3704
+          }
+        },
+        {
+          "index": 3,
+          "type": "ellipse",
+          "id": "ellipse_3",
+          "fill": "#00BEAE",
+          "original": {
+            "cx": 75.2249,
+            "cy": 16.3869,
+            "rx": 75.2249,
+            "ry": 16.3869
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 25.8136 359.219)",
+          "centerX": 89.01,
+          "centerY": 16.59,
+          "radiusX": 75.22,
+          "radiusY": 16.39,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2543,
+            "yPercent": 0.3319
+          }
+        },
+        {
+          "index": 4,
+          "type": "ellipse",
+          "id": "ellipse_4",
+          "fill": "#FF0085",
+          "original": {
+            "cx": 41.5578,
+            "cy": 8.05456,
+            "rx": 41.5578,
+            "ry": 8.05456
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 61.465 363.145)",
+          "centerX": 86.92,
+          "centerY": 16.81,
+          "radiusX": 41.56,
+          "radiusY": 8.05,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2483,
+            "yPercent": 0.3362
+          }
+        }
+      ]
+    },
+    "Group 7_4": {
+      "maskId": "mask4_71_41",
+      "mask": {
+        "x": 4.0,
+        "y": 275.0,
+        "width": 381.0,
+        "height": 80.0
+      },
+      "shape": {
+        "x": 20.0,
+        "y": 290.0,
+        "width": 350.0,
+        "height": 50.0
+      },
+      "viewBox": {
+        "width": 350.0,
+        "height": 50.0
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "ellipse",
+          "id": "ellipse_1",
+          "fill": "#3A747F",
+          "original": {
+            "cx": 125.503,
+            "cy": 30.3839,
+            "rx": 125.503,
+            "ry": 30.3839
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 -31.0347 289.466)",
+          "centerX": 89.32,
+          "centerY": 12.72,
+          "radiusX": 125.5,
+          "radiusY": 30.38,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2552,
+            "yPercent": 0.2544
+          }
+        },
+        {
+          "index": 2,
+          "type": "ellipse",
+          "id": "ellipse_2",
+          "fill": "#848484",
+          "original": {
+            "cx": 103.092,
+            "cy": 22.6166,
+            "rx": 103.092,
+            "ry": 22.6166
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 -6.2616 293.999)",
+          "centerX": 87.84,
+          "centerY": 12.87,
+          "radiusX": 103.09,
+          "radiusY": 22.62,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.251,
+            "yPercent": 0.2574
+          }
+        },
+        {
+          "index": 3,
+          "type": "ellipse",
+          "id": "ellipse_3",
+          "fill": "#848484",
+          "original": {
+            "cx": 71.2178,
+            "cy": 13.4786,
+            "rx": 71.2178,
+            "ry": 13.4786
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 38.5607 296.882)",
+          "centerX": 96.29,
+          "centerY": 11.17,
+          "radiusX": 71.22,
+          "radiusY": 13.48,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2751,
+            "yPercent": 0.2233
+          }
+        },
+        {
+          "index": 4,
+          "type": "ellipse",
+          "id": "ellipse_4",
+          "fill": "#8A8A8A",
+          "original": {
+            "cx": 39.3441,
+            "cy": 6.62506,
+            "rx": 39.3441,
+            "ry": 6.62506
+          },
+          "transform": "matrix(0.994726 -0.102564 0.510633 0.859799 71.7844 299.71)",
+          "centerX": 94.3,
+          "centerY": 11.37,
+          "radiusX": 39.34,
+          "radiusY": 6.63,
+          "rotation": -5.89,
+          "relativeCenter": {
+            "xPercent": 0.2694,
+            "yPercent": 0.2274
+          }
+        }
+      ]
+    },
+    "Group 15": {
+      "maskId": "mask5_71_41",
+      "mask": {
+        "x": -15.0,
+        "y": 670.0,
+        "width": 420.0,
+        "height": 380.0
+      },
+      "shape": {
+        "x": 1.0,
+        "y": 687.0,
+        "width": 389.0,
+        "height": 345.0
+      },
+      "viewBox": {
+        "width": 389.0,
+        "height": 345.0
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "path",
+          "id": "path_1",
+          "fill": "#00FE96",
+          "centerX": 218.28,
+          "centerY": 22.03,
+          "radiusX": 315.94,
+          "radiusY": 52.71,
+          "rotation": 0,
+          "bbox": {
+            "x": -96.6634,
+            "y": 656.324,
+            "width": 631.8874000000001,
+            "height": 105.42200000000003
+          },
+          "relativeCenter": {
+            "xPercent": 0.5611,
+            "yPercent": 0.0639
+          }
+        },
+        {
+          "index": 2,
+          "type": "path",
+          "id": "path_2",
+          "fill": "#FF00F5",
+          "centerX": 214.77,
+          "centerY": 22.38,
+          "radiusX": 257.91,
+          "radiusY": 40.46,
+          "rotation": 0,
+          "bbox": {
+            "x": -42.138,
+            "y": 668.919,
+            "width": 515.815,
+            "height": 80.91499999999996
+          },
+          "relativeCenter": {
+            "xPercent": 0.5521,
+            "yPercent": 0.0649
+          }
+        },
+        {
+          "index": 3,
+          "type": "path",
+          "id": "path_3",
+          "fill": "#00BEAE",
+          "centerX": 234.69,
+          "centerY": 19.22,
+          "radiusX": 176.69,
+          "radiusY": 25.35,
+          "rotation": 0,
+          "bbox": {
+            "x": 59.008,
+            "y": 680.872,
+            "width": 353.37100000000004,
+            "height": 50.69200000000001
+          },
+          "relativeCenter": {
+            "xPercent": 0.6033,
+            "yPercent": 0.0557
+          }
+        },
+        {
+          "index": 4,
+          "type": "path",
+          "id": "path_4",
+          "fill": "#00FE96",
+          "centerX": 230.01,
+          "centerY": 19.67,
+          "radiusX": 97.04,
+          "radiusY": 13.44,
+          "rotation": 0,
+          "bbox": {
+            "x": 133.97,
+            "y": 693.237,
+            "width": 194.08399999999997,
+            "height": 26.873000000000047
+          },
+          "relativeCenter": {
+            "xPercent": 0.5913,
+            "yPercent": 0.057
+          }
+        }
+      ]
+    },
+    "header": {
+      "maskId": null,
+      "mask": null,
+      "viewBox": {
+        "width": 390,
+        "height": 250
+      },
+      "ellipses": [
+        {
+          "index": 1,
+          "type": "path",
+          "id": "header_path_1",
+          "fill": "#FF0085",
+          "centerX": 179.52,
+          "centerY": 15.96,
+          "radiusX": 233.19,
+          "radiusY": 126.43,
+          "rotation": 0,
+          "bbox": {
+            "x": -53.6732,
+            "y": -110.471,
+            "width": 466.3792,
+            "height": 252.86
+          }
+        },
+        {
+          "index": 2,
+          "type": "path",
+          "id": "header_path_2",
+          "fill": "#FF00F5",
+          "centerX": 176.96,
+          "centerY": 16.68,
+          "radiusX": 190.15,
+          "radiusY": 96.67,
+          "rotation": 0,
+          "bbox": {
+            "x": -13.1912,
+            "y": -79.9937,
+            "width": 380.2962,
+            "height": 193.33769999999998
+          }
+        },
+        {
+          "index": 3,
+          "type": "path",
+          "id": "header_path_3",
+          "fill": "#00BEAE",
+          "centerX": 191.33,
+          "centerY": 9.58,
+          "radiusX": 130.07,
+          "radiusY": 60.2,
+          "rotation": 0,
+          "bbox": {
+            "x": 61.2501,
+            "y": -50.6217,
+            "width": 260.1499,
+            "height": 120.39670000000001
+          }
+        },
+        {
+          "index": 4,
+          "type": "path",
+          "id": "header_path_4",
+          "fill": "#00FE96",
+          "centerX": 187.91,
+          "centerY": 10.53,
+          "radiusX": 71.37,
+          "radiusY": 30.74,
+          "rotation": 0,
+          "bbox": {
+            "x": 116.544,
+            "y": -20.206,
+            "width": 142.73700000000002,
+            "height": 61.47409999999999
+          }
+        }
+      ]
+    }
+  }
+}

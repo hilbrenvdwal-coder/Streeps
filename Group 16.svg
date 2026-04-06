@@ -1,0 +1,46 @@
+<svg width="73" height="73" viewBox="0 0 73 73" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 16">
+<g id="Group 17">
+<mask id="mask0_244_150" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="73" height="73">
+<rect id="addbtn" width="73" height="73" rx="25" fill="white"/>
+</mask>
+<g mask="url(#mask0_244_150)">
+<g id="Ellipse 7" filter="url(#filter0_f_244_150)">
+<ellipse cx="36.5" cy="41.5" rx="17.5" ry="15.5" fill="#FF0085"/>
+</g>
+<g id="Ellipse 8" filter="url(#filter1_f_244_150)">
+<ellipse cx="17.0037" cy="38.2328" rx="12.4707" ry="10.6001" transform="rotate(2.97363 17.0037 38.2328)" fill="#FF00F5"/>
+</g>
+<g id="Ellipse 9" filter="url(#filter2_f_244_150)">
+<ellipse cx="58.8524" cy="57.0388" rx="10.0586" ry="6.63771" transform="rotate(-59.1951 58.8524 57.0388)" fill="#00BEAE"/>
+</g>
+<g id="Ellipse 10" filter="url(#filter3_f_244_150)">
+<ellipse cx="46" cy="16.5" rx="15" ry="8.5" fill="#00FE96"/>
+</g>
+</g>
+</g>
+<path id="Addcounter" d="M36.112 23.488C39.9733 23.488 42.928 24.0853 44.976 25.28C47.024 26.4747 48.048 28.1387 48.048 30.272C48.048 32.192 47.1413 33.6533 45.328 34.656C43.536 35.6373 41.0293 36.0747 37.808 35.968V35.328C41.2853 35.072 43.9947 35.4667 45.936 36.512C47.8773 37.536 48.848 39.1467 48.848 41.344C48.848 43.648 47.76 45.4187 45.584 46.656C43.408 47.8933 40.2507 48.512 36.112 48.512C32.016 48.512 28.8693 47.8933 26.672 46.656C24.496 45.4187 23.408 43.648 23.408 41.344C23.408 39.1467 24.3787 37.536 26.32 36.512C28.2613 35.4667 30.9707 35.072 34.448 35.328V35.968C31.2267 36.0747 28.7093 35.6373 26.896 34.656C25.104 33.6533 24.208 32.192 24.208 30.272C24.208 28.1387 25.232 26.4747 27.28 25.28C29.328 24.0853 32.272 23.488 36.112 23.488ZM36.112 43.872C38.2667 43.872 39.9093 43.616 41.04 43.104C42.1707 42.592 42.736 41.8453 42.736 40.864C42.736 39.8613 42.1707 39.1253 41.04 38.656C39.9093 38.1653 38.2667 37.92 36.112 37.92C33.9573 37.92 32.3147 38.1653 31.184 38.656C30.0747 39.1253 29.52 39.8613 29.52 40.864C29.52 41.8453 30.0747 42.592 31.184 43.104C32.3147 43.616 33.9573 43.872 36.112 43.872ZM36.112 33.632C37.392 33.632 38.4693 33.536 39.344 33.344C40.24 33.1307 40.912 32.8213 41.36 32.416C41.808 31.9893 42.032 31.4773 42.032 30.88C42.032 30.0053 41.52 29.3333 40.496 28.864C39.4933 28.3733 38.032 28.128 36.112 28.128C34.2133 28.128 32.752 28.3733 31.728 28.864C30.704 29.3333 30.192 30.0053 30.192 30.88C30.192 31.4773 30.416 31.9893 30.864 32.416C31.3333 32.8213 32.0053 33.1307 32.88 33.344C33.776 33.536 34.8533 33.632 36.112 33.632Z" fill="white"/>
+</g>
+<defs>
+<filter id="filter0_f_244_150" x="3.2" y="10.2" width="66.6" height="62.6" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="7.9" result="effect1_foregroundBlur_244_150"/>
+</filter>
+<filter id="filter1_f_244_150" x="-11.2625" y="11.8268" width="56.5325" height="52.8118" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="7.9" result="effect1_foregroundBlur_244_150"/>
+</filter>
+<filter id="filter2_f_244_150" x="35.3687" y="31.9521" width="46.9674" height="50.1734" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="7.9" result="effect1_foregroundBlur_244_150"/>
+</filter>
+<filter id="filter3_f_244_150" x="15.2" y="-7.8" width="61.6" height="48.6" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="7.9" result="effect1_foregroundBlur_244_150"/>
+</filter>
+</defs>
+</svg>

@@ -60,9 +60,11 @@ export function useConversations() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   const fetchConversations = useCallback(async () => {
     if (!user) return;
+    if (!hasLoadedRef.current) setLoading(true);
 
     // Ensure all user's groups have a group chat (runs once per session)
     if (!groupChatsEnsured) {
@@ -89,6 +91,7 @@ export function useConversations() {
     if (!memberships || memberships.length === 0) {
       setConversations([]);
       setLoading(false);
+      hasLoadedRef.current = true;
       return;
     }
 
@@ -100,7 +103,7 @@ export function useConversations() {
       .select('*')
       .in('id', convIds);
 
-    if (!convs) { setConversations([]); setLoading(false); return; }
+    if (!convs) { setConversations([]); setLoading(false); hasLoadedRef.current = true; return; }
 
     // Get all members of these conversations with profiles
     const { data: allMembers } = await supabase
@@ -219,6 +222,7 @@ export function useConversations() {
 
     setConversations(previews);
     setLoading(false);
+    hasLoadedRef.current = true;
   }, [user]);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);

@@ -96,6 +96,8 @@ export function useGroupDetail(groupId: string) {
   }, [user, groupId]);
 
   useEffect(() => {
+    setLoading(true);
+    setGroup(null);
     fetchAll();
 
     // Subscribe to realtime changes
@@ -147,15 +149,17 @@ export function useGroupDetail(groupId: string) {
     };
   }, [fetchAll]);
 
-  const addTally = async (category: number) => {
+  const addTally = async (category: number, count: number = 1) => {
     if (!user) return;
 
-    await supabase.from('tallies').insert({
+    const rows = Array.from({ length: count }, () => ({
       group_id: groupId,
       user_id: user.id,
       category,
       added_by: user.id,
-    });
+    }));
+
+    await supabase.from('tallies').insert(rows);
   };
 
   const toggleActive = async () => {
@@ -225,6 +229,7 @@ export function useGroupDetail(groupId: string) {
       category,
       emoji,
     });
+    await fetchAll();
   };
 
   const removeDrink = async (drinkId: string) => {
@@ -233,6 +238,7 @@ export function useGroupDetail(groupId: string) {
       .from('drinks')
       .update({ is_available: false })
       .eq('id', drinkId);
+    await fetchAll();
   };
 
   const updateGroupName = async (name: string) => {

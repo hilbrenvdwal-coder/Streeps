@@ -56,7 +56,7 @@ function loopAnim(anim: Animated.Value, amp: number, duration: number) {
   ).start();
 }
 
-function AnimatedAuroraLayer({ layer, index, gentle }: { layer: ShapeLayer; index: number; gentle?: boolean }) {
+function AnimatedAuroraLayer({ layer, index, gentle, animated = true }: { layer: ShapeLayer; index: number; gentle?: boolean; animated?: boolean }) {
   const cfgs = gentle ? ANIM_CFG_GENTLE : ANIM_CFG_BOLD;
   const cfg = cfgs[index] ?? cfgs[0];
 
@@ -67,28 +67,52 @@ function AnimatedAuroraLayer({ layer, index, gentle }: { layer: ShapeLayer; inde
   const sx = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    loopAnim(tx, cfg.tx, cfg.dTx);
-    loopAnim(ty, cfg.ty, cfg.dTy);
-    loopAnim(rot, cfg.rot, cfg.dRot);
-    const qSc = cfg.dSc / 4;
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sc, { toValue: 1 + cfg.sc, duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
-        Animated.timing(sc, { toValue: 1,           duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
-        Animated.timing(sc, { toValue: 1 - cfg.sc, duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
-        Animated.timing(sc, { toValue: 1,           duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
-      ]),
-    ).start();
-    const qSx = cfg.dSx / 4;
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sx, { toValue: 1 + cfg.sx, duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
-        Animated.timing(sx, { toValue: 1,           duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
-        Animated.timing(sx, { toValue: 1 - cfg.sx, duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
-        Animated.timing(sx, { toValue: 1,           duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, []);
+    if (animated) {
+      loopAnim(tx, cfg.tx, cfg.dTx);
+      loopAnim(ty, cfg.ty, cfg.dTy);
+      loopAnim(rot, cfg.rot, cfg.dRot);
+      const qSc = cfg.dSc / 4;
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sc, { toValue: 1 + cfg.sc, duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
+          Animated.timing(sc, { toValue: 1,           duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
+          Animated.timing(sc, { toValue: 1 - cfg.sc, duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
+          Animated.timing(sc, { toValue: 1,           duration: qSc, easing: SIN_EASE, useNativeDriver: true }),
+        ]),
+      ).start();
+      const qSx = cfg.dSx / 4;
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(sx, { toValue: 1 + cfg.sx, duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
+          Animated.timing(sx, { toValue: 1,           duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
+          Animated.timing(sx, { toValue: 1 - cfg.sx, duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
+          Animated.timing(sx, { toValue: 1,           duration: qSx, easing: SIN_EASE, useNativeDriver: true }),
+        ]),
+      ).start();
+    } else {
+      // Stop loops and smoothly return to rest position
+      tx.stopAnimation();
+      ty.stopAnimation();
+      sc.stopAnimation();
+      rot.stopAnimation();
+      sx.stopAnimation();
+      Animated.parallel([
+        Animated.timing(tx,  { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(ty,  { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(sc,  { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(rot, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(sx,  { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+
+    return () => {
+      tx.stopAnimation();
+      ty.stopAnimation();
+      sc.stopAnimation();
+      rot.stopAnimation();
+      sx.stopAnimation();
+    };
+  }, [animated]);
 
   // Interpolate rotation degrees to string "Xdeg"
   const rotateStr = rot.interpolate({
@@ -127,29 +151,9 @@ function AnimatedAuroraLayer({ layer, index, gentle }: { layer: ShapeLayer; inde
 const AuroraBackground = memo(({ mask, width, height, shapes, style, maskPadding = 0, animated = false, gentle = false }: AuroraBackgroundProps) => {
   const layers = (
     <View style={{ width, height }}>
-      {shapes.map((layer, i) =>
-        animated ? (
-          <AnimatedAuroraLayer key={i} layer={layer} index={i} gentle={gentle} />
-        ) : (
-          <Image
-            key={i}
-            source={layer.source}
-            style={{
-              position: 'absolute',
-              left: layer.center.x,
-              top: layer.center.y,
-              width: layer.width,
-              height: layer.height,
-              tintColor: layer.color,
-              transform: [
-                { translateX: -layer.width / 2 },
-                { translateY: -layer.height / 2 },
-              ],
-            }}
-            resizeMode="stretch"
-          />
-        )
-      )}
+      {shapes.map((layer, i) => (
+        <AnimatedAuroraLayer key={i} layer={layer} index={i} gentle={gentle} animated={animated} />
+      ))}
     </View>
   );
 
@@ -381,17 +385,20 @@ export const AuroraPresetView = memo(({
   style,
   animated,
   gentle,
+  noMask,
 }: {
   preset: AuroraPreset;
   colors?: string[];
   style?: ViewStyle;
   animated?: boolean;
   gentle?: boolean;
+  /** Skip the mask PNG — parent handles clipping via borderRadius + overflow:hidden */
+  noMask?: boolean;
 }) => {
   const c = colors ?? AURORA_COLORS[preset];
   const d = DATA[preset];
   const shapes = buildShapes(preset, c);
-  const mask = preset !== 'header' ? MASKS[preset as keyof typeof MASKS] : undefined;
+  const mask = (noMask || preset === 'header') ? undefined : MASKS[preset as keyof typeof MASKS];
 
   return (
     <AuroraBackground

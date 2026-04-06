@@ -4,6 +4,7 @@ import CategoryRow from '@/src/components/CategoryRow';
 import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
+import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
 import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -156,11 +157,17 @@ export default function HomeScreen() {
 
   // Content fade-in on data load (triggers on group switch + initial load)
   const contentOpacity = useRef(new Animated.Value(0)).current;
+  const [contentReady, setContentReady] = useState(false);
   useEffect(() => {
     if (group && group.id === selectedGroupId) {
-      Animated.timing(contentOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      setContentReady(false);
+      contentOpacity.setValue(0);
+      Animated.timing(contentOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start(() => {
+        setContentReady(true);
+      });
     } else {
       contentOpacity.setValue(0);
+      setContentReady(false);
     }
   }, [group?.id, selectedGroupId]);
 
@@ -500,7 +507,7 @@ export default function HomeScreen() {
                 {members.slice(0, showMembers ? members.length : 4).map((member, i) => {
                   const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
                   return (
-                    <AnimatedCard key={member.id} index={i}>
+                    <AnimatedCard key={member.id} index={i} enabled={contentReady}>
                     <Pressable style={s.lidRow} onPress={() => {
                       if (closeAnimRef.current) {
                         closeAnimRef.current.stop();
@@ -568,7 +575,7 @@ export default function HomeScreen() {
                   {drinks.slice(0, showAllDrinks ? drinks.length : 4).map((drink, i) => {
                     const catColor = t.categoryColors[(drink.category - 1) % 4];
                     return (
-                      <AnimatedCard key={drink.id} index={i}>
+                      <AnimatedCard key={drink.id} index={i} enabled={contentReady}>
                         <View style={s.drinkRow}>
                           <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
                           <Text style={s.drinkName}>{drink.name}</Text>
@@ -606,40 +613,18 @@ export default function HomeScreen() {
             )}
 
             {/* ── Meer opties (progressive disclosure) ── */}
-            <Pressable onPress={() => { LayoutAnimation.configureNext({ duration: 350, create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.scaleY, springDamping: 0.7 }, update: { type: LayoutAnimation.Types.easeInEaseOut }, delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.scaleY } }); setShowMoreOptions(!showMoreOptions); if (!showMoreOptions) setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }} style={s.moreOptionsToggle}>
+            <Pressable onPress={() => { setShowMoreOptions(!showMoreOptions); if (!showMoreOptions) setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300); }} style={s.moreOptionsToggle}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={s.moreOptionsText}>Meer opties</Text>
                 <Ionicons name={showMoreOptions ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
               </View>
             </Pressable>
-            {showMoreOptions && (
-              <>
-                {isAdmin && (
-                  <Pressable
-                    style={s.settingsBtn}
-                    onPress={() => setShowSettings(true)}
-                  >
-                    <Text style={s.settingsBtnText}>Instellingen</Text>
-                  </Pressable>
-                )}
-                <Pressable
-                  style={s.leaveBtn}
-                  onPress={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [
-                    { text: 'Annuleren', style: 'cancel' },
-                    { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } },
-                  ])}
-                >
-                  <Text style={s.leaveBtnText}>Uitstappen</Text>
-                </Pressable>
-              </>
-            )}
+            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onSettings={() => setShowSettings(true)} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
 
             <View style={{ height: 90 + insets.bottom }} />
           </Animated.View>
         ) : selectedGroupId && detailLoading ? (
-          <View style={[s.center, { paddingTop: 80 }]}>
-            <ActivityIndicator size="large" color="#FF0085" />
-          </View>
+          <HomeSkeleton />
         ) : !selectedGroupId ? (
           <View style={s.welcomeWrap}>
             <Text style={s.welcomeTitle}>Welkom.</Text>
@@ -1334,3 +1319,38 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 });
+
+// ── MoreOptionsPanel: animated expand/collapse ──
+function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: boolean; isAdmin: boolean; onSettings: () => void; onLeave: () => void }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.timing(anim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }).start();
+    } else if (mounted) {
+      Animated.timing(anim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: false }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+  }, [visible]);
+
+  if (!mounted) return null;
+
+  const maxHeight = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 150] });
+  const opacity = anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0, 1] });
+
+  return (
+    <Animated.View style={{ maxHeight, opacity, overflow: 'hidden' as const }}>
+      {isAdmin && (
+        <Pressable style={{ marginTop: 24, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' }} onPress={onSettings}>
+          <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FFFFFF' }}>Instellingen</Text>
+        </Pressable>
+      )}
+      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(235,84,102,0.12)', borderWidth: 1, borderColor: 'rgba(235,84,102,0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
+        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#EB5466' }}>Uitstappen</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}

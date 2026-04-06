@@ -1,0 +1,12 @@
+<svg width="350" height="50" viewBox="0 0 350 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#f0)"><ellipse cx="221.598" cy="100.81" rx="221.598" ry="100.81" transform="matrix(-0.980962 0.194202 -0.588029 -0.80884 471.316 -4.92124)" fill="#816C00"/></g>
+<g filter="url(#f1)"><ellipse cx="182.027" cy="75.0393" rx="182.027" ry="75.0393" transform="matrix(-0.980962 0.194202 -0.588029 -0.80884 419.932 -18.5934)" fill="#FCD145"/></g>
+<g filter="url(#f2)"><ellipse cx="125.748" cy="44.7204" rx="125.748" ry="44.7204" transform="matrix(-0.980962 0.194202 -0.588029 -0.80884 333.153 -26.6607)" fill="#FF00F5"/></g>
+<g filter="url(#f3)"><ellipse cx="69.4691" cy="21.9812" rx="69.4691" ry="21.9812" transform="matrix(-0.980962 0.194202 -0.588029 -0.80884 268.024 -34.8069)" fill="#3D3D3D"/></g>
+<defs>
+<filter id="f0" x="-84.8151" y="-189.743" width="558.946" height="292.635" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="bg"/><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape"/><feGaussianBlur stdDeviation="27.05"/></filter>
+<filter id="f1" x="-40.8296" y="-168.288" width="476.151" height="248.7" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="bg"/><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape"/><feGaussianBlur stdDeviation="27.05"/></filter>
+<filter id="f2" x="3.25047" y="-136.16" width="360.503" height="195.496" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="bg"/><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape"/><feGaussianBlur stdDeviation="27.05"/></filter>
+<filter id="f3" x="63.478" y="-115.515" width="246.948" height="152.839" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="bg"/><feBlend mode="normal" in="SourceGraphic" in2="bg" result="shape"/><feGaussianBlur stdDeviation="27.05"/></filter>
+</defs>
+</svg>

@@ -2646,6 +2646,57 @@ const ap = StyleSheet.create({
   emptyText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', textAlign: 'center', paddingTop: 40 },
 });
 
+// ── Skeleton loading for conversation list ──
+const SKELETON_WIDTHS = [
+  { name: '55%', preview: '75%' },
+  { name: '70%', preview: '60%' },
+  { name: '45%', preview: '85%' },
+  { name: '60%', preview: '50%' },
+  { name: '50%', preview: '70%' },
+  { name: '65%', preview: '65%' },
+  { name: '40%', preview: '80%' },
+];
+
+function ConversationSkeleton() {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity }}>
+      {SKELETON_WIDTHS.map((widths, i) => (
+        <View key={i} style={sk.row}>
+          <View style={sk.avatar} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={[sk.nameLine, { width: widths.name }]} />
+              <View style={sk.timeLine} />
+            </View>
+            <View style={[sk.previewLine, { width: widths.preview }]} />
+          </View>
+        </View>
+      ))}
+    </Animated.View>
+  );
+}
+
+const sk = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  avatar: { width: 54, height: 54, borderRadius: 27, marginRight: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
+  nameLine: { height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.06)' },
+  timeLine: { width: 32, height: 10, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.06)' },
+  previewLine: { height: 12, borderRadius: 6, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.06)' },
+});
+
 // ── Main chat screen ──
 export default function ChatScreen() {
   const mode = useColorScheme();
@@ -2655,12 +2706,20 @@ export default function ChatScreen() {
   const { conversations, loading, refresh, markAsRead } = useConversations();
   const { contacts, refresh: refreshContacts } = useContacts();
 
-  // Refresh conversations when screen comes into focus
+  // Refresh conversations silently when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       refresh();
     }, [refresh])
   );
+
+  // Manual pull-to-refresh (shows spinner only on user gesture)
+  const [isManualRefresh, setIsManualRefresh] = useState(false);
+  const handleManualRefresh = useCallback(async () => {
+    setIsManualRefresh(true);
+    await refresh();
+    setIsManualRefresh(false);
+  }, [refresh]);
   const navBarAnim = useNavBarAnim();
   const router = useRouter();
   const params = useLocalSearchParams<{ openDmUserId?: string; openDmName?: string; openDmConvId?: string; openDmAvatar?: string }>();
@@ -2981,15 +3040,19 @@ export default function ChatScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(c) => c.id}
-            refreshing={loading}
-            onRefresh={refresh}
+            refreshing={isManualRefresh}
+            onRefresh={handleManualRefresh}
             contentContainerStyle={{ paddingTop: 32, paddingBottom: 160 }}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={{ alignItems: 'center', paddingTop: 60 }}>
-                <Text style={cs.emptyText}>Nog geen berichten</Text>
-                <Text style={cs.emptySubtext}>Tik op een lid in je groep en stuur een bericht</Text>
-              </View>
+              loading ? (
+                <ConversationSkeleton />
+              ) : (
+                <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                  <Text style={cs.emptyText}>Nog geen berichten</Text>
+                  <Text style={cs.emptySubtext}>Tik op een lid in je groep en stuur een bericht</Text>
+                </View>
+              )
             }
             renderItem={({ item, index }) => (
               <AnimatedCard index={index} enabled={index < 15}>

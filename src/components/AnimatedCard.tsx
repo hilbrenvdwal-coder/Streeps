@@ -18,11 +18,15 @@ export function AnimatedCard({
   enabled = true,
   style,
 }: AnimatedCardProps) {
-  const opacity = useRef(new Animated.Value(enabled ? 0 : 1)).current;
-  const translateY = useRef(new Animated.Value(enabled ? initialTranslateY : 0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(initialTranslateY)).current;
 
   useEffect(() => {
     if (!enabled) return;
+
+    // Reset to start values when enabled transitions to true
+    opacity.setValue(0);
+    translateY.setValue(initialTranslateY);
 
     AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
       if (reduceMotion) {

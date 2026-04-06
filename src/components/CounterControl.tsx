@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, View, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { AuroraPresetView } from './AuroraBackground';
+import { Animated, Easing, StyleSheet, Text, View, Pressable } from 'react-native';
 
 /**
  * Counter Control — native translation of "Counter" group from Home_fixed_v4.svg
@@ -91,28 +89,49 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
     ]).start();
   }, [value]);
 
-  // Fade out → swap colors → fade in (single aurora, no double layers)
-  const [displayColors, setDisplayColors] = useState(auroraColors);
-  const auroraOpacity = useRef(new Animated.Value(1)).current;
+  // ── Pulsing ring (visible when value > 0) ──
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0)).current;
+  const flashOpacity = useRef(new Animated.Value(0)).current;
+  const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    if (displayColors?.join(',') !== auroraColors?.join(',')) {
-      Animated.timing(auroraOpacity, {
-        toValue: 0,
-        duration: 150,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }).start(() => {
-        setDisplayColors(auroraColors);
-        Animated.timing(auroraOpacity, {
-          toValue: 1,
-          duration: 150,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-      });
+    if (pulseAnimRef.current) {
+      pulseAnimRef.current.stop();
+      pulseAnimRef.current = null;
     }
-  }, [auroraColors]);
+
+    if (value > 0) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(pulseScale, { toValue: 1.08, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            Animated.timing(pulseOpacity, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+          ]),
+          Animated.parallel([
+            Animated.timing(pulseScale, { toValue: 1.0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+            Animated.timing(pulseOpacity, { toValue: 0.4, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+          ]),
+        ]),
+        { resetBeforeIteration: false }
+      );
+      pulseAnimRef.current = loop;
+      loop.start();
+    } else {
+      Animated.parallel([
+        Animated.timing(pulseScale, { toValue: 1, duration: 200, useNativeDriver: false }),
+        Animated.timing(pulseOpacity, { toValue: 0, duration: 200, useNativeDriver: false }),
+      ]).start();
+    }
+
+    return () => { if (pulseAnimRef.current) pulseAnimRef.current.stop(); };
+  }, [value > 0]);
+
+  const handleSubmitPress = useCallback(() => {
+    flashOpacity.setValue(1);
+    Animated.timing(flashOpacity, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: false }).start();
+    onSubmit?.();
+  }, [onSubmit]);
 
   return (
     <View style={s.row}>
@@ -124,11 +143,34 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
       </Pressable>
 
       {/* ── Counter display (tap to submit) ── */}
-      <Pressable style={[s.displayGlow]} onPress={onSubmit}>
+      <Pressable style={[s.displayGlow]} onPress={handleSubmitPress}>
         <View style={s.displayInner}>
-          <Animated.View style={[s.auroraWrap, { opacity: auroraOpacity }]} pointerEvents="none">
-            <AuroraPresetView preset="counter" animated gentle colors={displayColors} />
-          </Animated.View>
+          {/* Outer thick ring — category color, opacity pulses */}
+          {/* Outer thick ring — category color, center-stroked, with glow */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              s.ringOuter,
+              {
+                borderColor: auroraColors?.[0] ?? '#FF0085',
+                shadowColor: auroraColors?.[0] ?? '#FF0085',
+                opacity: pulseOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+          />
+          {/* Inner thin ring — white, center-stroked, with glow */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              s.ringInner,
+              {
+                shadowColor: auroraColors?.[0] ?? '#FF0085',
+                opacity: pulseOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+          />
           {layers.map((layer, i) => (
             <Animated.Text
               key={layer.key}
@@ -206,23 +248,50 @@ const s = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: RADIUS,
+    overflow: 'visible',
   },
 
-  // Inner container for display (no overflow:hidden — aurora MaskedView handles soft clipping)
+  // Inner container for display (no overflow:hidden — shadow glow must bleed out)
   displayInner: {
     flex: 1,
     borderRadius: RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
 
-  // Aurora background positioned inside display (mask is 73+9*2=91 wide, offset by -9)
-  auroraWrap: {
+  // Outer ring — thick, category color, center-stroked from 30px radius
+  // Center stroke: expand by borderWidth/2 on each side → width = 60 + 4 = 64
+  ringOuter: {
     position: 'absolute',
-    top: -9,
-    left: -9,
-    width: 91,
-    height: 91,
+    width: 64,
+    height: 64,
+    left: -2,    // offset = -borderWidth/2
+    top: -2,
+    borderRadius: 32,
+    borderWidth: 4,
+    // borderColor & shadowColor set dynamically
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  // Inner ring — thin, white, center-stroked from same 30px radius
+  // Center stroke: expand by borderWidth/2 → width = 60 + 1.5 ≈ 62
+  ringInner: {
+    position: 'absolute',
+    width: 62,
+    height: 62,
+    left: -1,    // offset = -borderWidth/2 ≈ -1
+    top: -1,
+    borderRadius: 31,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    // shadowColor set dynamically
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 6,
   },
 
   value: {

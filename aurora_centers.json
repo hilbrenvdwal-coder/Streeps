@@ -1,0 +1,375 @@
+{
+  "components": {
+    "Group 14": {
+      "mask": {
+        "id": "mask0_71_41",
+        "x": -20.0,
+        "y": 570.0,
+        "width": 420.0,
+        "height": 120.0
+      },
+      "shapes": [
+        {
+          "type": "path",
+          "index": 0,
+          "fill": "#00FE96",
+          "center": {
+            "x": 187.78,
+            "y": -6.21
+          },
+          "bbox_size": {
+            "width": 473.46,
+            "height": 138.86
+          }
+        },
+        {
+          "type": "path",
+          "index": 1,
+          "fill": "#FF00F5",
+          "center": {
+            "x": 185.05,
+            "y": -6.27
+          },
+          "bbox_size": {
+            "width": 387.76,
+            "height": 103.81
+          }
+        },
+        {
+          "type": "path",
+          "index": 2,
+          "fill": "#FF0085",
+          "center": {
+            "x": 273.55,
+            "y": 38.71
+          },
+          "bbox_size": {
+            "width": 266.74,
+            "height": 61.64
+          }
+        },
+        {
+          "type": "path",
+          "index": 3,
+          "fill": "#00FE96",
+          "center": {
+            "x": 197.38,
+            "y": -7.98
+          },
+          "bbox_size": {
+            "width": 147.0,
+            "height": 30.83
+          }
+        }
+      ]
+    },
+    "Group 7": {
+      "mask": {
+        "id": "mask1_71_41",
+        "x": 5.0,
+        "y": 452.0,
+        "width": 380.0,
+        "height": 80.0
+      },
+      "shapes": [
+        {
+          "type": "ellipse",
+          "index": 0,
+          "fill": "#F1F1F1",
+          "center": {
+            "x": 108.96,
+            "y": 32.5
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 1,
+          "fill": "#FF00F5",
+          "center": {
+            "x": 107.72,
+            "y": 32.62
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 2,
+          "fill": "#00BEAE",
+          "center": {
+            "x": 114.77,
+            "y": 31.2
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 3,
+          "fill": "#00FE96",
+          "center": {
+            "x": 113.12,
+            "y": 31.37
+          }
+        }
+      ]
+    },
+    "Group 7_2": {
+      "mask": {
+        "id": "mask2_71_41",
+        "x": 5.0,
+        "y": 393.0,
+        "width": 380.0,
+        "height": 80.0
+      },
+      "shapes": [
+        {
+          "type": "ellipse",
+          "index": 0,
+          "fill": "#816C00",
+          "center": {
+            "x": 110.43,
+            "y": 49.0
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 1,
+          "fill": "#FCD145",
+          "center": {
+            "x": 108.2,
+            "y": 43.38
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 2,
+          "fill": "#FF00F5",
+          "center": {
+            "x": 117.75,
+            "y": 47.95
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 3,
+          "fill": "#3D3D3D",
+          "center": {
+            "x": 115.68,
+            "y": 47.96
+          }
+        }
+      ]
+    },
+    "Group 7_3": {
+      "mask": {
+        "id": "mask3_71_41",
+        "x": 5.0,
+        "y": 334.0,
+        "width": 380.0,
+        "height": 80.0
+      },
+      "shapes": [
+        {
+          "type": "ellipse",
+          "index": 0,
+          "fill": "#FF0085",
+          "center": {
+            "x": 96.73,
+            "y": 33.36
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 1,
+          "fill": "#FF00F5",
+          "center": {
+            "x": 95.16,
+            "y": 33.52
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 2,
+          "fill": "#00BEAE",
+          "center": {
+            "x": 104.01,
+            "y": 31.59
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 3,
+          "fill": "#FF0085",
+          "center": {
+            "x": 101.92,
+            "y": 31.81
+          }
+        }
+      ]
+    },
+    "Group 7_4": {
+      "mask": {
+        "id": "mask4_71_41",
+        "x": 4.0,
+        "y": 275.0,
+        "width": 381.0,
+        "height": 80.0
+      },
+      "shapes": [
+        {
+          "type": "ellipse",
+          "index": 0,
+          "fill": "#3A747F",
+          "center": {
+            "x": 105.32,
+            "y": 27.72
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 1,
+          "fill": "#848484",
+          "center": {
+            "x": 103.84,
+            "y": 27.87
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 2,
+          "fill": "#848484",
+          "center": {
+            "x": 112.29,
+            "y": 26.17
+          }
+        },
+        {
+          "type": "ellipse",
+          "index": 3,
+          "fill": "#8A8A8A",
+          "center": {
+            "x": 110.3,
+            "y": 26.37
+          }
+        }
+      ]
+    },
+    "Group 15": {
+      "mask": {
+        "id": "mask5_71_41",
+        "x": -15.0,
+        "y": 670.0,
+        "width": 420.0,
+        "height": 380.0
+      },
+      "shapes": [
+        {
+          "type": "path",
+          "index": 0,
+          "fill": "#00FE96",
+          "center": {
+            "x": 234.28,
+            "y": 39.03
+          },
+          "bbox_size": {
+            "width": 631.89,
+            "height": 105.42
+          }
+        },
+        {
+          "type": "path",
+          "index": 1,
+          "fill": "#FF00F5",
+          "center": {
+            "x": 230.77,
+            "y": 39.38
+          },
+          "bbox_size": {
+            "width": 515.82,
+            "height": 80.91
+          }
+        },
+        {
+          "type": "path",
+          "index": 2,
+          "fill": "#00BEAE",
+          "center": {
+            "x": 250.69,
+            "y": 36.22
+          },
+          "bbox_size": {
+            "width": 353.37,
+            "height": 50.69
+          }
+        },
+        {
+          "type": "path",
+          "index": 3,
+          "fill": "#00FE96",
+          "center": {
+            "x": 246.01,
+            "y": 36.67
+          },
+          "bbox_size": {
+            "width": 194.08,
+            "height": 26.87
+          }
+        }
+      ]
+    },
+    "header": {
+      "mask": null,
+      "shapes": [
+        {
+          "type": "path",
+          "index": 0,
+          "fill": "#FF0085",
+          "center": {
+            "x": 179.52,
+            "y": 15.96
+          },
+          "bbox_size": {
+            "width": 466.38,
+            "height": 252.86
+          }
+        },
+        {
+          "type": "path",
+          "index": 1,
+          "fill": "#FF00F5",
+          "center": {
+            "x": 176.96,
+            "y": 16.68
+          },
+          "bbox_size": {
+            "width": 380.3,
+            "height": 193.34
+          }
+        },
+        {
+          "type": "path",
+          "index": 2,
+          "fill": "#00BEAE",
+          "center": {
+            "x": 191.33,
+            "y": 9.58
+          },
+          "bbox_size": {
+            "width": 260.15,
+            "height": 120.4
+          }
+        },
+        {
+          "type": "path",
+          "index": 3,
+          "fill": "#00FE96",
+          "center": {
+            "x": 187.91,
+            "y": 10.53
+          },
+          "bbox_size": {
+            "width": 142.74,
+            "height": 61.47
+          }
+        }
+      ]
+    }
+  }
+}

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/unbounded": "^0.4.1",
+    "@expo/ngrok": "^4.1.3",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-masked-view/masked-view": "^0.3.2",

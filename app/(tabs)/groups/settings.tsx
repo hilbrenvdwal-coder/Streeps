@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,7 +9,7 @@ import {
   Alert,
   Image,
   Platform,
-  Modal,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,17 +40,18 @@ export default function GroupSettingsScreen() {
   const [price2, setPrice2] = useState('');
   const [price3, setPrice3] = useState('');
   const [price4, setPrice4] = useState('');
-  const [catName1, setCatName1] = useState('');
-  const [catName2, setCatName2] = useState('');
-  const [catName3, setCatName3] = useState('');
-  const [catName4, setCatName4] = useState('');
+  const [catName1, setCatName1] = useState('Categorie 1');
+  const [catName2, setCatName2] = useState('Categorie 2');
+  const [catName3, setCatName3] = useState('Categorie 3');
+  const [catName4, setCatName4] = useState('Categorie 4');
   const [newDrinkName, setNewDrinkName] = useState('');
   const [newDrinkEmoji, setNewDrinkEmoji] = useState('');
   const [newDrinkCategory, setNewDrinkCategory] = useState('1');
   const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null);
   const [uploadingGroupAvatar, setUploadingGroupAvatar] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
-  const [pickerActive, setPickerActive] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
+  const pickerRef = useRef<View>(null);
 
   useEffect(() => {
     if (group) {
@@ -152,6 +153,40 @@ export default function GroupSettingsScreen() {
     { name: catName4, setName: setCatName4, price: price4, setPrice: setPrice4 },
   ];
 
+  const categoryNames = [catName1, catName2, catName3, catName4];
+
+  const panResponder = useMemo(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 5,
+      onPanResponderGrant: () => {
+        setScrubbing(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      },
+      onPanResponderMove: (evt) => {
+        if (!pickerRef.current) return;
+        pickerRef.current.measure((_x, _y, width, _height, pageX, _pageY) => {
+          const relX = evt.nativeEvent.pageX - pageX;
+          const dotIndex = Math.floor((relX / width) * 4);
+          const clamped = Math.max(0, Math.min(3, dotIndex));
+          const newCat = String(clamped + 1);
+          setNewDrinkCategory(prev => {
+            if (prev !== newCat) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+            return newCat;
+          });
+        });
+      },
+      onPanResponderRelease: () => {
+        setScrubbing(false);
+      },
+      onPanResponderTerminate: () => {
+        setScrubbing(false);
+      },
+    }),
+  []);
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
@@ -167,7 +202,7 @@ export default function GroupSettingsScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={s.content} scrollEnabled={!scrubbing}>
         {/* Group avatar */}
         {isAdmin && (
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingGroupAvatar}>
@@ -249,9 +284,9 @@ export default function GroupSettingsScreen() {
               <View style={s.drinkRow}>
                 <Text style={s.drinkEmoji}>{drink.emoji ?? '🍺'}</Text>
                 <Text style={s.drinkName}>{drink.name}</Text>
-                <View style={[s.catBadge, { backgroundColor: t.categoryColors[(drink.category - 1) % 4] + '18' }]}>
+                <View style={[s.catBadge, { backgroundColor: t.categoryColors[(drink.category - 1) % 4] + '33' }]}>
                   <Text style={[s.catBadgeText, { color: t.categoryColors[(drink.category - 1) % 4] }]}>
-                    {drink.category}
+                    {categoryNames[(drink.category - 1) % 4]}
                   </Text>
                 </View>
                 {isAdmin && (
@@ -290,17 +325,43 @@ export default function GroupSettingsScreen() {
                 />
               </View>
               <View style={s.divider} />
-              <Pressable
+              <View
+                ref={pickerRef}
                 style={s.categoryPickerRow}
-                onPress={() => setPickerActive(true)}
+                {...panResponder.panHandlers}
               >
                 <Text style={s.categoryPickerLabel}>Categorie</Text>
-                <View style={[s.categoryPickerDot, {
-                  backgroundColor: t.categoryColors[Number(newDrinkCategory) - 1],
-                  borderWidth: 2,
-                  borderColor: t.colors.text.primary,
-                }]} />
-              </Pressable>
+                <View style={s.categoryPickerDots}>
+                  {[1, 2, 3, 4].map((cat) => {
+                    const isSelected = newDrinkCategory === String(cat);
+                    return (
+                      <Pressable
+                        key={cat}
+                        onPress={() => {
+                          setNewDrinkCategory(String(cat));
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        hitSlop={8}
+                        style={[
+                          s.categoryPickerDot,
+                          {
+                            backgroundColor: t.categoryColors[cat - 1],
+                            opacity: isSelected ? 1 : 0.4,
+                            transform: [{ scale: isSelected ? 1.2 : 1 }],
+                          },
+                          isSelected && {
+                            borderWidth: 2,
+                            borderColor: '#fff',
+                          },
+                          scrubbing && isSelected && {
+                            transform: [{ scale: 1.4 }],
+                          },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
             </View>
             <Pressable style={s.addBtn} onPress={handleAddDrink}>
               <Text style={s.addBtnText}>Toevoegen</Text>
@@ -358,45 +419,6 @@ export default function GroupSettingsScreen() {
         onImageCaptured={handleImageCaptured}
       />
 
-      <Modal
-        visible={pickerActive}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPickerActive(false)}
-      >
-        <Pressable style={s.scrimOverlay} onPress={() => setPickerActive(false)}>
-          <View style={s.scrimCard}>
-            <Text style={s.scrimTitle}>Kies categorie</Text>
-            <View style={s.scrimDots}>
-              {[1, 2, 3, 4].map((cat) => {
-                const isSelected = newDrinkCategory === String(cat);
-                return (
-                  <Pressable
-                    key={cat}
-                    onPress={() => {
-                      setNewDrinkCategory(String(cat));
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setPickerActive(false);
-                    }}
-                    style={[
-                      s.scrimDot,
-                      {
-                        backgroundColor: t.categoryColors[cat - 1],
-                        opacity: isSelected ? 1 : 0.5,
-                        transform: [{ scale: isSelected ? 1.15 : 1 }],
-                      },
-                      isSelected && {
-                        borderWidth: 3,
-                        borderColor: '#FFFFFF',
-                      },
-                    ]}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -502,7 +524,7 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
     drinkEmoji: { fontSize: 20, marginRight: 12 },
     drinkName: { ...t.typography.body, color: t.colors.text.primary, flex: 1 },
     catBadge: {
-      paddingHorizontal: 8,
+      paddingHorizontal: 10,
       paddingVertical: 3,
       borderRadius: 9999,
     },
@@ -551,51 +573,26 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
     },
     dangerText: { ...t.typography.body, color: t.semantic.error, flex: 1 },
 
-    // Category picker (inline preview)
+    // Category picker (inline scrub)
     categoryPickerRow: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
       justifyContent: 'space-between' as const,
+      paddingVertical: 12,
       paddingHorizontal: 16,
-      height: 52,
     },
     categoryPickerLabel: {
-      ...t.typography.body,
-      color: t.colors.text.tertiary,
+      color: '#fff',
+      fontSize: 16,
+    },
+    categoryPickerDots: {
+      flexDirection: 'row' as const,
+      gap: 12,
     },
     categoryPickerDot: {
       width: 28,
       height: 28,
       borderRadius: 14,
-    },
-
-    // Category picker scrim/modal
-    scrimOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-    },
-    scrimCard: {
-      backgroundColor: t.colors.surface.card,
-      borderRadius: t.radius.lg,
-      paddingVertical: 28,
-      paddingHorizontal: 32,
-      alignItems: 'center' as const,
-      gap: 20,
-    },
-    scrimTitle: {
-      ...t.typography.bodyMedium,
-      color: t.colors.text.primary,
-    },
-    scrimDots: {
-      flexDirection: 'row' as const,
-      gap: 20,
-    },
-    scrimDot: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
     },
   });
 }
