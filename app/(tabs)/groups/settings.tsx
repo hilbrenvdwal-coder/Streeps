@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,7 +167,7 @@ export default function GroupSettingsScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={s.content} scrollEnabled={!pickerActive}>
+      <ScrollView contentContainerStyle={s.content}>
         {/* Group avatar */}
         {isAdmin && (
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingGroupAvatar}>
@@ -289,41 +290,17 @@ export default function GroupSettingsScreen() {
                 />
               </View>
               <View style={s.divider} />
-              <View
+              <Pressable
                 style={s.categoryPickerRow}
-                onTouchStart={() => setPickerActive(true)}
-                onTouchEnd={() => setPickerActive(false)}
-                onTouchCancel={() => setPickerActive(false)}
+                onPress={() => setPickerActive(true)}
               >
                 <Text style={s.categoryPickerLabel}>Categorie</Text>
-                <View style={s.categoryPickerDots}>
-                  {[1, 2, 3, 4].map((cat) => {
-                    const isSelected = newDrinkCategory === String(cat);
-                    return (
-                      <Pressable
-                        key={cat}
-                        onPress={() => {
-                          setNewDrinkCategory(String(cat));
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        }}
-                        hitSlop={8}
-                        style={[
-                          s.categoryPickerDot,
-                          {
-                            backgroundColor: t.categoryColors[cat - 1],
-                            opacity: isSelected ? 1 : 0.4,
-                            transform: [{ scale: isSelected ? 1.2 : 1 }],
-                          },
-                          isSelected && {
-                            borderWidth: 2,
-                            borderColor: t.colors.text.primary,
-                          },
-                        ]}
-                      />
-                    );
-                  })}
-                </View>
-              </View>
+                <View style={[s.categoryPickerDot, {
+                  backgroundColor: t.categoryColors[Number(newDrinkCategory) - 1],
+                  borderWidth: 2,
+                  borderColor: t.colors.text.primary,
+                }]} />
+              </Pressable>
             </View>
             <Pressable style={s.addBtn} onPress={handleAddDrink}>
               <Text style={s.addBtnText}>Toevoegen</Text>
@@ -380,6 +357,46 @@ export default function GroupSettingsScreen() {
         onClose={() => setCameraVisible(false)}
         onImageCaptured={handleImageCaptured}
       />
+
+      <Modal
+        visible={pickerActive}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerActive(false)}
+      >
+        <Pressable style={s.scrimOverlay} onPress={() => setPickerActive(false)}>
+          <View style={s.scrimCard}>
+            <Text style={s.scrimTitle}>Kies categorie</Text>
+            <View style={s.scrimDots}>
+              {[1, 2, 3, 4].map((cat) => {
+                const isSelected = newDrinkCategory === String(cat);
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => {
+                      setNewDrinkCategory(String(cat));
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setPickerActive(false);
+                    }}
+                    style={[
+                      s.scrimDot,
+                      {
+                        backgroundColor: t.categoryColors[cat - 1],
+                        opacity: isSelected ? 1 : 0.5,
+                        transform: [{ scale: isSelected ? 1.15 : 1 }],
+                      },
+                      isSelected && {
+                        borderWidth: 3,
+                        borderColor: '#FFFFFF',
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -534,29 +551,51 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
     },
     dangerText: { ...t.typography.body, color: t.semantic.error, flex: 1 },
 
-    // Category picker
+    // Category picker (inline preview)
     categoryPickerRow: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
       paddingHorizontal: 16,
       height: 52,
     },
     categoryPickerLabel: {
       ...t.typography.body,
       color: t.colors.text.tertiary,
-      marginRight: 16,
-    },
-    categoryPickerDots: {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      gap: 12,
-      flex: 1,
-      justifyContent: 'flex-end' as const,
     },
     categoryPickerDot: {
       width: 28,
       height: 28,
       borderRadius: 14,
+    },
+
+    // Category picker scrim/modal
+    scrimOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+    },
+    scrimCard: {
+      backgroundColor: t.colors.surface.card,
+      borderRadius: t.radius.lg,
+      paddingVertical: 28,
+      paddingHorizontal: 32,
+      alignItems: 'center' as const,
+      gap: 20,
+    },
+    scrimTitle: {
+      ...t.typography.bodyMedium,
+      color: t.colors.text.primary,
+    },
+    scrimDots: {
+      flexDirection: 'row' as const,
+      gap: 20,
+    },
+    scrimDot: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
     },
   });
 }
