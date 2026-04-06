@@ -49,6 +49,7 @@ export default function GroupSettingsScreen() {
   const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null);
   const [uploadingGroupAvatar, setUploadingGroupAvatar] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
+  const [pickerActive, setPickerActive] = useState(false);
 
   useEffect(() => {
     if (group) {
@@ -165,7 +166,7 @@ export default function GroupSettingsScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={s.content} scrollEnabled={!pickerActive}>
         {/* Group avatar */}
         {isAdmin && (
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingGroupAvatar}>
@@ -288,7 +289,12 @@ export default function GroupSettingsScreen() {
                 />
               </View>
               <View style={s.divider} />
-              <View style={s.categoryPickerRow} onStartShouldSetResponder={() => true}>
+              <View
+                style={s.categoryPickerRow}
+                onTouchStart={() => setPickerActive(true)}
+                onTouchEnd={() => setPickerActive(false)}
+                onTouchCancel={() => setPickerActive(false)}
+              >
                 <Text style={s.categoryPickerLabel}>Categorie</Text>
                 <View style={s.categoryPickerDots}>
                   {[1, 2, 3, 4].map((cat) => {
