@@ -949,7 +949,7 @@ export default function SettingsOverlay({
                         <View style={s.memberActions}>
                           <Pressable onPress={() => handleToggleAdmin(member.user_id, name, member.is_admin)} style={({ pressed }) => [s.memberActionBtn, pressed && { opacity: 0.7 }]}>
                             <Ionicons name={member.is_admin ? 'shield' : 'shield-outline'} size={18} color="#00BEAE" />
-                            <Text style={s.memberActionText}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
+                            <Text style={s.memberActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
                           </Pressable>
                           <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={({ pressed }) => [s.memberActionBtnDanger, pressed && { opacity: 0.7 }]}>
                             <Ionicons name="person-remove-outline" size={18} color="#EB5466" />
@@ -1111,10 +1111,10 @@ const s = StyleSheet.create({
   tallyCount: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', fontWeight: '600', marginRight: 8, minWidth: 24, textAlign: 'right' },
   tallyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   memberActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,217,163,0.1)' },
-  memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE' },
-  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, backgroundColor: 'rgba(235,84,102,0.1)' },
-  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466' },
+  memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(0,217,163,0.1)' },
+  memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', flexShrink: 1 },
+  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(235,84,102,0.1)' },
+  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466', flexShrink: 1 },
 
   // Invite
   inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, minHeight: 52 },
