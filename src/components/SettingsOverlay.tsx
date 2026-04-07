@@ -698,11 +698,11 @@ export default function SettingsOverlay({
       <Animated.View style={[s.container, { paddingTop: insets.top + 12 }, contentStyle]} pointerEvents="auto">
         {/* Header */}
         <View style={s.header}>
-          <Pressable onPress={handleClose} hitSlop={12} style={{ marginRight: 12 }}>
+          <Pressable onPress={handleClose} hitSlop={12} style={({ pressed }) => [{ marginRight: 12 }, pressed && { opacity: 0.7 }]} accessibilityLabel="Sluiten" accessibilityRole="button">
             <Ionicons name="close" size={24} color="#FFFFFF" />
           </Pressable>
           <Text style={s.headerTitle}>Instellingen</Text>
-          <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving} style={{ marginLeft: 'auto' }}>
+          <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving} style={({ pressed }) => [{ marginLeft: 'auto' }, pressed && { opacity: 0.7 }]}>
             <View style={s.saveBtnRow}>
               {savedOk && (
                 <Ionicons name="checkmark" size={16} color="#00BEAE" style={{ marginRight: 4 }} />
@@ -744,17 +744,17 @@ export default function SettingsOverlay({
 
           {/* Categories */}
           <Text style={s.sectionHeader}>CATEGORIEËN</Text>
-          <View style={s.card}>
-            {categories.map(({ name, setName, price, setPrice }, i) => {
-              const catNum = i + 1;
-              const enabled = enabledCats.has(catNum);
-              return (
-                <React.Fragment key={i}>
-                  {i > 0 && <View style={s.divider} />}
-                  <Animated.View style={[s.catRow, { opacity: catOpacityAnims[i] }]}>
+          <View style={s.catSectionRow}>
+            {/* Toggles kolom links */}
+            <View style={s.catTogglesColumn}>
+              {categories.map(({ name, setName, price, setPrice }, i) => {
+                const catNum = i + 1;
+                const enabled = enabledCats.has(catNum);
+                return (
+                  <Animated.View key={i} style={[s.catToggleWrapper, { opacity: catOpacityAnims[i] }]}>
                     <Pressable
                       onPress={() => toggleCategory(catNum)}
-                      style={[s.catToggle, { backgroundColor: enabled ? categoryColors[i] : '#3A3A3A' }]}
+                      style={({ pressed }) => [s.catToggle, { backgroundColor: enabled ? categoryColors[i] : '#3A3A3A' }, pressed && { opacity: 0.7 }]}
                     >
                       <Ionicons
                         name={enabled ? 'checkmark' : 'close'}
@@ -762,38 +762,53 @@ export default function SettingsOverlay({
                         color={enabled ? '#fff' : '#666'}
                       />
                     </Pressable>
-                    <TextInput
-                      style={s.catNameInput}
-                      value={name}
-                      onChangeText={setName}
-                      placeholder={`Categorie ${catNum}`}
-                      placeholderTextColor="#848484"
-                      editable={enabled}
-                    />
-                    {enabled ? (
-                      <View style={s.catPriceWrapper}>
-                        <Text style={s.euroSign}>€</Text>
-                        <TextInput
-                          style={[s.catPriceInput, priceErrors[catNum] ? s.catPriceInputError : null]}
-                          value={price}
-                          onChangeText={(v) => handlePriceChange(i, v, setPrice)}
-                          onBlur={() => handlePriceBlur(i, price, setPrice)}
-                          keyboardType="decimal-pad"
-                          placeholder="0,00"
-                          placeholderTextColor="#848484"
-                          maxLength={5}
-                        />
-                      </View>
-                    ) : (
-                      <Text style={s.catDisabledLabel}>Uit</Text>
-                    )}
                   </Animated.View>
-                  {priceErrors[catNum] && (
-                    <Text style={s.priceError}>{priceErrors[catNum]}</Text>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                );
+              })}
+            </View>
+
+            {/* Card rechts: naam + prijs */}
+            <View style={[s.card, { flex: 1 }]}>
+              {categories.map(({ name, setName, price, setPrice }, i) => {
+                const catNum = i + 1;
+                const enabled = enabledCats.has(catNum);
+                return (
+                  <React.Fragment key={i}>
+                    {i > 0 && <View style={s.divider} />}
+                    <Animated.View style={[s.catRow, { opacity: catOpacityAnims[i] }]}>
+                      <TextInput
+                        style={s.catNameInput}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder={`Categorie ${catNum}`}
+                        placeholderTextColor="#848484"
+                        editable={enabled}
+                      />
+                      {enabled ? (
+                        <View style={s.catPriceWrapper}>
+                          <Text style={s.euroSign}>€</Text>
+                          <TextInput
+                            style={[s.catPriceInput, priceErrors[catNum] ? s.catPriceInputError : null]}
+                            value={price}
+                            onChangeText={(v) => handlePriceChange(i, v, setPrice)}
+                            onBlur={() => handlePriceBlur(i, price, setPrice)}
+                            keyboardType="decimal-pad"
+                            placeholder="0,00"
+                            placeholderTextColor="#848484"
+                            maxLength={5}
+                          />
+                        </View>
+                      ) : (
+                        <Text style={s.catDisabledLabel}>Uit</Text>
+                      )}
+                    </Animated.View>
+                    {priceErrors[catNum] && (
+                      <Text style={s.priceError}>{priceErrors[catNum]}</Text>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </View>
           </View>
 
           {/* Drinks */}
@@ -814,7 +829,7 @@ export default function SettingsOverlay({
                     <View style={[s.drinkCatBadge, { backgroundColor: catColor + '20' }]}>
                       <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
                     </View>
-                    <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={8}>
+                    <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.7 }} accessibilityLabel={`${drink.name} verwijderen`} accessibilityRole="button">
                       <Ionicons name="close-circle" size={20} color="#EB5466" />
                     </Pressable>
                   </View>
@@ -826,7 +841,7 @@ export default function SettingsOverlay({
             <View style={s.addDrinkRow}>
               <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor="#848484" value={newDrinkName} onChangeText={setNewDrinkName} />
               <TextInput style={s.addDrinkEmoji} placeholder={'🍺'} placeholderTextColor="#848484" value={newDrinkEmoji} onChangeText={setNewDrinkEmoji} />
-              <Pressable onPress={handleAddDrink} style={s.addDrinkBtn}>
+              <Pressable onPress={handleAddDrink} hitSlop={4} style={({ pressed }) => [s.addDrinkBtn, pressed && { opacity: 0.7 }]} accessibilityLabel="Drankje toevoegen" accessibilityRole="button">
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </Pressable>
             </View>
@@ -854,7 +869,7 @@ export default function SettingsOverlay({
               return (
                 <React.Fragment key={member.id}>
                   {i > 0 && <View style={s.divider} />}
-                  <Pressable style={s.memberRow} onPress={() => toggleExpandMember(member.user_id)}>
+                  <Pressable style={({ pressed }) => [s.memberRow, pressed && { opacity: 0.7 }]} onPress={() => toggleExpandMember(member.user_id)} accessibilityLabel={`${name} details`} accessibilityRole="button">
                     {member.profile?.avatar_url ? (
                       <Image source={{ uri: member.profile.avatar_url }} style={s.memberAvatar} />
                     ) : (
@@ -891,8 +906,10 @@ export default function SettingsOverlay({
                                   }));
                                   addTally(cat as 1|2|3|4, member.user_id);
                                 }}
-                                style={s.tallyBtn}
+                                style={({ pressed }) => [s.tallyBtn, pressed && { opacity: 0.7 }]}
                                 hitSlop={4}
+                                accessibilityLabel="Streepje toevoegen"
+                                accessibilityRole="button"
                               >
                                 <Ionicons name="add" size={16} color="#00BEAE" />
                               </Pressable>
@@ -916,8 +933,10 @@ export default function SettingsOverlay({
                                     ]);
                                   }
                                 }}
-                                style={s.tallyBtn}
+                                style={({ pressed }) => [s.tallyBtn, pressed && { opacity: 0.7 }]}
                                 hitSlop={4}
+                                accessibilityLabel="Streepje verwijderen"
+                                accessibilityRole="button"
                               >
                                 <Ionicons name="remove" size={16} color="#EB5466" />
                               </Pressable>
@@ -928,11 +947,11 @@ export default function SettingsOverlay({
                       {/* Admin actions */}
                       {!isSelf && (
                         <View style={s.memberActions}>
-                          <Pressable onPress={() => handleToggleAdmin(member.user_id, name, member.is_admin)} style={s.memberActionBtn}>
+                          <Pressable onPress={() => handleToggleAdmin(member.user_id, name, member.is_admin)} style={({ pressed }) => [s.memberActionBtn, pressed && { opacity: 0.7 }]}>
                             <Ionicons name={member.is_admin ? 'shield' : 'shield-outline'} size={18} color="#00BEAE" />
                             <Text style={s.memberActionText}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
                           </Pressable>
-                          <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={s.memberActionBtnDanger}>
+                          <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={({ pressed }) => [s.memberActionBtnDanger, pressed && { opacity: 0.7 }]}>
                             <Ionicons name="person-remove-outline" size={18} color="#EB5466" />
                             <Text style={s.memberActionTextDanger}>Verwijderen</Text>
                           </Pressable>
@@ -950,7 +969,7 @@ export default function SettingsOverlay({
           <View style={s.card}>
             <View style={s.inviteRow}>
               <Text style={s.inviteCode}>{group?.invite_code ?? '...'}</Text>
-              <Pressable onPress={handleRegenerateCode} hitSlop={8}>
+              <Pressable onPress={handleRegenerateCode} hitSlop={8} style={({ pressed }) => pressed && { opacity: 0.7 }}>
                 <Text style={s.refreshText}>Vernieuwen</Text>
               </Pressable>
             </View>
@@ -959,20 +978,20 @@ export default function SettingsOverlay({
           {/* Danger zone */}
           <View style={[s.card, { marginTop: 24 }]}>
             {isAdmin && (
-              <Pressable style={s.dangerRow} onPress={handleRemoveAdmin}>
+              <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleRemoveAdmin}>
                 <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
                 <Text style={s.dangerRowText}>Admin afstaan</Text>
               </Pressable>
             )}
             {isAdmin && <View style={s.divider} />}
-            <Pressable style={s.dangerRow} onPress={handleLeaveGroup}>
+            <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleLeaveGroup}>
               <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
               <Text style={s.dangerRowText}>Groep verlaten</Text>
             </Pressable>
             {isAdmin && (
               <>
                 <View style={s.divider} />
-                <Pressable style={s.dangerRow} onPress={handleDeleteGroup}>
+                <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
                   <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
                   <Text style={s.dangerRowText}>Groep verwijderen</Text>
                 </Pressable>
@@ -1022,7 +1041,10 @@ const s = StyleSheet.create({
 
   // Categories
   catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
-  catToggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const, marginRight: 12 },
+  catToggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const },
+  catSectionRow: { flexDirection: 'row' as const, alignItems: 'stretch' as const },
+  catTogglesColumn: { width: 52, alignItems: 'center' as const, justifyContent: 'space-around' as const, paddingVertical: 8 },
+  catToggleWrapper: { height: 52, alignItems: 'center' as const, justifyContent: 'center' as const },
   catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 52 },
   catPriceWrapper: {
     flexDirection: 'row' as const,
@@ -1079,7 +1101,7 @@ const s = StyleSheet.create({
   memberAvatarFallback: { backgroundColor: '#F1F1F1' },
   memberAvatarText: { fontSize: 14, fontWeight: '600', color: '#333' },
   memberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  adminBadge: { fontFamily: 'Unbounded', fontSize: 11, color: '#00BEAE', marginTop: 1 },
+  adminBadge: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', marginTop: 1 },
 
   // Expanded member
   memberExpanded: { paddingHorizontal: 16, paddingBottom: 12 },
@@ -1087,12 +1109,12 @@ const s = StyleSheet.create({
   tallyDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
   tallyLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#FFFFFF', flex: 1 },
   tallyCount: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', fontWeight: '600', marginRight: 8, minWidth: 24, textAlign: 'right' },
-  tallyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
+  tallyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   memberActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,217,163,0.1)' },
-  memberActionText: { fontFamily: 'Unbounded', fontSize: 11, color: '#00BEAE' },
+  memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE' },
   memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, backgroundColor: 'rgba(235,84,102,0.1)' },
-  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 11, color: '#EB5466' },
+  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466' },
 
   // Invite
   inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, minHeight: 52 },
