@@ -96,106 +96,132 @@ function formatEuroStr(str: string): string | null {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-/** Touch-&-hold category badge selector */
+/** Touch-&-hold category badge selector.
+ *  Single PanResponder owns the entire gesture: long press → expand → drag → release. */
 function CategoryBadgeSelector({
   value,
   onChange,
   colors,
   categoryNames,
   enabledCategories,
+  onScrollEnable,
 }: {
   value: number;
   onChange: (v: number) => void;
   colors: readonly string[];
   categoryNames: string[];
   enabledCategories: number[];
+  onScrollEnable?: (enabled: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [hoveredCat, setHoveredCat] = useState<number | null>(null);
-  const itemRefs = useRef<Record<number, { y: number; height: number }>>({});
-  const containerRef = useRef<View>(null);
-  const containerLayout = useRef({ y: 0, height: 0 });
+  const expandedRef = useRef(false);
   const prevHovered = useRef<number | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chipPositions = useRef<{ cat: number; top: number; bottom: number }[]>([]);
+  const badgeRef = useRef<View>(null);
+  const badgeY = useRef(0);
 
-  const handleLongPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const expand = () => {
+    expandedRef.current = true;
     setExpanded(true);
     setHoveredCat(value);
     prevHovered.current = value;
+    onScrollEnable?.(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Pre-calculate chip positions: each chip is ~40px tall with 8px gap, centered on badge
+    const chipH = 40;
+    const gap = 8;
+    const totalH = enabledCategories.length * chipH + (enabledCategories.length - 1) * gap;
+    const startY = badgeY.current - totalH / 2 + chipH / 2;
+    chipPositions.current = enabledCategories.map((cat, i) => ({
+      cat,
+      top: startY + i * (chipH + gap) - chipH / 2,
+      bottom: startY + i * (chipH + gap) + chipH / 2,
+    }));
   };
 
-  const panRef = useRef(PanResponder.create({ onStartShouldSetPanResponder: () => false }));
+  const collapse = (confirm: boolean) => {
+    if (confirm && prevHovered.current !== null) {
+      onChange(prevHovered.current);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    expandedRef.current = false;
+    setExpanded(false);
+    setHoveredCat(null);
+    prevHovered.current = null;
+    onScrollEnable?.(true);
+  };
 
-  useEffect(() => {
-    panRef.current = PanResponder.create({
-      onStartShouldSetPanResponder: () => expanded,
-      onMoveShouldSetPanResponder: () => expanded,
-      onPanResponderMove: (_, gs) => {
-        if (!expanded) return;
-        const fingerY = gs.moveY;
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        // Start long press timer
+        longPressTimer.current = setTimeout(() => {
+          // Measure badge position at expand time
+          badgeRef.current?.measureInWindow((_x, y, _w, h) => {
+            badgeY.current = y + h / 2;
+            expand();
+          });
+        }, 250);
+      },
+      onPanResponderMove: (evt) => {
+        if (!expandedRef.current) {
+          // If moved too much before long press, cancel
+          return;
+        }
+        const fingerY = evt.nativeEvent.pageY;
         let found: number | null = null;
-        for (const cat of enabledCategories) {
-          const item = itemRefs.current[cat];
-          if (item) {
-            const itemTop = containerLayout.current.y + item.y;
-            const itemBottom = itemTop + item.height;
-            if (fingerY >= itemTop && fingerY <= itemBottom) {
-              found = cat;
-              break;
-            }
+        for (const pos of chipPositions.current) {
+          if (fingerY >= pos.top && fingerY <= pos.bottom) {
+            found = pos.cat;
+            break;
           }
         }
         if (found !== null && found !== prevHovered.current) {
-          setHoveredCat(found);
           prevHovered.current = found;
+          setHoveredCat(found);
           Haptics.selectionAsync();
         }
       },
       onPanResponderRelease: () => {
-        if (expanded) {
-          const finalCat = prevHovered.current;
-          if (finalCat !== null) {
-            onChange(finalCat);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
         }
-        setExpanded(false);
-        setHoveredCat(null);
-        prevHovered.current = null;
+        if (expandedRef.current) {
+          collapse(true);
+        }
       },
       onPanResponderTerminate: () => {
-        setExpanded(false);
-        setHoveredCat(null);
-        prevHovered.current = null;
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+        if (expandedRef.current) {
+          collapse(false);
+        }
       },
-    });
-  }, [expanded, enabledCategories, onChange]);
+    })
+  ).current;
 
   const selectedColor = colors[(value - 1) % 4];
   const selectedName = categoryNames[(value - 1) % 4] || `Categorie ${value}`;
 
   return (
     <>
-      <View style={cbs.collapsedContainer}>
-        <Pressable onLongPress={handleLongPress} delayLongPress={250}>
-          <View style={[cbs.badge, { backgroundColor: selectedColor + '20' }]}>
-            <Text style={[cbs.badgeText, { color: selectedColor }]}>{selectedName}</Text>
-          </View>
-        </Pressable>
+      <View style={cbs.collapsedContainer} ref={badgeRef} collapsable={false} {...pan.panHandlers}>
+        <View style={[cbs.badge, { backgroundColor: selectedColor + '20' }]}>
+          <Text style={[cbs.badgeText, { color: selectedColor }]}>{selectedName}</Text>
+        </View>
         <Text style={cbs.hintText}>Houd ingedrukt</Text>
       </View>
 
       <Modal visible={expanded} transparent animationType="fade" statusBarTranslucent>
-        <View
-          ref={containerRef}
-          style={cbs.modalOverlay}
-          onLayout={() => {
-            containerRef.current?.measureInWindow((_x, y, _w, h) => {
-              containerLayout.current = { y, height: h };
-            });
-          }}
-          {...panRef.current.panHandlers}
-        >
+        <View style={cbs.modalOverlay}>
           <View style={cbs.chipsList}>
             {enabledCategories.map((cat) => {
               const catColor = colors[(cat - 1) % 4];
@@ -209,12 +235,6 @@ function CategoryBadgeSelector({
                     { backgroundColor: catColor + (isHovered ? '40' : '20') },
                     isHovered && cbs.badgeItemHovered,
                   ]}
-                  onLayout={(e) => {
-                    itemRefs.current[cat] = {
-                      y: e.nativeEvent.layout.y,
-                      height: e.nativeEvent.layout.height,
-                    };
-                  }}
                 >
                   <Text
                     style={[
@@ -254,7 +274,6 @@ const cbs = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    alignSelf: 'center',
   },
   badgeItemHovered: { transform: [{ scale: 1.08 }] },
   badgeItemText: { fontFamily: 'Unbounded', fontSize: 14, textAlign: 'center' },
@@ -315,6 +334,7 @@ export default function SettingsOverlay({
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const [savedOk, setSavedOk] = useState(false);
   const catOpacityAnims = useRef([
     new Animated.Value(1),
@@ -649,7 +669,7 @@ export default function SettingsOverlay({
           </Pressable>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={scrollEnabled} contentContainerStyle={{ paddingBottom: 120 }}>
           {/* Group avatar */}
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
             {groupAvatarUrl ? (
@@ -772,6 +792,7 @@ export default function SettingsOverlay({
                 colors={categoryColors}
                 categoryNames={[catName1, catName2, catName3, catName4]}
                 enabledCategories={[...enabledCats].sort()}
+                onScrollEnable={setScrollEnabled}
               />
             </View>
           </View>
