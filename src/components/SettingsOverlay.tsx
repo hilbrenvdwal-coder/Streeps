@@ -991,7 +991,6 @@ export default function SettingsOverlay({
                 <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
                 <Text style={s.dangerRowText}>Groep verwijderen</Text>
               </Pressable>
-              </>
             )}
           </View>
         </ScrollView>
