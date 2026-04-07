@@ -121,6 +121,7 @@ function CategoryBadgeSelector({
   const chipPositions = useRef<{ cat: number; top: number; bottom: number }[]>([]);
   const badgeRef = useRef<View>(null);
   const badgeY = useRef(0);
+  const [chipsTopOffset, setChipsTopOffset] = useState(0);
 
   const expand = () => {
     expandedRef.current = true;
@@ -130,15 +131,19 @@ function CategoryBadgeSelector({
     onScrollEnable?.(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    // Pre-calculate chip positions: each chip is ~40px tall with 8px gap, centered on badge
+    // Position chips so the selected category sits at the badge's Y position
     const chipH = 40;
     const gap = 8;
-    const totalH = enabledCategories.length * chipH + (enabledCategories.length - 1) * gap;
-    const startY = badgeY.current - totalH / 2 + chipH / 2;
+    const selectedIdx = enabledCategories.indexOf(value);
+    // Top of the list = badge center - (selected chip's center offset from list top)
+    const selectedCenterFromListTop = selectedIdx * (chipH + gap) + chipH / 2;
+    const listTop = badgeY.current - selectedCenterFromListTop;
+    setChipsTopOffset(listTop);
+
     chipPositions.current = enabledCategories.map((cat, i) => ({
       cat,
-      top: startY + i * (chipH + gap) - chipH / 2,
-      bottom: startY + i * (chipH + gap) + chipH / 2,
+      top: listTop + i * (chipH + gap),
+      bottom: listTop + i * (chipH + gap) + chipH,
     }));
   };
 
@@ -222,7 +227,7 @@ function CategoryBadgeSelector({
 
       <Modal visible={expanded} transparent animationType="fade" statusBarTranslucent>
         <View style={cbs.modalOverlay}>
-          <View style={cbs.chipsList}>
+          <View style={[cbs.chipsList, { position: 'absolute', top: chipsTopOffset }]}>
             {enabledCategories.map((cat) => {
               const catColor = colors[(cat - 1) % 4];
               const catName = categoryNames[(cat - 1) % 4] || `Categorie ${cat}`;
@@ -263,7 +268,6 @@ const cbs = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
     alignItems: 'center',
   },
   chipsList: {
