@@ -12,6 +12,7 @@ import {
   Easing,
   PanResponder,
   LayoutAnimation,
+  Modal,
   Platform,
   UIManager,
 } from 'react-native';
@@ -20,6 +21,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
+import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
 
 interface Member {
@@ -72,73 +74,195 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-/** Drag-to-select category picker: hold the dot, drag up/down to pick 1–4 */
-function CategoryDragPicker({
+/** Converteer centen (integer) naar euro display string met Nederlandse komma-notatie */
+function centsToEuroStr(cents: number | null | undefined): string {
+  if (cents == null || cents === 0) return '';
+  return (cents / 100).toFixed(2).replace('.', ',');
+}
+
+/** Converteer euro input string (accepteert komma of punt) naar centen. Retourneert null bij ongeldige invoer. */
+function euroStrToCents(str: string): number | null {
+  if (!str.trim()) return null;
+  const normalized = str.replace(',', '.');
+  const parsed = parseFloat(normalized);
+  if (isNaN(parsed) || parsed < 0.01 || parsed > 99.99) return null;
+  return Math.round(parsed * 100);
+}
+
+/** Format een euro input string naar netjes 2-decimalen Nederlandse notatie */
+function formatEuroStr(str: string): string | null {
+  const cents = euroStrToCents(str);
+  if (cents == null) return null;
+  return (cents / 100).toFixed(2).replace('.', ',');
+}
+
+/** Touch & hold picker: hold dot → expands with all colors → slide to pick → release confirms */
+function TouchHoldCategoryPicker({
   value,
   onChange,
   colors,
+  activeOnly,
 }: {
   value: number;
   onChange: (v: number) => void;
   colors: readonly string[];
+  activeOnly?: number[];
 }) {
-  const [dragging, setDragging] = useState(false);
-  const startY = useRef(0);
-  const startVal = useRef(value);
+  const cats = activeOnly && activeOnly.length > 0 ? activeOnly : [1, 2, 3, 4];
+  const dotRef = useRef<View>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [hoveredCat, setHoveredCat] = useState(value);
+  const expandAnim = useRef(new Animated.Value(0)).current;
+  const liftScale = useRef(new Animated.Value(1)).current;
+  // Screen position of the resting dot
+  const dotPos = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  const hoveredRef = useRef(value);
 
-  const pan = useRef(
+  // Keep hoveredRef in sync
+  useEffect(() => { hoveredRef.current = hoveredCat; }, [hoveredCat]);
+
+  // Skip expand for single category
+  if (cats.length <= 1) {
+    return (
+      <View style={thp.wrap}>
+        <View style={[thp.dot, { backgroundColor: colors[(value - 1) % 4], borderWidth: 2, borderColor: '#fff' }]} />
+      </View>
+    );
+  }
+
+  const handleLongPress = () => {
+    // Measure dot position before expanding
+    dotRef.current?.measure((_x, _y, w, h, pageX, pageY) => {
+      dotPos.current = { x: pageX, y: pageY, w, h };
+      hoveredRef.current = value;
+      setHoveredCat(value);
+      setExpanded(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Lift then expand
+      expandAnim.setValue(0);
+      liftScale.setValue(1);
+      Animated.sequence([
+        Animated.spring(liftScale, { toValue: 1.3, damping: 15, stiffness: 300, useNativeDriver: true }),
+        Animated.spring(expandAnim, { toValue: 1, damping: 18, stiffness: 280, useNativeDriver: true }),
+      ]).start();
+    });
+  };
+
+  const handleRelease = () => {
+    if (!expanded) return;
+    const selected = hoveredRef.current;
+    onChange(selected);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    Animated.parallel([
+      Animated.timing(expandAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(liftScale, { toValue: 1, duration: 180, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+    ]).start(() => setExpanded(false));
+  };
+
+  const DOT_SIZE = 28;
+  const GAP = 12;
+  const totalWidth = cats.length * DOT_SIZE + (cats.length - 1) * GAP;
+  // Center the expanded row on the original dot
+  const rowLeft = dotPos.current.x + dotPos.current.w / 2 - totalWidth / 2;
+  const rowTop = dotPos.current.y - DOT_SIZE - 16; // above the dot
+
+  const getCatFromX = (fingerX: number) => {
+    const relX = fingerX - rowLeft;
+    const pitch = DOT_SIZE + GAP;
+    const idx = Math.round(relX / pitch - 0.5);
+    const clamped = Math.max(0, Math.min(cats.length - 1, idx));
+    return cats[clamped];
+  };
+
+  const overlayPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        setDragging(true);
-        startY.current = 0;
-        startVal.current = value;
+      onPanResponderMove: (evt) => {
+        const newCat = getCatFromX(evt.nativeEvent.pageX);
+        if (newCat !== hoveredRef.current) {
+          hoveredRef.current = newCat;
+          setHoveredCat(newCat);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
       },
-      onPanResponderMove: (_, gs) => {
-        // Every 30px of drag = 1 category step, drag UP = higher number
-        const steps = Math.round(-gs.dy / 30);
-        const next = Math.max(1, Math.min(4, startVal.current + steps));
-        if (next !== value) onChange(next);
-      },
-      onPanResponderRelease: () => setDragging(false),
-      onPanResponderTerminate: () => setDragging(false),
+      onPanResponderRelease: () => handleRelease(),
+      onPanResponderTerminate: () => handleRelease(),
     })
   ).current;
 
-  // Update startVal ref when value changes externally
-  useEffect(() => { startVal.current = value; }, [value]);
-
   return (
-    <View style={cdp.wrap} {...pan.panHandlers}>
-      {dragging ? (
-        // Expanded: show all 4 dots vertically (4 at top, 1 at bottom)
-        <View style={cdp.expanded}>
-          {[4, 3, 2, 1].map((cat) => (
-            <View
-              key={cat}
+    <>
+      <View style={thp.wrap} ref={dotRef} collapsable={false}>
+        <Animated.View style={{ transform: [{ scale: liftScale }] }}>
+          <Pressable
+            onLongPress={handleLongPress}
+            delayLongPress={250}
+            hitSlop={10}
+            style={[
+              thp.dot,
+              { backgroundColor: colors[(value - 1) % 4], borderWidth: 2, borderColor: '#fff' },
+            ]}
+          />
+        </Animated.View>
+      </View>
+
+      {expanded && (
+        <Modal visible transparent animationType="none" statusBarTranslucent>
+          <View style={thp.overlay} {...overlayPan.panHandlers}>
+            {/* Expanded dot row */}
+            <Animated.View
               style={[
-                cdp.dot,
-                { backgroundColor: colors[(cat - 1) % 4] },
-                cat === value && cdp.dotActive,
+                thp.expandedRow,
+                {
+                  left: rowLeft,
+                  top: rowTop,
+                  opacity: expandAnim,
+                  transform: [{
+                    scale: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+                  }],
+                },
               ]}
-            />
-          ))}
-        </View>
-      ) : (
-        // Collapsed: single dot with current color
-        <View style={[cdp.dot, cdp.dotLarge, { backgroundColor: colors[(value - 1) % 4] }]} />
+            >
+              {cats.map((cat) => {
+                const isHovered = cat === hoveredCat;
+                return (
+                  <View
+                    key={cat}
+                    style={[
+                      thp.expandedDot,
+                      { backgroundColor: colors[(cat - 1) % 4] },
+                      !isHovered && { opacity: 0.4 },
+                      isHovered && { borderWidth: 2.5, borderColor: '#fff', transform: [{ scale: 1.2 }] },
+                    ]}
+                  />
+                );
+              })}
+            </Animated.View>
+          </View>
+        </Modal>
       )}
-    </View>
+    </>
   );
 }
 
-const cdp = StyleSheet.create({
-  wrap: { width: 36, alignItems: 'center', justifyContent: 'center', minHeight: 36 },
-  expanded: { alignItems: 'center', gap: 6, paddingVertical: 4 },
-  dot: { width: 14, height: 14, borderRadius: 7, opacity: 0.4 },
-  dotActive: { opacity: 1, width: 18, height: 18, borderRadius: 9 },
-  dotLarge: { width: 18, height: 18, borderRadius: 9, opacity: 1 },
+const thp = StyleSheet.create({
+  wrap: { alignItems: 'center', justifyContent: 'center', minHeight: 36, paddingHorizontal: 4 },
+  dot: { width: 22, height: 22, borderRadius: 11 },
+  overlay: { flex: 1 },
+  expandedRow: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(30, 30, 30, 0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 25,
+  },
+  expandedDot: { width: 28, height: 28, borderRadius: 14 },
 });
 
 export default function SettingsOverlay({
@@ -193,6 +317,23 @@ export default function SettingsOverlay({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [tallyAdj, setTallyAdj] = useState<Record<string, Record<number, number>>>({});
+  const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
+  const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const catOpacityAnims = useRef([
+    new Animated.Value(1),
+    new Animated.Value(1),
+    new Animated.Value(1),
+    new Animated.Value(1),
+  ]).current;
+
+  const initialValues = useRef<{
+    groupName: string;
+    price1: string; price2: string; price3: string; price4: string;
+    catName1: string; catName2: string; catName3: string; catName4: string;
+    enabledCats: Set<number>;
+  } | null>(null);
 
   // Reset optimistic adjustments when real data arrives
   useEffect(() => { setTallyAdj({}); }, [recentTallies]);
@@ -207,14 +348,45 @@ export default function SettingsOverlay({
     if (visible && group) {
       setGroupName(group.name);
       setGroupAvatarUrl(group.avatar_url ?? null);
-      setPrice1(String(group.price_category_1));
-      setPrice2(String(group.price_category_2));
-      setPrice3(group.price_category_3 ? String(group.price_category_3) : '');
-      setPrice4(group.price_category_4 ? String(group.price_category_4) : '');
-      setCatName1(group.name_category_1 || 'Categorie 1');
-      setCatName2(group.name_category_2 || 'Categorie 2');
-      setCatName3(group.name_category_3 || 'Categorie 3');
-      setCatName4(group.name_category_4 || 'Categorie 4');
+      setPrice1(centsToEuroStr(group.price_category_1));
+      setPrice2(centsToEuroStr(group.price_category_2));
+      setPrice3(centsToEuroStr(group.price_category_3));
+      setPrice4(centsToEuroStr(group.price_category_4));
+      setPriceErrors({});
+      const catName1Value = group.name_category_1 || 'Categorie 1';
+      const catName2Value = group.name_category_2 || 'Categorie 2';
+      const catName3Value = group.name_category_3 || 'Categorie 3';
+      const catName4Value = group.name_category_4 || 'Categorie 4';
+      setCatName1(catName1Value);
+      setCatName2(catName2Value);
+      setCatName3(catName3Value);
+      setCatName4(catName4Value);
+
+      // Categories with a price are enabled
+      const enabledArray: number[] = [];
+      if (group.price_category_1) enabledArray.push(1);
+      if (group.price_category_2) enabledArray.push(2);
+      if (group.price_category_3) enabledArray.push(3);
+      if (group.price_category_4) enabledArray.push(4);
+      if (enabledArray.length === 0) { enabledArray.push(1); enabledArray.push(2); } // fallback
+      const enabled = new Set<number>(enabledArray);
+      setEnabledCats(enabled);
+      catOpacityAnims.forEach((anim, idx) => {
+        anim.setValue(enabled.has(idx + 1) ? 1 : 0.35);
+      });
+
+      initialValues.current = {
+        groupName: group.name,
+        price1: centsToEuroStr(group.price_category_1),
+        price2: centsToEuroStr(group.price_category_2),
+        price3: centsToEuroStr(group.price_category_3),
+        price4: centsToEuroStr(group.price_category_4),
+        catName1: catName1Value,
+        catName2: catName2Value,
+        catName3: catName3Value,
+        catName4: catName4Value,
+        enabledCats: new Set(enabledArray),
+      };
 
       setShowOpen(true);
       scrimOpacity.setValue(0);
@@ -226,7 +398,22 @@ export default function SettingsOverlay({
     }
   }, [visible]);
 
-  const handleClose = useCallback(() => {
+  const isDirty = (): boolean => {
+    const iv = initialValues.current;
+    if (!iv) return false;
+    const setsEqual = (a: Set<number>, b: Set<number>) =>
+      a.size === b.size && [...a].every((v) => b.has(v));
+    return (
+      groupName !== iv.groupName ||
+      price1 !== iv.price1 || price2 !== iv.price2 ||
+      price3 !== iv.price3 || price4 !== iv.price4 ||
+      catName1 !== iv.catName1 || catName2 !== iv.catName2 ||
+      catName3 !== iv.catName3 || catName4 !== iv.catName4 ||
+      !setsEqual(enabledCats, iv.enabledCats)
+    );
+  };
+
+  const performClose = useCallback(() => {
     Animated.parallel([
       Animated.timing(scrimOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(contentAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
@@ -236,18 +423,107 @@ export default function SettingsOverlay({
     });
   }, [onClose]);
 
-  const handleSave = () => {
-    handleClose();
-    updateGroupPrices({
+  const handleClose = useCallback(() => {
+    if (isDirty()) {
+      Alert.alert(
+        'Wijzigingen niet opgeslagen',
+        'Weet je zeker dat je wilt sluiten? Je wijzigingen worden niet opgeslagen.',
+        [
+          { text: 'Annuleer', style: 'cancel' },
+          { text: 'Sluiten', style: 'destructive', onPress: performClose },
+        ]
+      );
+    } else {
+      performClose();
+    }
+  }, [performClose]);
+
+  const handlePriceBlur = (index: number, value: string, setter: (v: string) => void) => {
+    if (!value.trim()) {
+      setPriceErrors((prev) => ({ ...prev, [index + 1]: null }));
+      return;
+    }
+    const formatted = formatEuroStr(value);
+    if (formatted == null) {
+      setPriceErrors((prev) => ({ ...prev, [index + 1]: 'Ongeldig bedrag' }));
+    } else {
+      setter(formatted);
+      setPriceErrors((prev) => ({ ...prev, [index + 1]: null }));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handlePriceChange = (index: number, value: string, setter: (v: string) => void) => {
+    setter(value);
+    if (priceErrors[index + 1]) {
+      setPriceErrors((prev) => ({ ...prev, [index + 1]: null }));
+    }
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+
+    // Validate prices
+    const p1 = euroStrToCents(price1);
+    const p2 = euroStrToCents(price2);
+    const p3 = price3.trim() ? euroStrToCents(price3) : null;
+    const p4 = price4.trim() ? euroStrToCents(price4) : null;
+
+    const errors: Record<number, string | null> = {};
+    if (p1 == null && price1.trim()) errors[1] = 'Ongeldig bedrag';
+    if (p2 == null && price2.trim()) errors[2] = 'Ongeldig bedrag';
+    if (p3 == null && price3.trim()) errors[3] = 'Ongeldig bedrag';
+    if (p4 == null && price4.trim()) errors[4] = 'Ongeldig bedrag';
+
+    if (Object.values(errors).some(Boolean)) {
+      setPriceErrors(errors);
+      return;
+    }
+
+    setIsSaving(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await updateGroupPrices({
       ...(groupName.trim() ? { name: groupName.trim() } : {}),
-      price_category_1: parseInt(price1) || 150,
-      price_category_2: parseInt(price2) || 300,
-      price_category_3: price3 ? parseInt(price3) : null,
-      price_category_4: price4 ? parseInt(price4) : null,
+      price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
+      price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
+      price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
+      price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
       name_category_1: catName1.trim() || 'Categorie 1',
       name_category_2: catName2.trim() || 'Categorie 2',
       name_category_3: catName3.trim() || 'Categorie 3',
       name_category_4: catName4.trim() || 'Categorie 4',
+    });
+    setSavedOk(true);
+    setTimeout(() => {
+      setIsSaving(false);
+      setSavedOk(false);
+      performClose();
+    }, 600);
+  };
+
+  const toggleCategory = (cat: number) => {
+    setEnabledCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) {
+        if (next.size <= 1) return prev;
+        next.delete(cat);
+        Animated.timing(catOpacityAnims[cat - 1], {
+          toValue: 0.35,
+          duration: 200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      } else {
+        next.add(cat);
+        Animated.timing(catOpacityAnims[cat - 1], {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      return next;
     });
   };
 
@@ -362,12 +638,19 @@ export default function SettingsOverlay({
       <Animated.View style={[s.container, { paddingTop: insets.top + 12 }, contentStyle]} pointerEvents="auto">
         {/* Header */}
         <View style={s.header}>
-          <Pressable onPress={handleClose} hitSlop={12}>
+          <Pressable onPress={handleClose} hitSlop={12} style={{ marginRight: 12 }}>
             <Ionicons name="close" size={24} color="#FFFFFF" />
           </Pressable>
           <Text style={s.headerTitle}>Instellingen</Text>
-          <Pressable onPress={handleSave} hitSlop={12}>
-            <Text style={s.saveText}>Opslaan</Text>
+          <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving} style={{ marginLeft: 'auto' }}>
+            <View style={s.saveBtnRow}>
+              {savedOk && (
+                <Ionicons name="checkmark" size={16} color="#00BEAE" style={{ marginRight: 4 }} />
+              )}
+              <Text style={[s.saveText, isSaving && { opacity: 0.5 }]}>
+                {savedOk ? 'Opgeslagen' : 'Opslaan'}
+              </Text>
+            </View>
           </Pressable>
         </View>
 
@@ -401,29 +684,55 @@ export default function SettingsOverlay({
           {/* Categories */}
           <Text style={s.sectionHeader}>CATEGORIEËN</Text>
           <View style={s.card}>
-            {categories.map(({ name, setName, price, setPrice }, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <View style={s.divider} />}
-                <View style={s.catRow}>
-                  <View style={[s.catDot, { backgroundColor: categoryColors[i] }]} />
-                  <TextInput
-                    style={s.catNameInput}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={`Categorie ${i + 1}`}
-                    placeholderTextColor="#848484"
-                  />
-                  <TextInput
-                    style={s.catPriceInput}
-                    value={price}
-                    onChangeText={setPrice}
-                    keyboardType="numeric"
-                    placeholder="ct"
-                    placeholderTextColor="#848484"
-                  />
-                </View>
-              </React.Fragment>
-            ))}
+            {categories.map(({ name, setName, price, setPrice }, i) => {
+              const catNum = i + 1;
+              const enabled = enabledCats.has(catNum);
+              return (
+                <React.Fragment key={i}>
+                  {i > 0 && <View style={s.divider} />}
+                  <Animated.View style={[s.catRow, { opacity: catOpacityAnims[i] }]}>
+                    <Pressable
+                      onPress={() => toggleCategory(catNum)}
+                      style={[s.catToggle, { backgroundColor: enabled ? categoryColors[i] : '#3A3A3A' }]}
+                    >
+                      <Ionicons
+                        name={enabled ? 'checkmark' : 'close'}
+                        size={16}
+                        color={enabled ? '#fff' : '#666'}
+                      />
+                    </Pressable>
+                    <TextInput
+                      style={s.catNameInput}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder={`Categorie ${catNum}`}
+                      placeholderTextColor="#848484"
+                      editable={enabled}
+                    />
+                    {enabled ? (
+                      <View style={s.catPriceWrapper}>
+                        <Text style={s.euroSign}>€</Text>
+                        <TextInput
+                          style={[s.catPriceInput, priceErrors[catNum] ? s.catPriceInputError : null]}
+                          value={price}
+                          onChangeText={(v) => handlePriceChange(i, v, setPrice)}
+                          onBlur={() => handlePriceBlur(i, price, setPrice)}
+                          keyboardType="decimal-pad"
+                          placeholder="0,00"
+                          placeholderTextColor="#848484"
+                          maxLength={5}
+                        />
+                      </View>
+                    ) : (
+                      <Text style={s.catDisabledLabel}>Uit</Text>
+                    )}
+                  </Animated.View>
+                  {priceErrors[catNum] && (
+                    <Text style={s.priceError}>{priceErrors[catNum]}</Text>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </View>
 
           {/* Drinks */}
@@ -449,15 +758,19 @@ export default function SettingsOverlay({
             <View style={s.addDrinkRow}>
               <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor="#848484" value={newDrinkName} onChangeText={setNewDrinkName} />
               <TextInput style={s.addDrinkEmoji} placeholder={'🍺'} placeholderTextColor="#848484" value={newDrinkEmoji} onChangeText={setNewDrinkEmoji} />
-              {/* Category drag picker: hold & drag up/down */}
-              <CategoryDragPicker
-                value={parseInt(newDrinkCat) || 1}
-                onChange={(v) => setNewDrinkCat(String(v))}
-                colors={categoryColors}
-              />
               <Pressable onPress={handleAddDrink} style={s.addDrinkBtn}>
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </Pressable>
+            </View>
+            {/* Horizontal category scrub picker */}
+            <View style={s.addDrinkPickerRow}>
+              <Text style={s.addDrinkPickerLabel}>Categorie</Text>
+              <TouchHoldCategoryPicker
+                value={parseInt(newDrinkCat) || 1}
+                onChange={(v) => setNewDrinkCat(String(v))}
+                colors={categoryColors}
+                activeOnly={[...enabledCats].sort()}
+              />
             </View>
           </View>
 
@@ -614,9 +927,10 @@ const s = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: '400', color: '#FFFFFF' },
   saveText: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '600', color: '#00BEAE' },
+  saveBtnRow: { flexDirection: 'row' as const, alignItems: 'center' as const },
 
   // Avatar
   avatarSection: { alignItems: 'center', marginBottom: 8 },
@@ -638,9 +952,45 @@ const s = StyleSheet.create({
 
   // Categories
   catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
-  catDot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+  catToggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const, marginRight: 12 },
   catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 52 },
-  catPriceInput: { fontFamily: 'Unbounded', width: 72, fontSize: 14, color: '#FFFFFF', textAlign: 'right', height: 52 },
+  catPriceWrapper: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 40,
+    minWidth: 88,
+  },
+  euroSign: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#848484',
+    marginRight: 4,
+  },
+  catPriceInput: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#FFFFFF',
+    textAlign: 'right' as const,
+    height: 40,
+    width: 56,
+    fontVariant: ['tabular-nums'] as any,
+  },
+  catPriceInputError: {
+    color: '#EB5466',
+  },
+  priceError: {
+    fontFamily: 'Unbounded',
+    fontSize: 10,
+    color: '#EB5466',
+    textAlign: 'right' as const,
+    paddingRight: 16,
+    paddingBottom: 4,
+    marginTop: -4,
+  },
+  catDisabledLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', width: 72, textAlign: 'right' },
 
   // Drinks
   drinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 50 },
@@ -650,6 +1000,8 @@ const s = StyleSheet.create({
   addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 48 },
   addDrinkEmoji: { fontFamily: 'Unbounded', width: 48, fontSize: 14, color: '#FFFFFF', textAlign: 'center', height: 48 },
   addDrinkBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
+  addDrinkPickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 44 },
+  addDrinkPickerLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
 
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 56 },
