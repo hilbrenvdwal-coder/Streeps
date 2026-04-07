@@ -96,8 +96,8 @@ function formatEuroStr(str: string): string | null {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-/** Vertical chip selector for drink categories */
-function CategoryChipSelector({
+/** Touch-&-hold category badge selector */
+function CategoryBadgeSelector({
   value,
   onChange,
   colors,
@@ -110,75 +110,152 @@ function CategoryChipSelector({
   categoryNames: string[];
   enabledCategories: number[];
 }) {
-  const startVal = useRef(value);
+  const [expanded, setExpanded] = useState(false);
+  const [hoveredCat, setHoveredCat] = useState<number | null>(null);
+  const itemRefs = useRef<Record<number, { y: number; height: number }>>({});
+  const containerRef = useRef<View>(null);
+  const containerLayout = useRef({ y: 0, height: 0 });
+  const prevHovered = useRef<number | null>(null);
 
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
-      onPanResponderGrant: () => {
-        startVal.current = value;
-      },
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setExpanded(true);
+    setHoveredCat(value);
+    prevHovered.current = value;
+  };
+
+  const panRef = useRef(PanResponder.create({ onStartShouldSetPanResponder: () => false }));
+
+  useEffect(() => {
+    panRef.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => expanded,
+      onMoveShouldSetPanResponder: () => expanded,
       onPanResponderMove: (_, gs) => {
-        const steps = Math.round(gs.dy / 50);
-        const idx = enabledCategories.indexOf(startVal.current);
-        const nextIdx = Math.max(0, Math.min(enabledCategories.length - 1, idx + steps));
-        const next = enabledCategories[nextIdx];
-        if (next !== undefined && next !== value) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onChange(next);
+        if (!expanded) return;
+        const fingerY = gs.moveY;
+        let found: number | null = null;
+        for (const cat of enabledCategories) {
+          const item = itemRefs.current[cat];
+          if (item) {
+            const itemTop = containerLayout.current.y + item.y;
+            const itemBottom = itemTop + item.height;
+            if (fingerY >= itemTop && fingerY <= itemBottom) {
+              found = cat;
+              break;
+            }
+          }
+        }
+        if (found !== null && found !== prevHovered.current) {
+          setHoveredCat(found);
+          prevHovered.current = found;
+          Haptics.selectionAsync();
         }
       },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
+      onPanResponderRelease: () => {
+        if (expanded) {
+          const finalCat = prevHovered.current;
+          if (finalCat !== null) {
+            onChange(finalCat);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+        setExpanded(false);
+        setHoveredCat(null);
+        prevHovered.current = null;
+      },
+      onPanResponderTerminate: () => {
+        setExpanded(false);
+        setHoveredCat(null);
+        prevHovered.current = null;
+      },
+    });
+  }, [expanded, enabledCategories, onChange]);
 
-  useEffect(() => { startVal.current = value; }, [value]);
+  const selectedColor = colors[(value - 1) % 4];
+  const selectedName = categoryNames[(value - 1) % 4] || `Categorie ${value}`;
+
+  if (expanded) {
+    return (
+      <View
+        ref={containerRef}
+        style={cbs.expandedContainer}
+        onLayout={() => {
+          containerRef.current?.measureInWindow((_x, y, _w, h) => {
+            containerLayout.current = { y, height: h };
+          });
+        }}
+        {...panRef.current.panHandlers}
+      >
+        {enabledCategories.map((cat) => {
+          const catColor = colors[(cat - 1) % 4];
+          const catName = categoryNames[(cat - 1) % 4] || `Categorie ${cat}`;
+          const isHovered = hoveredCat === cat;
+          return (
+            <View
+              key={cat}
+              style={[
+                cbs.badgeItem,
+                { backgroundColor: catColor + (isHovered ? '40' : '20') },
+                isHovered && cbs.badgeItemHovered,
+              ]}
+              onLayout={(e) => {
+                itemRefs.current[cat] = {
+                  y: e.nativeEvent.layout.y,
+                  height: e.nativeEvent.layout.height,
+                };
+              }}
+            >
+              <Text
+                style={[
+                  cbs.badgeItemText,
+                  { color: catColor },
+                  isHovered && { fontWeight: '600' },
+                ]}
+              >
+                {catName}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  }
 
   return (
-    <View style={ccs.container} {...pan.panHandlers}>
-      {enabledCategories.map((cat) => {
-        const isSelected = cat === value;
-        const color = colors[(cat - 1) % 4];
-        return (
-          <Pressable
-            key={cat}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onChange(cat);
-            }}
-            style={[
-              ccs.chip,
-              { backgroundColor: color + (isSelected ? '40' : '20') },
-              isSelected && { borderWidth: 1.5, borderColor: color },
-            ]}
-          >
-            {isSelected && <View style={[ccs.dot, { backgroundColor: color }]} />}
-            <Text style={[
-              ccs.label,
-              { color },
-              isSelected && { fontWeight: '600' },
-            ]}>
-              {categoryNames[(cat - 1) % 4]}
-            </Text>
-          </Pressable>
-        );
-      })}
+    <View style={cbs.collapsedContainer}>
+      <Pressable onLongPress={handleLongPress} delayLongPress={250}>
+        <View style={[cbs.badge, { backgroundColor: selectedColor + '20' }]}>
+          <Text style={[cbs.badgeText, { color: selectedColor }]}>{selectedName}</Text>
+        </View>
+      </Pressable>
+      <Text style={cbs.hintText}>Houd ingedrukt</Text>
     </View>
   );
 }
 
-const ccs = StyleSheet.create({
-  container: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+const cbs = StyleSheet.create({
+  collapsedContainer: { alignItems: 'center', justifyContent: 'center' },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  badgeText: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
+  hintText: { fontFamily: 'Unbounded', fontSize: 8, color: '#848484', marginTop: 2, textAlign: 'center' },
+  expandedContainer: {
+    backgroundColor: 'rgba(40, 40, 40, 0.95)',
     borderRadius: 12,
+    paddingVertical: 4,
+    position: 'absolute',
+    right: 52,
+    bottom: 4,
+    minWidth: 140,
+    zIndex: 100,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  label: { fontFamily: 'Unbounded', fontSize: 13 },
+  badgeItem: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginHorizontal: 4, marginVertical: 2 },
+  badgeItemHovered: { transform: [{ scale: 1.05 }] },
+  badgeItemText: { fontFamily: 'Unbounded', fontSize: 12 },
 });
 
 export default function SettingsOverlay({
@@ -685,15 +762,16 @@ export default function SettingsOverlay({
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </Pressable>
             </View>
-            {/* Vertical category selector */}
-            <View style={s.divider} />
-            <CategoryChipSelector
-              value={parseInt(newDrinkCat) || 1}
-              onChange={(v) => setNewDrinkCat(String(v))}
-              colors={categoryColors}
-              categoryNames={[catName1, catName2, catName3, catName4]}
-              enabledCategories={[...enabledCats].sort()}
-            />
+            {/* Category badge selector: hold to expand, drag to pick */}
+            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
+              <CategoryBadgeSelector
+                value={parseInt(newDrinkCat) || 1}
+                onChange={(v) => setNewDrinkCat(String(v))}
+                colors={categoryColors}
+                categoryNames={[catName1, catName2, catName3, catName4]}
+                enabledCategories={[...enabledCats].sort()}
+              />
+            </View>
           </View>
 
           {/* Members */}
