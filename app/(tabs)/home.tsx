@@ -137,7 +137,7 @@ export default function HomeScreen() {
 
   // Tally flow state
   const [selectedCategory, setSelectedCategory] = useState<number | null>(1);
-  const [tallyCount, setTallyCount] = useState(1);
+  const [tallyCount, setTallyCount] = useState(0);
   const [showVerification, setShowVerification] = useState(false);
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -293,7 +293,7 @@ export default function HomeScreen() {
       await addTally(selectedCategory as 1 | 2 | 3 | 4, count);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showToast(`${count}× ${catName} toegevoegd`);
-      setTallyCount(1);
+      setTallyCount(0);
     } catch {
       showToast('Kon streepje niet opslaan, probeer opnieuw', 'error');
     }
@@ -465,7 +465,7 @@ export default function HomeScreen() {
               <CounterControl
                 value={tallyCount}
                 onIncrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
-                onDecrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 1)); }}
+                onDecrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
                 onSubmit={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
                 auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
               />
@@ -474,7 +474,7 @@ export default function HomeScreen() {
                   <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
                 </View>
               )}
-              {tallyCount > 1 && (
+              {tallyCount >= 1 && (
                 <Text style={s.submitHint}>Tik om te bevestigen</Text>
               )}
             </View>

@@ -53,8 +53,8 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
   const layersRef = useRef(layers);
   layersRef.current = layers;
 
-  const targetScale = (v: number) => 1 + Math.min((v - 1) / 9, 1) * 0.35;
-  const targetRotate = (v: number) => Math.min((v - 1) / 9, 1) * 15;
+  const targetScale = (v: number) => v <= 0 ? 1 : 1 + Math.min((v - 1) / 9, 1) * 0.35;
+  const targetRotate = (v: number) => v <= 0 ? 0 : Math.min((v - 1) / 9, 1) * 15;
 
   const removeLayer = useCallback((key: number) => {
     setLayers(prev => prev.filter(l => l.key !== key));
