@@ -46,6 +46,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
+import { useNavBarAnim } from './_layout';
 
 // ── SlideModal: frosted scrim + content slides ──
 function SlideModal({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
@@ -180,6 +181,21 @@ export default function HomeScreen() {
   // Group selector modal
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const navBarAnim = useNavBarAnim();
+
+  const openSettings = useCallback(() => {
+    setShowSettings(true);
+    Animated.timing(navBarAnim, {
+      toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true,
+    }).start();
+  }, [navBarAnim]);
+
+  const closeSettings = useCallback(() => {
+    setShowSettings(false);
+    Animated.timing(navBarAnim, {
+      toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true,
+    }).start();
+  }, [navBarAnim]);
 
   // Avatar preview
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
@@ -558,7 +574,7 @@ export default function HomeScreen() {
 
             {/* ── Drankenlijst ── */}
             {drinks.length === 0 && isAdmin && (
-              <Pressable style={s.emptyState} onPress={() => setShowSettings(true)}>
+              <Pressable style={s.emptyState} onPress={openSettings}>
                 <Text style={s.emptyStateText}>Nog geen drankjes — tik om toe te voegen</Text>
               </Pressable>
             )}
@@ -619,7 +635,7 @@ export default function HomeScreen() {
                 <Ionicons name={showMoreOptions ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
               </View>
             </Pressable>
-            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onSettings={() => setShowSettings(true)} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
+            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onSettings={openSettings} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
 
             <View style={{ height: 90 + insets.bottom }} />
           </Animated.View>
@@ -701,7 +717,7 @@ export default function HomeScreen() {
       {selectedGroupId && group && (
         <SettingsOverlay
           visible={showSettings}
-          onClose={() => setShowSettings(false)}
+          onClose={closeSettings}
           group={group}
           groupId={selectedGroupId}
           members={members}

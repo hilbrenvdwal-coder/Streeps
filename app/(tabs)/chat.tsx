@@ -2736,6 +2736,21 @@ export default function ChatScreen() {
   const [showingChat, setShowingChat] = useState(false);
   const [closingConv, setClosingConv] = useState<ConversationPreview | null>(null);
   const [showAddPeople, setShowAddPeople] = useState(false);
+
+  const openAddPeople = useCallback(() => {
+    setShowAddPeople(true);
+    Animated.timing(navBarAnim, {
+      toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true,
+    }).start();
+  }, [navBarAnim]);
+
+  const closeAddPeople = useCallback(() => {
+    setShowAddPeople(false);
+    Animated.timing(navBarAnim, {
+      toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true,
+    }).start();
+  }, [navBarAnim]);
+
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [viewProfileUserId, setViewProfileUserId] = useState<string | null>(null);
   const [viewGroupId, setViewGroupId] = useState<string | null>(null);
@@ -2978,7 +2993,7 @@ export default function ChatScreen() {
             )}
           </Pressable>
           <Text style={cs.title}>Berichten</Text>
-          <Pressable onPress={() => setShowAddPeople(true)} hitSlop={12} style={{ marginRight: 6 }}>
+          <Pressable onPress={openAddPeople} hitSlop={12} style={{ marginRight: 6 }}>
             <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
             {pendingRequestCount > 0 && (
               <View style={{
@@ -3125,7 +3140,7 @@ export default function ChatScreen() {
 
       {/* Profile overlay */}
       <ProfileOverlay visible={showProfile} onClose={() => setShowProfile(false)} />
-      <AddPeopleOverlay visible={showAddPeople} onClose={() => setShowAddPeople(false)} onFriendshipChange={refreshContacts} onViewProfile={(id) => setViewProfileUserId(id)} refreshKey={friendshipRefreshKey} />
+      <AddPeopleOverlay visible={showAddPeople} onClose={closeAddPeople} onFriendshipChange={refreshContacts} onViewProfile={(id) => setViewProfileUserId(id)} refreshKey={friendshipRefreshKey} />
       <UserProfileOverlay visible={!!viewProfileUserId} userId={viewProfileUserId} onClose={() => setViewProfileUserId(null)} cachedData={viewProfileUserId ? profileCache[viewProfileUserId] : undefined} onFriendshipChange={() => { refreshContacts(); setFriendshipRefreshKey((k) => k + 1); }} />
       <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled }))} />
       {showGiftOverlay && currentConv && (
