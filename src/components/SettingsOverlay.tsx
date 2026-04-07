@@ -96,173 +96,89 @@ function formatEuroStr(str: string): string | null {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-/** Touch & hold picker: hold dot → expands with all colors → slide to pick → release confirms */
-function TouchHoldCategoryPicker({
+/** Vertical chip selector for drink categories */
+function CategoryChipSelector({
   value,
   onChange,
   colors,
-  activeOnly,
+  categoryNames,
+  enabledCategories,
 }: {
   value: number;
   onChange: (v: number) => void;
   colors: readonly string[];
-  activeOnly?: number[];
+  categoryNames: string[];
+  enabledCategories: number[];
 }) {
-  const cats = activeOnly && activeOnly.length > 0 ? activeOnly : [1, 2, 3, 4];
-  const dotRef = useRef<View>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [hoveredCat, setHoveredCat] = useState(value);
-  const expandAnim = useRef(new Animated.Value(0)).current;
-  const liftScale = useRef(new Animated.Value(1)).current;
-  // Screen position of the resting dot
-  const dotPos = useRef({ x: 0, y: 0, w: 0, h: 0 });
-  const hoveredRef = useRef(value);
+  const startVal = useRef(value);
 
-  // Keep hoveredRef in sync
-  useEffect(() => { hoveredRef.current = hoveredCat; }, [hoveredCat]);
-
-  // Skip expand for single category
-  if (cats.length <= 1) {
-    return (
-      <View style={thp.wrap}>
-        <View style={[thp.dot, { backgroundColor: colors[(value - 1) % 4], borderWidth: 2, borderColor: '#fff' }]} />
-      </View>
-    );
-  }
-
-  const handleLongPress = () => {
-    // Measure dot position before expanding
-    dotRef.current?.measure((_x, _y, w, h, pageX, pageY) => {
-      dotPos.current = { x: pageX, y: pageY, w, h };
-      hoveredRef.current = value;
-      setHoveredCat(value);
-      setExpanded(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      // Lift then expand
-      expandAnim.setValue(0);
-      liftScale.setValue(1);
-      Animated.sequence([
-        Animated.spring(liftScale, { toValue: 1.3, damping: 15, stiffness: 300, useNativeDriver: true }),
-        Animated.spring(expandAnim, { toValue: 1, damping: 18, stiffness: 280, useNativeDriver: true }),
-      ]).start();
-    });
-  };
-
-  const handleRelease = () => {
-    if (!expanded) return;
-    const selected = hoveredRef.current;
-    onChange(selected);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    Animated.parallel([
-      Animated.timing(expandAnim, { toValue: 0, duration: 180, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-      Animated.timing(liftScale, { toValue: 1, duration: 180, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-    ]).start(() => setExpanded(false));
-  };
-
-  const DOT_SIZE = 28;
-  const GAP = 12;
-  const totalWidth = cats.length * DOT_SIZE + (cats.length - 1) * GAP;
-  // Center the expanded row on the original dot
-  const rowLeft = dotPos.current.x + dotPos.current.w / 2 - totalWidth / 2;
-  const rowTop = dotPos.current.y - DOT_SIZE - 16; // above the dot
-
-  const getCatFromX = (fingerX: number) => {
-    const relX = fingerX - rowLeft;
-    const pitch = DOT_SIZE + GAP;
-    const idx = Math.round(relX / pitch - 0.5);
-    const clamped = Math.max(0, Math.min(cats.length - 1, idx));
-    return cats[clamped];
-  };
-
-  const overlayPan = useRef(
+  const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderMove: (evt) => {
-        const newCat = getCatFromX(evt.nativeEvent.pageX);
-        if (newCat !== hoveredRef.current) {
-          hoveredRef.current = newCat;
-          setHoveredCat(newCat);
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
+      onPanResponderGrant: () => {
+        startVal.current = value;
+      },
+      onPanResponderMove: (_, gs) => {
+        const steps = Math.round(gs.dy / 50);
+        const idx = enabledCategories.indexOf(startVal.current);
+        const nextIdx = Math.max(0, Math.min(enabledCategories.length - 1, idx + steps));
+        const next = enabledCategories[nextIdx];
+        if (next !== undefined && next !== value) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onChange(next);
         }
       },
-      onPanResponderRelease: () => handleRelease(),
-      onPanResponderTerminate: () => handleRelease(),
+      onPanResponderRelease: () => {},
     })
   ).current;
 
-  return (
-    <>
-      <View style={thp.wrap} ref={dotRef} collapsable={false}>
-        <Animated.View style={{ transform: [{ scale: liftScale }] }}>
-          <Pressable
-            onLongPress={handleLongPress}
-            delayLongPress={250}
-            hitSlop={10}
-            style={[
-              thp.dot,
-              { backgroundColor: colors[(value - 1) % 4], borderWidth: 2, borderColor: '#fff' },
-            ]}
-          />
-        </Animated.View>
-      </View>
+  useEffect(() => { startVal.current = value; }, [value]);
 
-      {expanded && (
-        <Modal visible transparent animationType="none" statusBarTranslucent>
-          <View style={thp.overlay} {...overlayPan.panHandlers}>
-            {/* Expanded dot row */}
-            <Animated.View
-              style={[
-                thp.expandedRow,
-                {
-                  left: rowLeft,
-                  top: rowTop,
-                  opacity: expandAnim,
-                  transform: [{
-                    scale: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
-                  }],
-                },
-              ]}
-            >
-              {cats.map((cat) => {
-                const isHovered = cat === hoveredCat;
-                return (
-                  <View
-                    key={cat}
-                    style={[
-                      thp.expandedDot,
-                      { backgroundColor: colors[(cat - 1) % 4] },
-                      !isHovered && { opacity: 0.4 },
-                      isHovered && { borderWidth: 2.5, borderColor: '#fff', transform: [{ scale: 1.2 }] },
-                    ]}
-                  />
-                );
-              })}
-            </Animated.View>
-          </View>
-        </Modal>
-      )}
-    </>
+  return (
+    <View style={ccs.container} {...pan.panHandlers}>
+      {enabledCategories.map((cat) => {
+        const isSelected = cat === value;
+        const color = colors[(cat - 1) % 4];
+        return (
+          <Pressable
+            key={cat}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onChange(cat);
+            }}
+            style={[
+              ccs.chip,
+              { backgroundColor: color + (isSelected ? '40' : '20') },
+              isSelected && { borderWidth: 1.5, borderColor: color },
+            ]}
+          >
+            {isSelected && <View style={[ccs.dot, { backgroundColor: color }]} />}
+            <Text style={[
+              ccs.label,
+              { color },
+              isSelected && { fontWeight: '600' },
+            ]}>
+              {categoryNames[(cat - 1) % 4]}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
-const thp = StyleSheet.create({
-  wrap: { alignItems: 'center', justifyContent: 'center', minHeight: 36, paddingHorizontal: 4 },
-  dot: { width: 22, height: 22, borderRadius: 11 },
-  overlay: { flex: 1 },
-  expandedRow: {
-    position: 'absolute',
+const ccs = StyleSheet.create({
+  container: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(30, 30, 30, 0.85)',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 25,
+    borderRadius: 12,
   },
-  expandedDot: { width: 28, height: 28, borderRadius: 14 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  label: { fontFamily: 'Unbounded', fontSize: 13 },
 });
 
 export default function SettingsOverlay({
@@ -741,18 +657,25 @@ export default function SettingsOverlay({
             {drinks.length === 0 && (
               <Text style={s.emptyText}>Geen drankjes</Text>
             )}
-            {drinks.map((drink, i) => (
-              <React.Fragment key={drink.id}>
-                {i > 0 && <View style={s.divider} />}
-                <View style={s.drinkRow}>
-                  <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
-                  <Text style={s.drinkName}>{drink.name}</Text>
-                  <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={8}>
-                    <Ionicons name="close-circle" size={20} color="#EB5466" />
-                  </Pressable>
-                </View>
-              </React.Fragment>
-            ))}
+            {drinks.map((drink, i) => {
+              const catColor = categoryColors[(drink.category - 1) % 4];
+              const catName = getCategoryName?.(drink.category) ?? `Cat ${drink.category}`;
+              return (
+                <React.Fragment key={drink.id}>
+                  {i > 0 && <View style={s.divider} />}
+                  <View style={s.drinkRow}>
+                    <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '🍺'}</Text>
+                    <Text style={s.drinkName}>{drink.name}</Text>
+                    <View style={[s.drinkCatBadge, { backgroundColor: catColor + '20' }]}>
+                      <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
+                    </View>
+                    <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={8}>
+                      <Ionicons name="close-circle" size={20} color="#EB5466" />
+                    </Pressable>
+                  </View>
+                </React.Fragment>
+              );
+            })}
             <View style={s.divider} />
             {/* Add drink inline */}
             <View style={s.addDrinkRow}>
@@ -762,16 +685,15 @@ export default function SettingsOverlay({
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </Pressable>
             </View>
-            {/* Horizontal category scrub picker */}
-            <View style={s.addDrinkPickerRow}>
-              <Text style={s.addDrinkPickerLabel}>Categorie</Text>
-              <TouchHoldCategoryPicker
-                value={parseInt(newDrinkCat) || 1}
-                onChange={(v) => setNewDrinkCat(String(v))}
-                colors={categoryColors}
-                activeOnly={[...enabledCats].sort()}
-              />
-            </View>
+            {/* Vertical category selector */}
+            <View style={s.divider} />
+            <CategoryChipSelector
+              value={parseInt(newDrinkCat) || 1}
+              onChange={(v) => setNewDrinkCat(String(v))}
+              colors={categoryColors}
+              categoryNames={[catName1, catName2, catName3, catName4]}
+              enabledCategories={[...enabledCats].sort()}
+            />
           </View>
 
           {/* Members */}
@@ -1000,8 +922,8 @@ const s = StyleSheet.create({
   addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 48 },
   addDrinkEmoji: { fontFamily: 'Unbounded', width: 48, fontSize: 14, color: '#FFFFFF', textAlign: 'center', height: 48 },
   addDrinkBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
-  addDrinkPickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, height: 44 },
-  addDrinkPickerLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
+  drinkCatBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
+  drinkCatBadgeText: { fontFamily: 'Unbounded', fontSize: 11 },
 
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 56 },
