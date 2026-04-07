@@ -174,62 +174,64 @@ function CategoryBadgeSelector({
   const selectedColor = colors[(value - 1) % 4];
   const selectedName = categoryNames[(value - 1) % 4] || `Categorie ${value}`;
 
-  if (expanded) {
-    return (
-      <View
-        ref={containerRef}
-        style={cbs.expandedContainer}
-        onLayout={() => {
-          containerRef.current?.measureInWindow((_x, y, _w, h) => {
-            containerLayout.current = { y, height: h };
-          });
-        }}
-        {...panRef.current.panHandlers}
-      >
-        {enabledCategories.map((cat) => {
-          const catColor = colors[(cat - 1) % 4];
-          const catName = categoryNames[(cat - 1) % 4] || `Categorie ${cat}`;
-          const isHovered = hoveredCat === cat;
-          return (
-            <View
-              key={cat}
-              style={[
-                cbs.badgeItem,
-                { backgroundColor: catColor + (isHovered ? '40' : '20') },
-                isHovered && cbs.badgeItemHovered,
-              ]}
-              onLayout={(e) => {
-                itemRefs.current[cat] = {
-                  y: e.nativeEvent.layout.y,
-                  height: e.nativeEvent.layout.height,
-                };
-              }}
-            >
-              <Text
-                style={[
-                  cbs.badgeItemText,
-                  { color: catColor },
-                  isHovered && { fontWeight: '600' },
-                ]}
-              >
-                {catName}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    );
-  }
-
   return (
-    <View style={cbs.collapsedContainer}>
-      <Pressable onLongPress={handleLongPress} delayLongPress={250}>
-        <View style={[cbs.badge, { backgroundColor: selectedColor + '20' }]}>
-          <Text style={[cbs.badgeText, { color: selectedColor }]}>{selectedName}</Text>
+    <>
+      <View style={cbs.collapsedContainer}>
+        <Pressable onLongPress={handleLongPress} delayLongPress={250}>
+          <View style={[cbs.badge, { backgroundColor: selectedColor + '20' }]}>
+            <Text style={[cbs.badgeText, { color: selectedColor }]}>{selectedName}</Text>
+          </View>
+        </Pressable>
+        <Text style={cbs.hintText}>Houd ingedrukt</Text>
+      </View>
+
+      <Modal visible={expanded} transparent animationType="fade" statusBarTranslucent>
+        <View
+          ref={containerRef}
+          style={cbs.modalOverlay}
+          onLayout={() => {
+            containerRef.current?.measureInWindow((_x, y, _w, h) => {
+              containerLayout.current = { y, height: h };
+            });
+          }}
+          {...panRef.current.panHandlers}
+        >
+          <View style={cbs.chipsList}>
+            {enabledCategories.map((cat) => {
+              const catColor = colors[(cat - 1) % 4];
+              const catName = categoryNames[(cat - 1) % 4] || `Categorie ${cat}`;
+              const isHovered = hoveredCat === cat;
+              return (
+                <View
+                  key={cat}
+                  style={[
+                    cbs.badgeItem,
+                    { backgroundColor: catColor + (isHovered ? '40' : '20') },
+                    isHovered && cbs.badgeItemHovered,
+                  ]}
+                  onLayout={(e) => {
+                    itemRefs.current[cat] = {
+                      y: e.nativeEvent.layout.y,
+                      height: e.nativeEvent.layout.height,
+                    };
+                  }}
+                >
+                  <Text
+                    style={[
+                      cbs.badgeItemText,
+                      { color: catColor },
+                      isHovered && { fontWeight: '600' },
+                    ]}
+                  >
+                    {catName}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
-      </Pressable>
-      <Text style={cbs.hintText}>Houd ingedrukt</Text>
-    </View>
+      </Modal>
+    </>
   );
 }
 
@@ -238,24 +240,24 @@ const cbs = StyleSheet.create({
   badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   badgeText: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
   hintText: { fontFamily: 'Unbounded', fontSize: 8, color: '#848484', marginTop: 2, textAlign: 'center' },
-  expandedContainer: {
-    backgroundColor: 'rgba(40, 40, 40, 0.95)',
-    borderRadius: 12,
-    paddingVertical: 4,
-    position: 'absolute',
-    right: 52,
-    bottom: 4,
-    minWidth: 140,
-    zIndex: 100,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  badgeItem: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginHorizontal: 4, marginVertical: 2 },
-  badgeItemHovered: { transform: [{ scale: 1.05 }] },
-  badgeItemText: { fontFamily: 'Unbounded', fontSize: 12 },
+  chipsList: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  badgeItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  badgeItemHovered: { transform: [{ scale: 1.08 }] },
+  badgeItemText: { fontFamily: 'Unbounded', fontSize: 14, textAlign: 'center' },
 });
 
 export default function SettingsOverlay({
