@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Image, Dimensions, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -19,6 +20,22 @@ const DESIGN_W = 390;
 const s = (v: number) => (v / DESIGN_W) * SCREEN_W;
 
 const PROFIEL_AURORA_COLORS = ['#FF0085', '#00BEAE', '#F1F1F1', '#00FE96'];
+
+function FadeMask({ children }: { children: React.ReactNode }) {
+  return (
+    <MaskedView
+      style={{ flex: 1 }}
+      maskElement={
+        <View style={{ flex: 1 }}>
+          <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
+          <View style={{ flex: 1, backgroundColor: '#000' }} />
+        </View>
+      }
+    >
+      {children}
+    </MaskedView>
+  );
+}
 
 export default function ProfielScreen() {
   const mode = useColorScheme();
@@ -160,6 +177,7 @@ export default function ProfielScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
+      <FadeMask>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Status bar spacer */}
         <View style={{ height: insets.top }} />
@@ -275,6 +293,7 @@ export default function ProfielScreen() {
         </Pressable>
         </AnimatedCard>
       </ScrollView>
+      </FadeMask>
 
       <CameraModal
         visible={cameraVisible}

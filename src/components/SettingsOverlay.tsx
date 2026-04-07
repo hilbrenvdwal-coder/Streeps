@@ -19,6 +19,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
 import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
@@ -96,8 +98,12 @@ function formatEuroStr(str: string): string | null {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-/** Touch-&-hold category badge selector.
- *  Single PanResponder owns the entire gesture: long press → expand → drag → release. */
+const BADGE_HEIGHT = 32;
+const BADGE_PADDING_H = 12;
+const BADGE_BORDER_RADIUS = 16;
+const ITEM_GAP = 4;
+
+/** Tap to open list, or long press to drag-select */
 function CategoryBadgeSelector({
   value,
   onChange,
@@ -114,146 +120,165 @@ function CategoryBadgeSelector({
   onScrollEnable?: (enabled: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [isDragMode, setIsDragMode] = useState(false);
   const [hoveredCat, setHoveredCat] = useState<number | null>(null);
-  const expandedRef = useRef(false);
-  const prevHovered = useRef<number | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const chipPositions = useRef<{ cat: number; top: number; bottom: number }[]>([]);
   const badgeRef = useRef<View>(null);
-  const badgeY = useRef(0);
-  const [chipsTopOffset, setChipsTopOffset] = useState(0);
+  const badgeLayout = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const listTopRef = useRef(0);
+  const hoveredCatRef = useRef<number | null>(null);
 
-  const expand = () => {
-    expandedRef.current = true;
-    setExpanded(true);
-    setHoveredCat(value);
-    prevHovered.current = value;
-    onScrollEnable?.(false);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  useEffect(() => { hoveredCatRef.current = hoveredCat; }, [hoveredCat]);
 
-    // Position chips so the selected category sits at the badge's Y position
-    const chipH = 40;
-    const gap = 8;
-    const selectedIdx = enabledCategories.indexOf(value);
-    // Top of the list = badge center - (selected chip's center offset from list top)
-    const selectedCenterFromListTop = selectedIdx * (chipH + gap) + chipH / 2;
-    const listTop = badgeY.current - selectedCenterFromListTop;
-    setChipsTopOffset(listTop);
+  const measureBadge = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      badgeRef.current?.measureInWindow((x, y, width, height) => {
+        badgeLayout.current = { x, y, width, height };
+        resolve();
+      });
+    });
+  }, []);
 
-    chipPositions.current = enabledCategories.map((cat, i) => ({
-      cat,
-      top: listTop + i * (chipH + gap),
-      bottom: listTop + i * (chipH + gap) + chipH,
-    }));
+  const computeListTop = () => {
+    const idx = enabledCategories.indexOf(value);
+    return badgeLayout.current.y - idx * (BADGE_HEIGHT + ITEM_GAP);
   };
 
-  const collapse = (confirm: boolean) => {
-    if (confirm && prevHovered.current !== null) {
-      onChange(prevHovered.current);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    expandedRef.current = false;
+  const handleTapOpen = async () => {
+    await measureBadge();
+    listTopRef.current = computeListTop();
+    setExpanded(true);
+    setIsDragMode(false);
+    onScrollEnable?.(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleLongPressOpen = async () => {
+    await measureBadge();
+    listTopRef.current = computeListTop();
+    setExpanded(true);
+    setIsDragMode(true);
+    setHoveredCat(value);
+    hoveredCatRef.current = value;
+    onScrollEnable?.(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleSelect = (cat: number) => {
+    onChange(cat);
     setExpanded(false);
+    setIsDragMode(false);
     setHoveredCat(null);
-    prevHovered.current = null;
+    onScrollEnable?.(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleClose = () => {
+    setExpanded(false);
+    setIsDragMode(false);
+    setHoveredCat(null);
     onScrollEnable?.(true);
   };
 
-  const pan = useRef(
+  const dragPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        // Start long press timer
-        longPressTimer.current = setTimeout(() => {
-          // Measure badge position at expand time
-          badgeRef.current?.measureInWindow((_x, y, _w, h) => {
-            badgeY.current = y + h / 2;
-            expand();
-          });
-        }, 250);
-      },
-      onPanResponderMove: (evt) => {
-        if (!expandedRef.current) {
-          // If moved too much before long press, cancel
-          return;
-        }
-        const fingerY = evt.nativeEvent.pageY;
-        let found: number | null = null;
-        for (const pos of chipPositions.current) {
-          if (fingerY >= pos.top && fingerY <= pos.bottom) {
-            found = pos.cat;
-            break;
-          }
-        }
-        if (found !== null && found !== prevHovered.current) {
-          prevHovered.current = found;
-          setHoveredCat(found);
+      onPanResponderMove: (_, gs) => {
+        const itemHeight = BADGE_HEIGHT + ITEM_GAP;
+        const relativeY = gs.moveY - listTopRef.current;
+        const idx = Math.floor(relativeY / itemHeight);
+        const clamped = Math.max(0, Math.min(enabledCategories.length - 1, idx));
+        const newCat = enabledCategories[clamped];
+        if (newCat !== hoveredCatRef.current) {
+          hoveredCatRef.current = newCat;
+          setHoveredCat(newCat);
           Haptics.selectionAsync();
         }
       },
-      onPanResponderRelease: () => {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-        }
-        if (expandedRef.current) {
-          collapse(true);
-        }
+      onPanResponderRelease: (_, gs) => {
+        const itemHeight = BADGE_HEIGHT + ITEM_GAP;
+        const relativeY = gs.moveY - listTopRef.current;
+        const idx = Math.floor(relativeY / itemHeight);
+        const clamped = Math.max(0, Math.min(enabledCategories.length - 1, idx));
+        const finalCat = enabledCategories[clamped];
+        onChange(finalCat);
+        setExpanded(false);
+        setIsDragMode(false);
+        setHoveredCat(null);
+        onScrollEnable?.(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       },
       onPanResponderTerminate: () => {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-        }
-        if (expandedRef.current) {
-          collapse(false);
-        }
+        setExpanded(false);
+        setIsDragMode(false);
+        setHoveredCat(null);
+        onScrollEnable?.(true);
       },
     })
   ).current;
 
-  const selectedColor = colors[(value - 1) % 4];
-  const selectedName = categoryNames[(value - 1) % 4] || `Categorie ${value}`;
+  const renderBadge = (cat: number, isSelected: boolean, isHovered: boolean) => {
+    const color = colors[(cat - 1) % 4];
+    return (
+      <View style={[
+        cbs.badge,
+        { backgroundColor: color + '20' },
+        (isSelected || isHovered) && { borderWidth: 2, borderColor: '#FFFFFF' },
+        (isSelected || isHovered) && { transform: [{ scale: 1.08 }] },
+      ]}>
+        <Text style={[cbs.badgeText, { color }]}>
+          {categoryNames[(cat - 1)] ?? `Cat ${cat}`}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <>
-      <View style={cbs.collapsedContainer} ref={badgeRef} collapsable={false} {...pan.panHandlers}>
-        <View style={[cbs.badge, { backgroundColor: selectedColor + '20' }]}>
-          <Text style={[cbs.badgeText, { color: selectedColor }]}>{selectedName}</Text>
-        </View>
-        <Text style={cbs.hintText}>Houd ingedrukt</Text>
+      <View style={cbs.collapsedContainer} collapsable={false}>
+        <Pressable
+          ref={badgeRef}
+          onPress={handleTapOpen}
+          onLongPress={handleLongPressOpen}
+          delayLongPress={250}
+        >
+          {renderBadge(value, false, false)}
+        </Pressable>
+        <Text style={cbs.hintText}>Tik om te wijzigen</Text>
       </View>
 
-      <Modal visible={expanded} transparent animationType="fade" statusBarTranslucent>
-        <View style={cbs.modalOverlay}>
-          <View style={[cbs.chipsList, { position: 'absolute', top: chipsTopOffset }]}>
-            {enabledCategories.map((cat) => {
-              const catColor = colors[(cat - 1) % 4];
-              const catName = categoryNames[(cat - 1) % 4] || `Categorie ${cat}`;
-              const isHovered = hoveredCat === cat;
-              return (
-                <View
-                  key={cat}
-                  style={[
-                    cbs.badgeItem,
-                    { backgroundColor: catColor + (isHovered ? '40' : '20') },
-                    isHovered && cbs.badgeItemHovered,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      cbs.badgeItemText,
-                      { color: catColor },
-                      isHovered && { fontWeight: '600' },
-                    ]}
-                  >
-                    {catName}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+      <Modal visible={expanded} transparent animationType="none" onRequestClose={handleClose} statusBarTranslucent>
+        <Pressable
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+          onPress={() => { if (!isDragMode) handleClose(); }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            top: listTopRef.current,
+            left: badgeLayout.current.x,
+            minWidth: badgeLayout.current.width,
+          }}
+          pointerEvents="box-none"
+          {...(isDragMode ? dragPan.panHandlers : {})}
+        >
+          {enabledCategories.map((cat) => {
+            const isSelected = cat === value;
+            const isHovered = isDragMode && cat === hoveredCat;
+            return isDragMode ? (
+              <View key={cat} style={{ marginBottom: ITEM_GAP }}>
+                {renderBadge(cat, isSelected, isHovered)}
+              </View>
+            ) : (
+              <Pressable
+                key={cat}
+                onPress={() => handleSelect(cat)}
+                style={{ marginBottom: ITEM_GAP }}
+              >
+                {renderBadge(cat, isSelected, false)}
+              </Pressable>
+            );
+          })}
         </View>
       </Modal>
     </>
@@ -262,26 +287,42 @@ function CategoryBadgeSelector({
 
 const cbs = StyleSheet.create({
   collapsedContainer: { alignItems: 'center', justifyContent: 'center' },
-  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  badgeText: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
-  hintText: { fontFamily: 'Unbounded', fontSize: 8, color: '#848484', marginTop: 2, textAlign: 'center' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  badge: {
+    height: BADGE_HEIGHT,
+    paddingHorizontal: BADGE_PADDING_H,
+    borderRadius: BADGE_BORDER_RADIUS,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipsList: {
-    alignItems: 'center',
-    gap: 8,
+  badgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  badgeItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+  hintText: {
+    fontFamily: 'Unbounded',
+    fontSize: 8,
+    color: '#848484',
+    marginTop: 2,
+    textAlign: 'center',
   },
-  badgeItemHovered: { transform: [{ scale: 1.08 }] },
-  badgeItemText: { fontFamily: 'Unbounded', fontSize: 14, textAlign: 'center' },
 });
+
+function FadeMask({ children }: { children: React.ReactNode }) {
+  return (
+    <MaskedView
+      style={{ flex: 1 }}
+      maskElement={
+        <View style={{ flex: 1 }}>
+          <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
+          <View style={{ flex: 1, backgroundColor: '#000' }} />
+        </View>
+      }
+    >
+      {children}
+    </MaskedView>
+  );
+}
 
 export default function SettingsOverlay({
   visible,
@@ -673,6 +714,7 @@ export default function SettingsOverlay({
           </Pressable>
         </View>
 
+        <FadeMask>
         <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={scrollEnabled} contentContainerStyle={{ paddingBottom: 120 }}>
           {/* Group avatar */}
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
@@ -938,6 +980,7 @@ export default function SettingsOverlay({
             )}
           </View>
         </ScrollView>
+        </FadeMask>
       </Animated.View>
 
       <CameraModal

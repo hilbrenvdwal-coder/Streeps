@@ -1270,6 +1270,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
           <Text style={po.title}>Profiel</Text>
           <View style={{ width: 24 }} />
         </View>
+        <FadeMask>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           {/* Avatar */}
           <Pressable style={po.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
@@ -1351,6 +1352,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
             <Text style={po.logoutText}>Uitloggen</Text>
           </Pressable>
         </ScrollView>
+        </FadeMask>
       </Animated.View>
 
       <CameraModal
@@ -2500,7 +2502,9 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
           style={{ flex: 1 }}
         >
           {/* Page 0: Toevoegen */}
-          <ScrollView style={{ width: SCREEN_W }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}>
+          <View style={{ width: SCREEN_W, flex: 1 }}>
+          <FadeMask>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}>
             {loadingSuggestions && suggestions.length === 0 ? (
               <View style={ap.card}>
                 {[0, 1, 2, 3].map((i) => (
@@ -2535,9 +2539,13 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
               </View>
             )}
           </ScrollView>
+          </FadeMask>
+          </View>
 
           {/* Page 1: Verzoeken */}
-          <ScrollView style={{ width: SCREEN_W }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}>
+          <View style={{ width: SCREEN_W, flex: 1 }}>
+          <FadeMask>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}>
             {requests.length === 0 && outgoingRequests.length === 0 ? (
               <Text style={ap.emptyText}>Geen openstaande verzoeken</Text>
             ) : (
@@ -2602,6 +2610,8 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
               </>
             )}
           </ScrollView>
+          </FadeMask>
+          </View>
         </Animated.ScrollView>
       </Animated.View>
       {/* Edge swipe zone for dismiss (over the ScrollView) */}
