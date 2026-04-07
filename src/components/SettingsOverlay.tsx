@@ -774,7 +774,7 @@ export default function SettingsOverlay({
                 const enabled = enabledCats.has(catNum);
                 return (
                   <React.Fragment key={i}>
-                    {i > 0 && <View style={s.divider} />}
+                    
                     <Animated.View style={[s.catRow, { opacity: catOpacityAnims[i] }]}>
                       <TextInput
                         style={s.catNameInput}
@@ -822,7 +822,7 @@ export default function SettingsOverlay({
               const catName = getCategoryName?.(drink.category) ?? `Cat ${drink.category}`;
               return (
                 <React.Fragment key={drink.id}>
-                  {i > 0 && <View style={s.divider} />}
+                  
                   <View style={s.drinkRow}>
                     <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '🍺'}</Text>
                     <Text style={s.drinkName}>{drink.name}</Text>
@@ -836,7 +836,6 @@ export default function SettingsOverlay({
                 </React.Fragment>
               );
             })}
-            <View style={s.divider} />
             {/* Add drink inline */}
             <View style={s.addDrinkRow}>
               <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor="#848484" value={newDrinkName} onChangeText={setNewDrinkName} />
@@ -868,7 +867,7 @@ export default function SettingsOverlay({
               const memberTallies = tallyCounts?.[member.user_id] ?? {};
               return (
                 <React.Fragment key={member.id}>
-                  {i > 0 && <View style={s.divider} />}
+                  
                   <Pressable style={({ pressed }) => [s.memberRow, pressed && { opacity: 0.7 }]} onPress={() => toggleExpandMember(member.user_id)} accessibilityLabel={`${name} details`} accessibilityRole="button">
                     {member.profile?.avatar_url ? (
                       <Image source={{ uri: member.profile.avatar_url }} style={s.memberAvatar} />
@@ -983,18 +982,15 @@ export default function SettingsOverlay({
                 <Text style={s.dangerRowText}>Admin afstaan</Text>
               </Pressable>
             )}
-            {isAdmin && <View style={s.divider} />}
             <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleLeaveGroup}>
               <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
               <Text style={s.dangerRowText}>Groep verlaten</Text>
             </Pressable>
             {isAdmin && (
-              <>
-                <View style={s.divider} />
-                <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
-                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
-                  <Text style={s.dangerRowText}>Groep verwijderen</Text>
-                </Pressable>
+              <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
+                <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                <Text style={s.dangerRowText}>Groep verwijderen</Text>
+              </Pressable>
               </>
             )}
           </View>
@@ -1032,8 +1028,7 @@ const s = StyleSheet.create({
   sectionHeader: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '400', color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
 
   // Card
-  card: { backgroundColor: 'rgba(78, 78, 78, 0.3)', borderRadius: 25, overflow: 'hidden' },
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
+  card: { backgroundColor: 'rgba(78, 78, 78, 0.3)', borderRadius: 25, overflow: 'hidden', gap: 4 },
 
   // Inputs
   inputRow: { paddingHorizontal: 20, minHeight: 52, justifyContent: 'center' },
