@@ -126,15 +126,25 @@ function CategoryBadgeSelector({
   const badgeLayout = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const listTopRef = useRef(0);
   const hoveredCatRef = useRef<number | null>(null);
+  const enabledCategoriesRef = useRef(enabledCategories);
+  const onChangeRef = useRef(onChange);
+  const onScrollEnableRef = useRef(onScrollEnable);
 
   useEffect(() => { hoveredCatRef.current = hoveredCat; }, [hoveredCat]);
+  useEffect(() => { enabledCategoriesRef.current = enabledCategories; }, [enabledCategories]);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { onScrollEnableRef.current = onScrollEnable; }, [onScrollEnable]);
 
   const measureBadge = useCallback((): Promise<void> => {
     return new Promise((resolve) => {
-      badgeRef.current?.measureInWindow((x, y, width, height) => {
-        badgeLayout.current = { x, y, width, height };
-        resolve();
-      });
+      if (!badgeRef.current) { resolve(); return; }
+      try {
+        badgeRef.current.measureInWindow((x, y, width, height) => {
+          badgeLayout.current = { x, y, width, height };
+          resolve();
+        });
+      } catch (_e) { resolve(); }
+      setTimeout(resolve, 150);
     });
   }, []);
 
@@ -184,11 +194,12 @@ function CategoryBadgeSelector({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderMove: (_, gs) => {
+        const cats = enabledCategoriesRef.current;
         const itemHeight = BADGE_HEIGHT + ITEM_GAP;
         const relativeY = gs.moveY - listTopRef.current;
         const idx = Math.floor(relativeY / itemHeight);
-        const clamped = Math.max(0, Math.min(enabledCategories.length - 1, idx));
-        const newCat = enabledCategories[clamped];
+        const clamped = Math.max(0, Math.min(cats.length - 1, idx));
+        const newCat = cats[clamped];
         if (newCat !== hoveredCatRef.current) {
           hoveredCatRef.current = newCat;
           setHoveredCat(newCat);
@@ -196,23 +207,24 @@ function CategoryBadgeSelector({
         }
       },
       onPanResponderRelease: (_, gs) => {
+        const cats = enabledCategoriesRef.current;
         const itemHeight = BADGE_HEIGHT + ITEM_GAP;
         const relativeY = gs.moveY - listTopRef.current;
         const idx = Math.floor(relativeY / itemHeight);
-        const clamped = Math.max(0, Math.min(enabledCategories.length - 1, idx));
-        const finalCat = enabledCategories[clamped];
-        onChange(finalCat);
+        const clamped = Math.max(0, Math.min(cats.length - 1, idx));
+        const finalCat = cats[clamped];
+        onChangeRef.current(finalCat);
         setExpanded(false);
         setIsDragMode(false);
         setHoveredCat(null);
-        onScrollEnable?.(true);
+        onScrollEnableRef.current?.(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       },
       onPanResponderTerminate: () => {
         setExpanded(false);
         setIsDragMode(false);
         setHoveredCat(null);
-        onScrollEnable?.(true);
+        onScrollEnableRef.current?.(true);
       },
     })
   ).current;
@@ -397,6 +409,15 @@ export default function SettingsOverlay({
 
   // Reset optimistic adjustments when real data arrives
   useEffect(() => { setTallyAdj({}); }, [recentTallies]);
+
+  // Reset newDrinkCat when selected category is no longer enabled
+  useEffect(() => {
+    const currentCat = parseInt(newDrinkCat) || 1;
+    if (!enabledCats.has(currentCat)) {
+      const firstEnabled = [...enabledCats].sort()[0];
+      if (firstEnabled) setNewDrinkCat(String(firstEnabled));
+    }
+  }, [enabledCats, newDrinkCat]);
 
   const toggleExpandMember = useCallback((userId: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.create(250, 'easeInEaseOut', 'opacity'));
