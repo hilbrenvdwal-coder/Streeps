@@ -52,6 +52,7 @@ interface Props {
   hideBar?: boolean;
   currentGroup?: { name: string; avatar_url?: string | null } | null;
   activeCount?: number;
+  onCreated?: (group: { id: string; name: string; invite_code: string }) => void;
 }
 
 export default function GroupSelector({
@@ -66,6 +67,7 @@ export default function GroupSelector({
   hideBar,
   currentGroup,
   activeCount = 0,
+  onCreated,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [showOpen, setShowOpen] = useState(false);
@@ -137,7 +139,10 @@ export default function GroupSelector({
     if (result && 'error' in result && result.error) { Alert.alert('Fout', result.error as string); return; }
     setNewName('');
     setInlineMode('none');
-    if (result && 'data' in result && result.data) onSelect(result.data.id);
+    if (result && 'data' in result && result.data) {
+      onSelect(result.data.id);
+      onCreated?.(result.data);
+    }
     handleClose();
   };
 

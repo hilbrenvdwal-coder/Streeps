@@ -3,6 +3,7 @@ import { AuroraPresetView, AURORA_COLORS } from '@/src/components/AuroraBackgrou
 import CategoryRow from '@/src/components/CategoryRow';
 import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
+import GroupSetupWizard from '@/src/components/GroupSetupWizard';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
@@ -181,6 +182,7 @@ export default function HomeScreen() {
   // Group selector modal
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [wizardGroup, setWizardGroup] = useState<{ id: string; name: string; invite_code: string } | null>(null);
   const navBarAnim = useNavBarAnim();
 
   const openSettings = useCallback(() => {
@@ -711,6 +713,15 @@ export default function HomeScreen() {
         onClose={() => setShowGroupSelector(false)}
         currentGroup={group}
         activeCount={members.filter((m) => m.is_active).length}
+        onCreated={(g) => setWizardGroup(g)}
+      />
+
+      <GroupSetupWizard
+        visible={!!wizardGroup}
+        onClose={() => setWizardGroup(null)}
+        groupId={wizardGroup?.id ?? ''}
+        groupName={wizardGroup?.name ?? ''}
+        inviteCode={wizardGroup?.invite_code ?? ''}
       />
 
       {/* ── Settings overlay ── */}
