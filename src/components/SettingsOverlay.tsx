@@ -729,7 +729,9 @@ export default function SettingsOverlay({
                 const catNum = i + 1;
                 const enabled = enabledCats.has(catNum);
                 return (
-                  <Animated.View key={i} style={[s.catToggleWrapper, { opacity: catOpacityAnims[i] }]}>
+                  <React.Fragment key={i}>
+                  {i > 0 && <View style={{ height: 1 }} />}
+                  <Animated.View style={[s.catToggleWrapper, { opacity: catOpacityAnims[i] }]}>
                     <Pressable
                       onPress={() => toggleCategory(catNum)}
                       style={({ pressed }) => [s.catToggle, { backgroundColor: enabled ? categoryColors[i] : '#3A3A3A' }, pressed && { opacity: 0.7 }]}
@@ -741,6 +743,7 @@ export default function SettingsOverlay({
                       />
                     </Pressable>
                   </Animated.View>
+                  </React.Fragment>
                 );
               })}
             </View>
@@ -1021,7 +1024,7 @@ const s = StyleSheet.create({
   catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
   catToggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const },
   catSectionRow: { flexDirection: 'row' as const, alignItems: 'stretch' as const },
-  catTogglesColumn: { width: 52, alignItems: 'center' as const, justifyContent: 'space-around' as const, paddingVertical: 8 },
+  catTogglesColumn: { width: 52, alignItems: 'center' as const, justifyContent: 'flex-start' as const },
   catToggleWrapper: { height: 52, alignItems: 'center' as const, justifyContent: 'center' as const },
   catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 52 },
   catPriceWrapper: {
