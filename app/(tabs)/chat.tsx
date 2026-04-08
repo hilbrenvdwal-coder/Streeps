@@ -2480,6 +2480,11 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
               outputRange: i === 0 ? [1, 0] : [0, 1],
               extrapolate: 'clamp',
             });
+            const normalOpacity = apScrollX.interpolate({
+              inputRange: [0, SCREEN_W],
+              outputRange: i === 0 ? [0, 1] : [1, 0],
+              extrapolate: 'clamp',
+            });
             return (
               <Pressable
                 key={t.key}
@@ -2487,7 +2492,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                 onPress={() => handleApTabPress(i)}
                 onLayout={(e) => onApTabLayout(i, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
               >
-                <Text style={ap.tabText}>{labelText}</Text>
+                <Animated.Text style={[ap.tabText, { opacity: normalOpacity }]}>{labelText}</Animated.Text>
                 <Animated.Text style={[ap.tabText, ap.tabTextActive, { position: 'absolute', opacity: activeOpacity }]}>
                   {labelText}
                 </Animated.Text>
