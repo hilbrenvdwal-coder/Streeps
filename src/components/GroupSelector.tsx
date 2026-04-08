@@ -9,8 +9,6 @@ import {
   Alert,
   Animated,
   Easing,
-  LayoutAnimation,
-  UIManager,
   Platform,
   Keyboard,
   Dimensions,
@@ -22,17 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import type { Theme } from '@/src/theme';
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-const SPRING_LAYOUT = LayoutAnimation.create(
-  300,
-  LayoutAnimation.Types.easeInEaseOut,
-  LayoutAnimation.Properties.scaleXY,
-);
 
 interface Group {
   id: string;
@@ -136,7 +123,6 @@ export default function GroupSelector({
   }, [visible]);
 
   const switchInlineMode = useCallback((mode: 'none' | 'create' | 'join') => {
-    LayoutAnimation.configureNext(SPRING_LAYOUT);
     setInlineMode(mode);
     if (mode !== 'none') {
       setTimeout(() => inputRef.current?.focus(), 100);

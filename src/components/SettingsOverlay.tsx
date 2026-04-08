@@ -10,11 +10,9 @@ import {
   Animated,
   Easing,
   PanResponder,
-  LayoutAnimation,
   Modal,
   TouchableWithoutFeedback,
   Platform,
-  UIManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,9 +71,6 @@ interface Props {
   getCategoryName?: (cat: number) => string;
 }
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 /** Converteer centen (integer) naar euro display string met Nederlandse komma-notatie */
 function centsToEuroStr(cents: number | null | undefined): string {
@@ -477,7 +472,6 @@ export default function SettingsOverlay({
   }, [enabledCats, newDrinkCat]);
 
   const toggleExpandMember = useCallback((userId: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(250, 'easeInEaseOut', 'opacity'));
     setExpandedMember((prev) => (prev === userId ? null : userId));
   }, []);
 

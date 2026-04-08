@@ -26,7 +26,6 @@ import {
   Alert,
   Animated,
   Easing,
-  LayoutAnimation,
   Modal,
   PanResponder,
   Platform,
@@ -35,15 +34,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  UIManager,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
@@ -563,7 +558,7 @@ export default function HomeScreen() {
                 })}
               </View>
               {members.length > 4 && (
-                <Pressable onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowMembers(!showMembers); }} style={s.bekijkMeer}>
+                <Pressable onPress={() => { setShowMembers(!showMembers); }} style={s.bekijkMeer}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={s.bekijkMeerText}>
                       {showMembers ? 'Minder tonen' : 'Meer tonen'}
@@ -606,7 +601,7 @@ export default function HomeScreen() {
                   })}
                 </View>
                 {drinks.length > 4 && (
-                  <Pressable onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowAllDrinks(!showAllDrinks); }} style={s.bekijkMeer}>
+                  <Pressable onPress={() => { setShowAllDrinks(!showAllDrinks); }} style={s.bekijkMeer}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={s.bekijkMeerText}>
                         {showAllDrinks ? 'Minder tonen' : 'Meer tonen'}
