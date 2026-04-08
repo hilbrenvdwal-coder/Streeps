@@ -70,14 +70,6 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
-      {/* Groups stack kept for push navigation (settings, etc.) */}
-      <Tabs.Screen
-        name="groups"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
     </Tabs>
     </NavBarAnimContext.Provider>
   );
