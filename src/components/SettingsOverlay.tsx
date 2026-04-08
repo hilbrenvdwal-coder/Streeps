@@ -139,7 +139,7 @@ function CategoryBadgeSelector({
   const color = colors[(value - 1) % colors.length];
   const label = getCategoryName?.(value) ?? `Cat ${value}`;
 
-  const chipHeight = 40;
+  const chipHeight = 44;
   const chipGap = 8;
 
   /** Compute the Y range for each chip based on badge position and selected index */
@@ -350,7 +350,7 @@ function CategoryBadgeSelector({
 
           {/* Hint text */}
           <View style={cbs.hintContainer}>
-            <Text style={cbs.hintText}>Tik of houd ingedrukt</Text>
+            <Text style={cbs.hintText}>Houd ingedrukt</Text>
           </View>
         </View>
       </Modal>
@@ -359,15 +359,15 @@ function CategoryBadgeSelector({
 }
 
 const cbs = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, alignSelf: 'flex-start' },
+  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, alignSelf: 'flex-start' },
   badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  badgeLabel: { fontFamily: 'Unbounded', fontSize: 11, fontWeight: '500' },
+  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '500' },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20, alignSelf: 'flex-start' },
+  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
-  chipLabel: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
+  chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '500' },
   hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
   hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
@@ -805,12 +805,13 @@ export default function SettingsOverlay({
           <View style={s.card}>
             <View style={s.inputRow}>
               <TextInput
-                style={s.inputText}
+                style={[s.inputText, { flex: 1 }]}
                 value={groupName}
                 onChangeText={setGroupName}
                 placeholder="Groepsnaam"
                 placeholderTextColor="#848484"
               />
+              <Ionicons name="create-outline" size={18} color="#848484" style={{ marginLeft: 8 }} />
             </View>
           </View>
 
@@ -1111,7 +1112,7 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
 
   // Inputs
-  inputRow: { paddingHorizontal: 20, minHeight: 52, justifyContent: 'center' },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
   inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
 
   // Categories
