@@ -13,7 +13,6 @@ import {
   PanResponder,
   LayoutAnimation,
   Modal,
-  TouchableWithoutFeedback,
   Platform,
   UIManager,
 } from 'react-native';
@@ -175,8 +174,10 @@ function CategoryBadgeSelector({
   }, []);
 
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => isDragModeRef.current,
+    onMoveShouldSetPanResponder: () => isDragModeRef.current,
+    onStartShouldSetPanResponderCapture: () => isDragModeRef.current,
+    onMoveShouldSetPanResponderCapture: () => isDragModeRef.current,
     onPanResponderMove: (evt: GestureResponderEvent) => {
       if (!isDragModeRef.current) return;
       const fingerY = evt.nativeEvent.pageY;
@@ -196,6 +197,7 @@ function CategoryBadgeSelector({
       }
     },
     onPanResponderRelease: () => {
+      if (!isDragModeRef.current) return;
       if (hoveredCatRef.current !== null) {
         handleSelect(hoveredCatRef.current);
       } else {
@@ -226,9 +228,7 @@ function CategoryBadgeSelector({
 
       <Modal visible={expanded} transparent statusBarTranslucent animationType="fade" onRequestClose={handleClose}>
         <View style={cbs.modalRoot} {...panResponder.panHandlers}>
-          <TouchableWithoutFeedback onPress={isDragMode ? undefined : handleClose}>
-            <View style={cbs.scrim} />
-          </TouchableWithoutFeedback>
+          <Pressable style={cbs.scrim} onPress={handleClose} pointerEvents={isDragMode ? 'none' : 'auto'} />
 
           <View style={[cbs.chipList, { top: listTop }]} pointerEvents={isDragMode ? 'none' : 'auto'}>
             {enabledCategories.map((cat) => {
@@ -272,7 +272,7 @@ const cbs = StyleSheet.create({
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20, alignSelf: 'flex-start' },
+  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20 },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
   chipLabel: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
 });
