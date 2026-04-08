@@ -48,6 +48,7 @@ export default function GroupSetupWizard({
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
   const stepOpacity = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
 
   // Step 1: Group photo
   const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export default function GroupSetupWizard({
   const [price2, setPrice2] = useState('3,00');
   const [price3, setPrice3] = useState('4,50');
   const [price4, setPrice4] = useState('6,00');
+  const [cat2Enabled, setCat2Enabled] = useState(true);
   const [cat3Enabled, setCat3Enabled] = useState(false);
   const [cat4Enabled, setCat4Enabled] = useState(false);
 
@@ -86,6 +88,7 @@ export default function GroupSetupWizard({
       setPrice2('3,00');
       setPrice3('4,50');
       setPrice4('6,00');
+      setCat2Enabled(true);
       setCat3Enabled(false);
       setCat4Enabled(false);
       setNewDrinkName('');
@@ -124,6 +127,16 @@ export default function GroupSetupWizard({
     });
   }, [onClose]);
 
+  // Animate progress bar when step changes
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: step / TOTAL_STEPS,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [step]);
+
   // Fade transition between steps
   const goToStep = useCallback((nextStep: number) => {
     Animated.timing(stepOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }).start(() => {
@@ -146,13 +159,13 @@ export default function GroupSetupWizard({
         name_category_3: catName3.trim() || 'Categorie 3',
         name_category_4: catName4.trim() || 'Categorie 4',
         price_category_1: parseCents(price1) || 150,
-        price_category_2: parseCents(price2) || 300,
+        price_category_2: cat2Enabled ? (parseCents(price2) || 300) : null,
         price_category_3: cat3Enabled ? (parseCents(price3) || 450) : null,
         price_category_4: cat4Enabled ? (parseCents(price4) || 600) : null,
       }).eq('id', groupId);
     }
     goToStep(step + 1);
-  }, [step, catName1, catName2, catName3, catName4, price1, price2, price3, price4, cat3Enabled, cat4Enabled, groupId, goToStep]);
+  }, [step, catName1, catName2, catName3, catName4, price1, price2, price3, price4, cat2Enabled, cat3Enabled, cat4Enabled, groupId, goToStep]);
 
   const handleSkip = useCallback(() => {
     goToStep(step + 1);
@@ -227,7 +240,12 @@ export default function GroupSetupWizard({
   const renderProgress = () => (
     <View style={ws.progressWrap}>
       <View style={ws.progressBar}>
-        <View style={[ws.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%` }]} />
+        <Animated.View style={[ws.progressFill, {
+          width: progressAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['0%', '100%'],
+          }),
+        }]} />
       </View>
       <Text style={ws.progressText}>Stap {step} van {TOTAL_STEPS}</Text>
     </View>
@@ -261,8 +279,8 @@ export default function GroupSetupWizard({
   // ── Step 2: Categories ──
   const renderStep2 = () => {
     const categories = [
-      { name: catName1, setName: setCatName1, price: price1, setPrice: setPrice1, enabled: true, setEnabled: null, index: 0 },
-      { name: catName2, setName: setCatName2, price: price2, setPrice: setPrice2, enabled: true, setEnabled: null, index: 1 },
+      { name: catName1, setName: setCatName1, price: price1, setPrice: setPrice1, enabled: true, setEnabled: null as null, index: 0 },
+      { name: catName2, setName: setCatName2, price: price2, setPrice: setPrice2, enabled: cat2Enabled, setEnabled: setCat2Enabled, index: 1 },
       { name: catName3, setName: setCatName3, price: price3, setPrice: setPrice3, enabled: cat3Enabled, setEnabled: setCat3Enabled, index: 2 },
       { name: catName4, setName: setCatName4, price: price4, setPrice: setPrice4, enabled: cat4Enabled, setEnabled: setCat4Enabled, index: 3 },
     ];
@@ -276,7 +294,9 @@ export default function GroupSetupWizard({
           <React.Fragment key={i}>
             {i > 0 && <View style={ws.divider} />}
             <View style={[ws.catRow, !cat.enabled && ws.catRowDisabled]}>
-              <View style={[ws.catDot, { backgroundColor: categoryColors[cat.index] }]} />
+              <View style={[ws.catBadge, { backgroundColor: categoryColors[cat.index] + '30' }]}>
+                <Text style={[ws.catBadgeText, { color: categoryColors[cat.index] }]}>{cat.name || `Cat ${i + 1}`}</Text>
+              </View>
               {cat.enabled ? (
                 <>
                   <TextInput
@@ -286,20 +306,22 @@ export default function GroupSetupWizard({
                     placeholder={`Categorie ${i + 1}`}
                     placeholderTextColor="#848484"
                   />
-                  <Text style={ws.euroSign}>€</Text>
-                  <TextInput
-                    style={ws.catPriceInput}
-                    value={cat.price}
-                    onChangeText={cat.setPrice}
-                    keyboardType="decimal-pad"
-                    placeholder="0,00"
-                    placeholderTextColor="#848484"
-                  />
+                  <View style={ws.catPriceWrapper}>
+                    <Text style={ws.euroSign}>€</Text>
+                    <TextInput
+                      style={ws.catPriceInput}
+                      value={cat.price}
+                      onChangeText={cat.setPrice}
+                      keyboardType="decimal-pad"
+                      placeholder="0,00"
+                      placeholderTextColor="#848484"
+                    />
+                  </View>
                 </>
               ) : (
-                <Text style={ws.catDisabledText}>{cat.name}</Text>
+                <View style={{ flex: 1 }} />
               )}
-              {cat.setEnabled && (
+              {cat.setEnabled !== null ? (
                 <Switch
                   value={cat.enabled}
                   onValueChange={cat.setEnabled}
@@ -307,6 +329,8 @@ export default function GroupSetupWizard({
                   thumbColor="#FFFFFF"
                   style={{ marginLeft: 8 }}
                 />
+              ) : (
+                <View style={{ width: 59 }} />
               )}
             </View>
           </React.Fragment>
@@ -356,7 +380,7 @@ export default function GroupSetupWizard({
           />
           {/* Category selector dots */}
           <View style={ws.catSelectorRow}>
-            {[1, 2, 3, 4].filter((c) => c <= 2 || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled)).map((c) => (
+            {[1, 2, 3, 4].filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled)).map((c) => (
               <Pressable key={c} onPress={() => setNewDrinkCat(c)}>
                 <View style={[
                   ws.catSelectorDot,
@@ -561,13 +585,20 @@ const ws = StyleSheet.create({
     paddingHorizontal: 4,
   },
   catRowDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
-  catDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
+  catBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 10,
+    minWidth: 72,
+    alignItems: 'center' as const,
+  },
+  catBadgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    fontWeight: '600',
   },
   catNameInput: {
     fontFamily: 'Unbounded',
@@ -575,6 +606,14 @@ const ws = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     height: 44,
+  },
+  catPriceWrapper: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 40,
   },
   euroSign: {
     fontFamily: 'Unbounded',
@@ -584,11 +623,11 @@ const ws = StyleSheet.create({
   },
   catPriceInput: {
     fontFamily: 'Unbounded',
-    width: 60,
+    width: 52,
     fontSize: 14,
     color: '#FFFFFF',
-    textAlign: 'right',
-    height: 44,
+    textAlign: 'right' as const,
+    height: 40,
   },
   catDisabledText: {
     fontFamily: 'Unbounded',
@@ -686,8 +725,9 @@ const ws = StyleSheet.create({
     marginBottom: 24,
   },
   inviteCodeText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: 'Unbounded',
     fontSize: 28,
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 6,
     textAlign: 'center',
