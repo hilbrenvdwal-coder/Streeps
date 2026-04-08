@@ -430,35 +430,43 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={go.sectionHeader}>AAN WIE?</Text>
-                <Pressable onPress={selectAll} hitSlop={8}>
-                  <Text style={[go.selectAllText, allSelected && { color: '#00BEAE' }]}>{allSelected ? 'Deselecteer' : 'Iedereen'}</Text>
-                </Pressable>
+                {members.length > 0 && (
+                  <Pressable onPress={selectAll} hitSlop={8}>
+                    <Text style={[go.selectAllText, allSelected && { color: '#00BEAE' }]}>{allSelected ? 'Deselecteer' : 'Iedereen'}</Text>
+                  </Pressable>
+                )}
               </View>
               <View style={go.card}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 14 }}>
-                  {members.map((m) => {
-                    const selected = selectedRecipients.has(m.id);
-                    return (
-                      <Pressable key={m.id} style={[go.recipientItem, selected && go.recipientSelected]} onPress={() => toggleRecipient(m.id)}>
-                        <View>
-                          {m.avatar_url ? (
-                            <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} />
-                          ) : (
-                            <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
-                              <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
-                            </View>
-                          )}
-                          {selected && (
-                            <View style={go.checkBadge}>
-                              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                            </View>
-                          )}
-                        </View>
-                        <Text style={[go.recipientName, selected && { color: '#FFFFFF' }]} numberOfLines={1}>{m.full_name?.split(' ')[0]}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                {members.length === 0 ? (
+                  <View style={go.emptyRecipients}>
+                    <Text style={go.emptyRecipientsText}>Voeg mensen toe aan deze groep om weg te geven!</Text>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 14 }}>
+                    {members.map((m) => {
+                      const selected = selectedRecipients.has(m.id);
+                      return (
+                        <Pressable key={m.id} style={[go.recipientItem, selected && go.recipientSelected]} onPress={() => toggleRecipient(m.id)}>
+                          <View>
+                            {m.avatar_url ? (
+                              <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} />
+                            ) : (
+                              <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
+                                <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
+                              </View>
+                            )}
+                            {selected && (
+                              <View style={go.checkBadge}>
+                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[go.recipientName, selected && { color: '#FFFFFF' }]} numberOfLines={1}>{m.full_name?.split(' ')[0]}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                )}
               </View>
             </>
           )}
@@ -535,6 +543,8 @@ const go = StyleSheet.create({
   recipientAvatarText: { color: '#333', fontSize: 16, fontWeight: '600' },
   recipientName: { fontFamily: 'Unbounded', fontSize: 10, color: '#848484', marginTop: 4, textAlign: 'center' },
   checkBadge: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center' },
+  emptyRecipients: { alignItems: 'center', justifyContent: 'center', paddingVertical: 28, paddingHorizontal: 20 },
+  emptyRecipientsText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center', lineHeight: 20 },
   selectAllText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginRight: 4, marginTop: 24, marginBottom: 8 },
   dmRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   dmName: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF' },
@@ -1058,6 +1068,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         ListEmptyComponent={
           <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40 }}>
             <Text style={dt.empty}>Nog geen berichten</Text>
+            <Text style={[dt.empty, { fontSize: 13, color: '#00BEAE', marginTop: 4 }]}>Start het gesprek!</Text>
           </View>
         }
       />
@@ -3145,11 +3156,6 @@ export default function ChatScreen() {
             onProfilePress={currentConv.other_user_id ? () => setViewProfileUserId(currentConv.other_user_id) : undefined}
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
             onGiftPress={currentConv.type === 'group' ? () => {
-              const cachedMembers = currentConv.group_id ? groupProfileCache[currentConv.group_id]?.members : undefined;
-              if (cachedMembers !== undefined && cachedMembers.length < 2) {
-                Alert.alert('Groep te klein', 'Voeg mensen toe aan deze groep om weg te geven!');
-                return;
-              }
               Keyboard.dismiss();
               setShowGiftOverlay(true);
             } : undefined}
