@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   StyleSheet, View, Text, Pressable, FlatList, Image, TextInput,
   Dimensions, Animated, Easing, ScrollView, Alert, Platform, PanResponder,
-  Keyboard, Share, ActivityIndicator, Switch, Modal,
+  Keyboard, Share, ActivityIndicator, Switch, Modal, InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -2873,20 +2873,24 @@ export default function ChatScreen() {
     setShowingChat(true);
     slideAnim.setValue(0);
     swipeX.setValue(0);
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: 1, duration: 350, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
-      }),
-      Animated.timing(navBarAnim, {
-        toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
-      }),
-    ]).start();
-    // Prefetch profile/group data
-    if (conv.type === 'dm' && conv.other_user_id) {
-      prefetchProfile(conv.other_user_id);
-    } else if (conv.type === 'group' && conv.group_id) {
-      prefetchGroup(conv.group_id);
-    }
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 1, duration: 350, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
+        }),
+        Animated.timing(navBarAnim, {
+          toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+        }),
+      ]).start();
+    });
+    // Prefetch profile/group data after animation to avoid JS thread contention
+    InteractionManager.runAfterInteractions(() => {
+      if (conv.type === 'dm' && conv.other_user_id) {
+        prefetchProfile(conv.other_user_id);
+      } else if (conv.type === 'group' && conv.group_id) {
+        prefetchGroup(conv.group_id);
+      }
+    });
   }, [prefetchProfile, prefetchGroup, navBarAnim]);
 
   // Open DM from route params (e.g. from home screen "Stuur bericht")
