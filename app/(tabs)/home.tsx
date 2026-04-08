@@ -245,6 +245,7 @@ export default function HomeScreen() {
   }, [selectedGroupId]);
 
   const profileAnim = useRef(new Animated.Value(0)).current;
+  const profilePhotoAnim = useRef(new Animated.Value(0)).current;
   const profileSwipeX = useRef(new Animated.Value(0)).current;
   const closeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -373,14 +374,19 @@ export default function HomeScreen() {
     if (selectedMemberData) {
       setShowProfile(true);
       profileAnim.setValue(0);
+      profilePhotoAnim.setValue(0);
       profileSwipeX.setValue(0);
       Animated.spring(profileAnim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
+      setTimeout(() => {
+        Animated.spring(profilePhotoAnim, { toValue: 1, damping: 18, stiffness: 180, mass: 1, useNativeDriver: true }).start();
+      }, 150);
     }
   }, [selectedMemberId]);
 
   const closeProfile = useCallback(() => {
     const anim = Animated.parallel([
       Animated.timing(profileAnim, { toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(profilePhotoAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(profileSwipeX, { toValue: SCREEN_W, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }),
     ]);
     closeAnimRef.current = anim;
@@ -812,12 +818,11 @@ export default function HomeScreen() {
             </Pressable>
 
             <ScrollView contentContainerStyle={s.profileScroll} showsVerticalScrollIndicator={false} pointerEvents="auto">
-              {/* Avatar animates from list position to center */}
+              {/* Avatar animates separately after modal fade — scale-up spring */}
               <Animated.View style={{
+                opacity: profilePhotoAnim,
                 transform: [
-                  { translateX: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.x - SCREEN_W / 2, 0] }) },
-                  { translateY: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.y - 200, 0] }) },
-                  { scale: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.size / 160, 1] }) },
+                  { scale: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] }) },
                 ],
               }}>
                 {selectedMemberData.member.profile?.avatar_url ? (
