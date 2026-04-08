@@ -39,7 +39,14 @@ Off-topic:
 
 Lengte:
 - Kort als het kan, langer als de vraag erom vraagt
-- Geen onnodige uitleg of disclaimers`
+- Geen onnodige uitleg of disclaimers
+
+ANTI-HALLUCINATIE (STRIKT):
+- Gebruik ALLEEN de data die in je context staat (Stand, Recent, Dranken, leden)
+- Verzin NOOIT namen, streepjes, drankjes of andere data
+- Als je iets niet weet of de data niet hebt: zeg dat eerlijk ("weet ik niet bro", "geen data over")
+- Als iemand vraagt wie er in de groep zit: noem ALLEEN de namen uit je Stand-data
+- Als er geen Stand-data is: zeg dat je het niet kunt zien`
 
 Deno.serve(async (req) => {
   try {
