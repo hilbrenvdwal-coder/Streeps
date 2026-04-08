@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme } from '@/src/theme';
+import { getTheme, streepsMagenta } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
@@ -2629,10 +2629,10 @@ const ap = StyleSheet.create({
 
   // Tabs
   tabBar: { flexDirection: 'row', height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.4)', padding: 5, alignItems: 'center', marginBottom: 20 },
-  tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: 'rgba(255,0,77,0.19)' },
+  tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: streepsMagenta + '30' },
   tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', borderRadius: 20 },
-  tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
-  tabTextActive: { color: '#FF004D' },
+  tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', fontWeight: '700' },
+  tabTextActive: { color: streepsMagenta, fontWeight: '700' },
 
   // Card
   card: { borderRadius: 25, overflow: 'hidden' },
