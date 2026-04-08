@@ -175,28 +175,32 @@ export default function HomeScreen() {
   const [drinksExpanded, setDrinksExpanded] = useState(false);
 
   const toggleMembers = useCallback(() => {
-    if (showMembers) {
-      Animated.timing(membersExpandAnim, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start(() => setMembersExpanded(false));
-      setShowMembers(false);
+    if (membersExpanded) {
+      Animated.timing(membersExpandAnim, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start(() => {
+        setMembersExpanded(false);
+        setShowMembers(false);
+      });
     } else {
       setMembersExpanded(true);
       setShowMembers(true);
       membersExpandAnim.setValue(0);
       Animated.timing(membersExpandAnim, { toValue: 1, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start();
     }
-  }, [showMembers, membersExpandAnim]);
+  }, [membersExpanded, membersExpandAnim]);
 
   const toggleDrinks = useCallback(() => {
-    if (showAllDrinks) {
-      Animated.timing(drinksExpandAnim, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start(() => setDrinksExpanded(false));
-      setShowAllDrinks(false);
+    if (drinksExpanded) {
+      Animated.timing(drinksExpandAnim, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start(() => {
+        setDrinksExpanded(false);
+        setShowAllDrinks(false);
+      });
     } else {
       setDrinksExpanded(true);
       setShowAllDrinks(true);
       drinksExpandAnim.setValue(0);
       Animated.timing(drinksExpandAnim, { toValue: 1, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start();
     }
-  }, [showAllDrinks, drinksExpandAnim]);
+  }, [drinksExpanded, drinksExpandAnim]);
 
   // Member detail modal
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -626,9 +630,9 @@ export default function HomeScreen() {
                 <Pressable onPress={toggleMembers} style={s.bekijkMeer}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={s.bekijkMeerText}>
-                      {showMembers ? 'Minder tonen' : 'Meer tonen'}
+                      {membersExpanded ? 'Minder tonen' : 'Meer tonen'}
                     </Text>
-                    <Ionicons name={showMembers ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
+                    <Ionicons name={membersExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
                   </View>
                 </Pressable>
               )}
@@ -683,9 +687,9 @@ export default function HomeScreen() {
                   <Pressable onPress={toggleDrinks} style={s.bekijkMeer}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={s.bekijkMeerText}>
-                        {showAllDrinks ? 'Minder tonen' : 'Meer tonen'}
+                        {drinksExpanded ? 'Minder tonen' : 'Meer tonen'}
                       </Text>
-                      <Ionicons name={showAllDrinks ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
+                      <Ionicons name={drinksExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
                     </View>
                   </Pressable>
                 )}
