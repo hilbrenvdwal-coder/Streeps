@@ -2644,7 +2644,7 @@ const ap = StyleSheet.create({
   tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: 'rgba(255,0,133,0.19)' },
   tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', borderRadius: 20 },
   tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
-  tabTextActive: { color: '#FF0085' },
+  tabTextActive: { color: '#FF0085', fontWeight: '700' },
 
   // Card
   card: { borderRadius: 25, overflow: 'hidden' },
