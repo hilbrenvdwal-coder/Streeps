@@ -1271,7 +1271,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
           <View style={{ width: 24 }} />
         </View>
         <FadeMask>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 32, paddingBottom: 120 }}>
           {/* Avatar */}
           <Pressable style={po.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
             {avatarUrl ? (
@@ -2504,7 +2504,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
           {/* Page 0: Toevoegen */}
           <View style={{ width: SCREEN_W, flex: 1 }}>
           <FadeMask>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 32, paddingBottom: 120, paddingHorizontal: 20 }}>
             {loadingSuggestions && suggestions.length === 0 ? (
               <View style={ap.card}>
                 {[0, 1, 2, 3].map((i) => (
@@ -2545,7 +2545,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
           {/* Page 1: Verzoeken */}
           <View style={{ width: SCREEN_W, flex: 1 }}>
           <FadeMask>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 32, paddingBottom: 120, paddingHorizontal: 20 }}>
             {requests.length === 0 && outgoingRequests.length === 0 ? (
               <Text style={ap.emptyText}>Geen openstaande verzoeken</Text>
             ) : (
