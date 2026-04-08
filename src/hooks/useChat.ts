@@ -403,7 +403,6 @@ export function useChatMessages(conversationId: string | null) {
   // ── Reset & fetch on conversation change ──
   // Defer data loading until after slide-in animation completes to prevent jitter
   useEffect(() => {
-    setMessages([]);
     setLoading(true);
     setLoadingMore(false);
     setHasMore(true);

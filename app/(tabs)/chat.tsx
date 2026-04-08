@@ -25,6 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
+import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -845,7 +846,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   groupId?: string | null; otherUserId?: string | null; onGiftPress?: () => void; botEnabled?: boolean;
 }) {
   const { user } = useAuth();
-  const { messages, loadingMore, hasMore, loadMore, sendMessage, sendImage, reactions, toggleLike } = useChatMessages(conversationId);
+  const { messages, loading: messagesLoading, loadingMore, hasMore, loadMore, sendMessage, sendImage, reactions, toggleLike } = useChatMessages(conversationId);
   const [text, setText] = useState('');
   const seenIds = useRef(new Set<string>()).current;
   const initialLoadDone = useRef(false);
@@ -1063,7 +1064,12 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
           );
         }}
         ListEmptyComponent={
-          <Text style={dt.empty}>Nog geen berichten</Text>
+          messagesLoading ? null : (
+            <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40, paddingBottom: 20 }}>
+              <Text style={dt.empty}>Nog geen berichten</Text>
+              <Text style={[dt.empty, { fontSize: 13, color: '#00BEAE', marginTop: 2 }]}>Start het gesprek!</Text>
+            </View>
+          )
         }
       />
     </FadeMask>
@@ -2424,20 +2430,19 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
   const handleReject = async (friendshipId: string) => {
     await supabase.from('friendships').delete().eq('id', friendshipId);
     setRemovingIds((prev) => new Set(prev).add(friendshipId));
-    onFriendshipChange();
   };
 
   const handleCancelOutgoing = async (friendshipId: string, friendId: string) => {
     await supabase.from('friendships').delete().eq('id', friendshipId);
     setRemovingIds((prev) => new Set(prev).add(friendshipId));
     setPendingIds((prev) => { const next = new Set(prev); next.delete(friendId); return next; });
-    onFriendshipChange();
   };
 
   const finalizeRemoval = (friendshipId: string) => {
     setRequests((prev) => prev.filter((r) => r.id !== friendshipId));
     setOutgoingRequests((prev) => prev.filter((r) => r.id !== friendshipId));
     setRemovingIds((prev) => { const next = new Set(prev); next.delete(friendshipId); return next; });
+    onFriendshipChange();
   };
 
   if (!show) return null;
@@ -2776,6 +2781,17 @@ export default function ChatScreen() {
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
+  // Preload messages for visible conversations
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
+  const onViewableItemsChanged = useCallback(({ changed }: { viewableItems: any[]; changed: any[] }) => {
+    changed.forEach((token: any) => {
+      const convId = token.item?.id;
+      if (!convId) return;
+      if (token.isViewable) { cancelUnload(convId); preloadConversation(convId); }
+      else { scheduleUnload(convId); }
+    });
+  }, []);
+
   // Fetch pending incoming friend request count
   useEffect(() => {
     if (!user) return;
@@ -3076,6 +3092,8 @@ export default function ChatScreen() {
             onRefresh={handleManualRefresh}
             contentContainerStyle={{ paddingTop: 32, paddingBottom: 160 }}
             showsVerticalScrollIndicator={false}
+            viewabilityConfig={viewabilityConfig}
+            onViewableItemsChanged={onViewableItemsChanged}
             ListEmptyComponent={
               loading ? (
                 <ConversationSkeleton />
