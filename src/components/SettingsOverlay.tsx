@@ -316,11 +316,15 @@ function CategoryBadgeSelector({
         <View style={cbs.modalRoot}>
           {/* Scrim: tappable in tap mode, pass-through in drag mode */}
           {isDragMode ? (
-            <View style={cbs.scrim} pointerEvents="none" />
-          ) : (
-            <TouchableWithoutFeedback onPress={handleClose}>
+            <Pressable style={StyleSheet.absoluteFillObject} pointerEvents="none">
+              <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
               <View style={cbs.scrim} />
-            </TouchableWithoutFeedback>
+            </Pressable>
+          ) : (
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} pointerEvents="auto">
+              <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+              <View style={cbs.scrim} />
+            </Pressable>
           )}
 
           <View style={[cbs.chipList, { top: listTop }]} pointerEvents={isDragMode ? 'none' : 'auto'}>
@@ -363,7 +367,7 @@ const cbs = StyleSheet.create({
   badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '500' },
   modalRoot: { flex: 1 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
   chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
