@@ -818,11 +818,13 @@ export default function HomeScreen() {
             </Pressable>
 
             <ScrollView contentContainerStyle={s.profileScroll} showsVerticalScrollIndicator={false} pointerEvents="auto">
-              {/* Avatar animates separately after modal fade — scale-up spring */}
+              {/* Avatar zooms from list position with delayed start */}
               <Animated.View style={{
                 opacity: profilePhotoAnim,
                 transform: [
-                  { scale: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] }) },
+                  { translateX: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.x - SCREEN_W / 2, 0] }) },
+                  { translateY: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.y - 200, 0] }) },
+                  { scale: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.size / 160, 1] }) },
                 ],
               }}>
                 {selectedMemberData.member.profile?.avatar_url ? (
