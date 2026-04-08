@@ -13,6 +13,7 @@ import {
   LayoutAnimation,
   UIManager,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -83,6 +84,22 @@ export default function GroupSelector({
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const spinAnim = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0),
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
 
   // Open overlay
@@ -212,7 +229,7 @@ export default function GroupSelector({
                   </View>
                 }
               >
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8, paddingBottom: keyboardHeight > 0 ? keyboardHeight : 8 }}>
                   {otherGroups.map((group) => (
                     <Pressable key={group.id} style={st.groupRow} onPress={() => handleSelect(group.id)}>
                       {group.avatar_url ? (
