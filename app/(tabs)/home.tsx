@@ -168,6 +168,36 @@ export default function HomeScreen() {
     }
   }, [group?.id, selectedGroupId]);
 
+  // Expand/collapse animations
+  const membersExpandAnim = useRef(new Animated.Value(0)).current;
+  const drinksExpandAnim = useRef(new Animated.Value(0)).current;
+  const [membersExpanded, setMembersExpanded] = useState(false);
+  const [drinksExpanded, setDrinksExpanded] = useState(false);
+
+  const toggleMembers = useCallback(() => {
+    if (showMembers) {
+      Animated.timing(membersExpandAnim, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start(() => setMembersExpanded(false));
+      setShowMembers(false);
+    } else {
+      setMembersExpanded(true);
+      setShowMembers(true);
+      membersExpandAnim.setValue(0);
+      Animated.timing(membersExpandAnim, { toValue: 1, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start();
+    }
+  }, [showMembers, membersExpandAnim]);
+
+  const toggleDrinks = useCallback(() => {
+    if (showAllDrinks) {
+      Animated.timing(drinksExpandAnim, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start(() => setDrinksExpanded(false));
+      setShowAllDrinks(false);
+    } else {
+      setDrinksExpanded(true);
+      setShowAllDrinks(true);
+      drinksExpandAnim.setValue(0);
+      Animated.timing(drinksExpandAnim, { toValue: 1, duration: 200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }).start();
+    }
+  }, [showAllDrinks, drinksExpandAnim]);
+
   // Member detail modal
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [showAllDrinks, setShowAllDrinks] = useState(false);
@@ -517,7 +547,7 @@ export default function HomeScreen() {
                 <Text style={s.ledenCount}>{members.length} leden</Text>
               </View>
               <View key={selectedGroupId} style={s.ledenList}>
-                {members.slice(0, showMembers ? members.length : 4).map((member, i) => {
+                {members.slice(0, 4).map((member, i) => {
                   const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
                   return (
                     <AnimatedCard key={member.id} index={i} enabled={contentReady}>
@@ -556,9 +586,44 @@ export default function HomeScreen() {
                     </AnimatedCard>
                   );
                 })}
+                {membersExpanded && members.slice(4).map((member, i) => {
+                  const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
+                  return (
+                    <Animated.View key={member.id} style={{ opacity: membersExpandAnim }}>
+                    <Pressable style={s.lidRow} onPress={() => {
+                      const ref = memberAvatarRefs[member.user_id];
+                      if (ref) {
+                        ref.measureInWindow((x, y, w, h) => {
+                          setMemberAvatarOrigin({ x: x + w / 2, y: y + h / 2, size: w });
+                          selectMember(member.user_id);
+                        });
+                      } else {
+                        selectMember(member.user_id);
+                      }
+                    }}>
+                      <View ref={(r) => { memberAvatarRefs[member.user_id] = r; }} collapsable={false} style={s.lidAvatarWrap}>
+                        {member.profile?.avatar_url ? (
+                          <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} transition={200} cachePolicy="memory-disk" />
+                        ) : (
+                          <View style={[s.lidAvatar, s.lidAvatarFallback]}>
+                            <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
+                          </View>
+                        )}
+                        {member.is_active && (
+                          <View style={s.onlineBadge}>
+                            <View style={s.onlineDot} />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={s.lidName}>{mName}</Text>
+                      {member.is_admin && <Ionicons name="shield" size={14} color="#00BEAE" style={{ marginLeft: 6 }} />}
+                    </Pressable>
+                    </Animated.View>
+                  );
+                })}
               </View>
               {members.length > 4 && (
-                <Pressable onPress={() => { setShowMembers(!showMembers); }} style={s.bekijkMeer}>
+                <Pressable onPress={toggleMembers} style={s.bekijkMeer}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={s.bekijkMeerText}>
                       {showMembers ? 'Minder tonen' : 'Meer tonen'}
@@ -585,7 +650,7 @@ export default function HomeScreen() {
                   <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
                 </View>
                 <View style={s.drankenlijstList}>
-                  {drinks.slice(0, showAllDrinks ? drinks.length : 4).map((drink, i) => {
+                  {drinks.slice(0, 4).map((drink, i) => {
                     const catColor = t.categoryColors[(drink.category - 1) % 4];
                     return (
                       <AnimatedCard key={drink.id} index={i} enabled={contentReady}>
@@ -599,9 +664,23 @@ export default function HomeScreen() {
                       </AnimatedCard>
                     );
                   })}
+                  {drinksExpanded && drinks.slice(4).map((drink) => {
+                    const catColor = t.categoryColors[(drink.category - 1) % 4];
+                    return (
+                      <Animated.View key={drink.id} style={{ opacity: drinksExpandAnim }}>
+                        <View style={s.drinkRow}>
+                          <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
+                          <Text style={s.drinkName}>{drink.name}</Text>
+                          <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                            <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                          </View>
+                        </View>
+                      </Animated.View>
+                    );
+                  })}
                 </View>
                 {drinks.length > 4 && (
-                  <Pressable onPress={() => { setShowAllDrinks(!showAllDrinks); }} style={s.bekijkMeer}>
+                  <Pressable onPress={toggleDrinks} style={s.bekijkMeer}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={s.bekijkMeerText}>
                         {showAllDrinks ? 'Minder tonen' : 'Meer tonen'}
