@@ -1066,9 +1066,9 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
           );
         }}
         ListEmptyComponent={
-          <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40 }}>
+          <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40, paddingBottom: 20 }}>
             <Text style={dt.empty}>Nog geen berichten</Text>
-            <Text style={[dt.empty, { fontSize: 13, color: '#00BEAE', marginTop: 4 }]}>Start het gesprek!</Text>
+            <Text style={[dt.empty, { fontSize: 13, color: '#00BEAE', marginTop: 2 }]}>Start het gesprek!</Text>
           </View>
         }
       />
