@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -117,6 +117,7 @@ function CategoryBadgeSelector({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [isDragMode, setIsDragMode] = useState(false);
+  const isDragModeRef = useRef(false);
   const [hoveredCat, setHoveredCat] = useState<number | null>(null);
   const [badgePos, setBadgePos] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const badgeRef = useRef<View>(null);
@@ -127,6 +128,7 @@ function CategoryBadgeSelector({
   const chipLayoutsRef = useRef<Record<number, LayoutRectangle>>({});
   const hoveredCatRef = useRef<number | null>(null);
 
+  useEffect(() => { isDragModeRef.current = isDragMode; }, [isDragMode]);
   useEffect(() => { enabledCategoriesRef.current = enabledCategories; }, [enabledCategories]);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onScrollEnableRef.current = onScrollEnable; }, [onScrollEnable]);
@@ -172,11 +174,11 @@ function CategoryBadgeSelector({
     chipLayoutsRef.current[cat] = layout;
   }, []);
 
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => isDragMode,
-    onMoveShouldSetPanResponder: () => isDragMode,
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (evt: GestureResponderEvent) => {
-      if (!isDragMode) return;
+      if (!isDragModeRef.current) return;
       const fingerY = evt.nativeEvent.pageY;
       const cats = enabledCategoriesRef.current;
       let found: number | null = null;
@@ -201,7 +203,7 @@ function CategoryBadgeSelector({
       }
     },
     onPanResponderTerminate: () => handleClose(),
-  }), [isDragMode, handleSelect, handleClose]);
+  })).current;
 
   const selectedIndex = enabledCategories.indexOf(value);
   const chipHeight = 40;
@@ -223,12 +225,12 @@ function CategoryBadgeSelector({
       </View>
 
       <Modal visible={expanded} transparent statusBarTranslucent animationType="fade" onRequestClose={handleClose}>
-        <View style={cbs.modalRoot} {...(isDragMode ? panResponder.panHandlers : {})}>
+        <View style={cbs.modalRoot} {...panResponder.panHandlers}>
           <TouchableWithoutFeedback onPress={isDragMode ? undefined : handleClose}>
             <View style={cbs.scrim} />
           </TouchableWithoutFeedback>
 
-          <View style={[cbs.chipList, { top: listTop, left: badgePos.x - 8 }]} pointerEvents={isDragMode ? 'none' : 'auto'}>
+          <View style={[cbs.chipList, { top: listTop }]} pointerEvents={isDragMode ? 'none' : 'auto'}>
             {enabledCategories.map((cat) => {
               const catColor = colors[(cat - 1) % colors.length];
               const catLabel = getCategoryName?.(cat) ?? `Cat ${cat}`;
@@ -269,7 +271,7 @@ const cbs = StyleSheet.create({
   badgeLabel: { fontFamily: 'Unbounded', fontSize: 11, fontWeight: '500' },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  chipList: { position: 'absolute', alignItems: 'flex-start', gap: 8 },
+  chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20, alignSelf: 'flex-start' },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
   chipLabel: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
