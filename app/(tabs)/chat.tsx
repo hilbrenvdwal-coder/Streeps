@@ -2637,8 +2637,8 @@ const ap = StyleSheet.create({
   tabBar: { flexDirection: 'row', height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.4)', padding: 5, alignItems: 'center', marginBottom: 20 },
   tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: streepsMagenta + '30' },
   tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', borderRadius: 20 },
-  tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', fontWeight: '700' },
-  tabTextActive: { color: streepsMagenta, fontWeight: '700' },
+  tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', fontWeight: '500' },
+  tabTextActive: { color: streepsMagenta },
 
   // Card
   card: { borderRadius: 25, overflow: 'hidden' },
