@@ -5,7 +5,6 @@ import {
   Text,
   Pressable,
   TextInput,
-  Image,
   ScrollView,
   Alert,
   Animated,
@@ -16,6 +15,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -261,7 +261,7 @@ export default function GroupSetupWizard({
 
       <Pressable style={ws.avatarCircle} onPress={() => setCameraVisible(true)} disabled={uploadingAvatar}>
         {groupAvatarUrl ? (
-          <Image source={{ uri: groupAvatarUrl }} style={ws.avatarImage} />
+          <Image source={{ uri: groupAvatarUrl }} style={ws.avatarImage} transition={200} cachePolicy="memory-disk" />
         ) : (
           <Ionicons name="camera" size={40} color="#848484" />
         )}

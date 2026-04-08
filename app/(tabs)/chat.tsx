@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  StyleSheet, View, Text, Pressable, FlatList, Image, TextInput,
+  StyleSheet, View, Text, Pressable, FlatList, TextInput,
   Dimensions, Animated, Easing, ScrollView, Alert, Platform, PanResponder,
-  Keyboard, Share, ActivityIndicator, Switch, Modal, InteractionManager,
+  Keyboard, Share, ActivityIndicator, Switch, Modal,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -24,8 +25,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
-import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
-import type { ViewToken } from 'react-native';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -432,43 +431,35 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={go.sectionHeader}>AAN WIE?</Text>
-                {members.length > 0 && (
-                  <Pressable onPress={selectAll} hitSlop={8}>
-                    <Text style={[go.selectAllText, allSelected && { color: '#00BEAE' }]}>{allSelected ? 'Deselecteer' : 'Iedereen'}</Text>
-                  </Pressable>
-                )}
+                <Pressable onPress={selectAll} hitSlop={8}>
+                  <Text style={[go.selectAllText, allSelected && { color: '#00BEAE' }]}>{allSelected ? 'Deselecteer' : 'Iedereen'}</Text>
+                </Pressable>
               </View>
               <View style={go.card}>
-                {members.length === 0 ? (
-                  <View style={go.emptyRecipients}>
-                    <Text style={go.emptyRecipientsText}>Voeg mensen toe aan deze groep om weg te geven!</Text>
-                  </View>
-                ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 14 }}>
-                    {members.map((m) => {
-                      const selected = selectedRecipients.has(m.id);
-                      return (
-                        <Pressable key={m.id} style={[go.recipientItem, selected && go.recipientSelected]} onPress={() => toggleRecipient(m.id)}>
-                          <View>
-                            {m.avatar_url ? (
-                              <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} />
-                            ) : (
-                              <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
-                                <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
-                              </View>
-                            )}
-                            {selected && (
-                              <View style={go.checkBadge}>
-                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                              </View>
-                            )}
-                          </View>
-                          <Text style={[go.recipientName, selected && { color: '#FFFFFF' }]} numberOfLines={1}>{m.full_name?.split(' ')[0]}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                )}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 14 }}>
+                  {members.map((m) => {
+                    const selected = selectedRecipients.has(m.id);
+                    return (
+                      <Pressable key={m.id} style={[go.recipientItem, selected && go.recipientSelected]} onPress={() => toggleRecipient(m.id)}>
+                        <View>
+                          {m.avatar_url ? (
+                            <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} transition={200} cachePolicy="memory-disk" />
+                          ) : (
+                            <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
+                              <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
+                            </View>
+                          )}
+                          {selected && (
+                            <View style={go.checkBadge}>
+                              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[go.recipientName, selected && { color: '#FFFFFF' }]} numberOfLines={1}>{m.full_name?.split(' ')[0]}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
             </>
           )}
@@ -545,8 +536,6 @@ const go = StyleSheet.create({
   recipientAvatarText: { color: '#333', fontSize: 16, fontWeight: '600' },
   recipientName: { fontFamily: 'Unbounded', fontSize: 10, color: '#848484', marginTop: 4, textAlign: 'center' },
   checkBadge: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center' },
-  emptyRecipients: { alignItems: 'center', justifyContent: 'center', paddingVertical: 28, paddingHorizontal: 20 },
-  emptyRecipientsText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center', lineHeight: 20 },
   selectAllText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginRight: 4, marginTop: 24, marginBottom: 8 },
   dmRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   dmName: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF' },
@@ -657,7 +646,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         <View style={!isMine && type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined}>
           {!isMine && type === 'group' && (
             item.profile?.avatar_url ? (
-              <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} />
+              <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[dt.bubbleAvatar, dt.bubbleAvatarFallback]}>
                 <Text style={dt.bubbleAvatarText}>{(item.profile?.full_name || '?')[0]?.toUpperCase()}</Text>
@@ -667,7 +656,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
           <Pressable onPress={handlePress}>
             <View style={[{ marginBottom: 8, maxWidth: 240, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }]}>
               <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-                <Image source={{ uri: item.metadata.image_url }} style={{ width: 240, height: 180 }} resizeMode="cover" />
+                <Image source={{ uri: item.metadata.image_url }} style={{ width: 240, height: 180 }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
               </View>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
             </View>
@@ -696,7 +685,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
                 <BotIcon size={20} color="#00BEAE" />
               </View>
             ) : item.profile?.avatar_url ? (
-              <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} />
+              <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[dt.bubbleAvatar, dt.bubbleAvatarFallback]}>
                 <Text style={dt.bubbleAvatarText}>{senderName[0]?.toUpperCase()}</Text>
@@ -1068,10 +1057,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
           );
         }}
         ListEmptyComponent={
-          <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40, paddingBottom: 20 }}>
-            <Text style={dt.empty}>Nog geen berichten</Text>
-            <Text style={[dt.empty, { fontSize: 13, color: '#00BEAE', marginTop: 2 }]}>Start het gesprek!</Text>
-          </View>
+          <Text style={dt.empty}>Nog geen berichten</Text>
         }
       />
     </FadeMask>
@@ -1086,7 +1072,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         </Pressable>
         <Pressable style={dt.headerProfile} onPress={onProfilePress || onGroupPress} disabled={!onProfilePress && !onGroupPress}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={dt.headerAvatar} />
+            <Image source={{ uri: avatarUrl }} style={dt.headerAvatar} transition={200} cachePolicy="memory-disk" />
           ) : (
             <View style={[dt.headerAvatar, dt.headerAvatarFallback]}>
               <Text style={dt.headerAvatarText}>{name[0]?.toUpperCase()}</Text>
@@ -1290,7 +1276,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
           {/* Avatar */}
           <Pressable style={po.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={po.avatar} />
+              <Image source={{ uri: avatarUrl }} style={po.avatar} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[po.avatar, po.avatarFallback]}>
                 <Text style={po.avatarInitial}>{(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase()}</Text>
@@ -1568,7 +1554,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
           <View style={up.avatarSection}>
             <Pressable onPress={handleAvatarPress} ref={avatarRef}>
               {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={up.avatar} />
+                <Image source={{ uri: profile.avatar_url }} style={up.avatar} transition={200} cachePolicy="memory-disk" />
               ) : (
                 <View style={[up.avatar, up.avatarFallback]}>
                   <Text style={up.avatarInitial}>{profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
@@ -1634,7 +1620,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
                 { scale: zoomAnim.interpolate({ inputRange: [0, 1], outputRange: [scaleFrom, 1] }) },
               ],
             }}>
-              <Image source={{ uri: profile.avatar_url }} style={{ width: targetSize, height: targetSize }} />
+              <Image source={{ uri: profile.avatar_url }} style={{ width: targetSize, height: targetSize }} transition={200} cachePolicy="memory-disk" />
             </Animated.View>
           </View>
         );
@@ -1872,7 +1858,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
           {/* Avatar */}
           <View style={gp.avatarSection}>
             {group?.avatar_url ? (
-              <Image source={{ uri: group.avatar_url }} style={gp.avatar} />
+              <Image source={{ uri: group.avatar_url }} style={gp.avatar} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[gp.avatar, gp.avatarFallback]}>
                 <Text style={gp.avatarInitial}>{group?.name?.[0]?.toUpperCase() || '?'}</Text>
@@ -1890,7 +1876,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                 {i > 0 && <View style={gp.divider} />}
                 <Pressable style={gp.memberRow} onPress={() => { if (m.user_id !== user?.id) onViewProfile(m.user_id); }}>
                   {m.profile?.avatar_url ? (
-                    <Image source={{ uri: m.profile.avatar_url }} style={gp.memberAvatar} />
+                    <Image source={{ uri: m.profile.avatar_url }} style={gp.memberAvatar} transition={200} cachePolicy="memory-disk" />
                   ) : (
                     <View style={[gp.memberAvatar, gp.memberAvatarFallback]}>
                       <Text style={gp.memberAvatarText}>{m.profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
@@ -2482,11 +2468,6 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
               outputRange: i === 0 ? [1, 0] : [0, 1],
               extrapolate: 'clamp',
             });
-            const normalOpacity = apScrollX.interpolate({
-              inputRange: [0, SCREEN_W],
-              outputRange: i === 0 ? [0, 1] : [1, 0],
-              extrapolate: 'clamp',
-            });
             return (
               <Pressable
                 key={t.key}
@@ -2494,7 +2475,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                 onPress={() => handleApTabPress(i)}
                 onLayout={(e) => onApTabLayout(i, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
               >
-                <Animated.Text style={[ap.tabText, { opacity: normalOpacity }]}>{labelText}</Animated.Text>
+                <Text style={ap.tabText}>{labelText}</Text>
                 <Animated.Text style={[ap.tabText, ap.tabTextActive, { position: 'absolute', opacity: activeOpacity }]}>
                   {labelText}
                 </Animated.Text>
@@ -2542,7 +2523,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                   <StaggerPersonRow key={person.id} index={i}>
                     <Pressable style={ap.personRow} onPress={() => onViewProfile(person.id)}>
                       {person.avatar_url ? (
-                        <Image source={{ uri: person.avatar_url }} style={ap.personAvatar} />
+                        <Image source={{ uri: person.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                       ) : (
                         <View style={[ap.personAvatar, ap.personAvatarFallback]}>
                           <Text style={ap.personAvatarText}>{person.full_name?.[0]?.toUpperCase()}</Text>
@@ -2578,7 +2559,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                         <AnimatedRow key={req.id} removing={removingIds.has(req.id)} onRemoved={() => finalizeRemoval(req.id)}>
                           <Pressable style={ap.personRow} onPress={() => req.profile?.id && onViewProfile(req.profile.id)}>
                             {req.profile?.avatar_url ? (
-                              <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} />
+                              <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
                               <View style={[ap.personAvatar, ap.personAvatarFallback]}>
                                 <Text style={ap.personAvatarText}>{req.profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
@@ -2608,7 +2589,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                         <AnimatedRow key={req.id} removing={removingIds.has(req.id)} onRemoved={() => finalizeRemoval(req.id)}>
                           <Pressable style={ap.personRow} onPress={() => req.profile?.id && onViewProfile(req.profile.id)}>
                             {req.profile?.avatar_url ? (
-                              <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} />
+                              <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
                               <View style={[ap.personAvatar, ap.personAvatarFallback]}>
                                 <Text style={ap.personAvatarText}>{req.profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
@@ -2648,10 +2629,10 @@ const ap = StyleSheet.create({
 
   // Tabs
   tabBar: { flexDirection: 'row', height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.4)', padding: 5, alignItems: 'center', marginBottom: 20 },
-  tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: 'rgba(255,0,133,0.19)' },
+  tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: 'rgba(255,0,77,0.19)' },
   tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', borderRadius: 20 },
   tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
-  tabTextActive: { color: '#FF0085', fontWeight: '700' },
+  tabTextActive: { color: '#FF004D' },
 
   // Card
   card: { borderRadius: 25, overflow: 'hidden' },
@@ -2789,25 +2770,6 @@ export default function ChatScreen() {
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
-  // Preload message cache: start loading messages for visible conversations
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 50,
-    minimumViewTime: 300,
-  }).current;
-
-  const onViewableItemsChanged = useRef(({ changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
-    changed.forEach((token) => {
-      const convId = token.item?.id;
-      if (!convId) return;
-      if (token.isViewable) {
-        cancelUnload(convId);
-        preloadConversation(convId);
-      } else {
-        scheduleUnload(convId);
-      }
-    });
-  }).current;
-
   // Fetch pending incoming friend request count
   useEffect(() => {
     if (!user) return;
@@ -2899,24 +2861,20 @@ export default function ChatScreen() {
     setShowingChat(true);
     slideAnim.setValue(0);
     swipeX.setValue(0);
-    requestAnimationFrame(() => {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 1, duration: 350, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
-        }),
-        Animated.timing(navBarAnim, {
-          toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
-        }),
-      ]).start();
-    });
-    // Prefetch profile/group data after animation to avoid JS thread contention
-    InteractionManager.runAfterInteractions(() => {
-      if (conv.type === 'dm' && conv.other_user_id) {
-        prefetchProfile(conv.other_user_id);
-      } else if (conv.type === 'group' && conv.group_id) {
-        prefetchGroup(conv.group_id);
-      }
-    });
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }),
+      Animated.timing(navBarAnim, {
+        toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }),
+    ]).start();
+    // Prefetch profile/group data
+    if (conv.type === 'dm' && conv.other_user_id) {
+      prefetchProfile(conv.other_user_id);
+    } else if (conv.type === 'group' && conv.group_id) {
+      prefetchGroup(conv.group_id);
+    }
   }, [prefetchProfile, prefetchGroup, navBarAnim]);
 
   // Open DM from route params (e.g. from home screen "Stuur bericht")
@@ -2944,10 +2902,10 @@ export default function ChatScreen() {
     setClosingConv(activeConv);
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: 0, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
+        toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true,
       }),
       Animated.timing(navBarAnim, {
-        toValue: 0, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
+        toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true,
       }),
     ]).start(() => {
       swipeX.setValue(0);
@@ -3028,22 +2986,7 @@ export default function ChatScreen() {
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
       {/* ── Conversation list (always mounted) ── */}
-      <Animated.View style={{
-        flex: 1,
-        paddingTop: insets.top,
-        transform: [{
-          translateX: Animated.add(
-            slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, -SCREEN_W * 0.3],
-            }),
-            swipeX.interpolate({
-              inputRange: [0, SCREEN_W],
-              outputRange: [0, SCREEN_W * 0.3],
-            })
-          ),
-        }],
-      }}>
+      <View style={{ flex: 1, paddingTop: insets.top }}>
         {/* Aurora */}
         <View style={cs.auroraWrap} pointerEvents="none">
           <AuroraPresetView preset="header" colors={CHAT_AURORA_COLORS} animated gentle />
@@ -3053,7 +2996,7 @@ export default function ChatScreen() {
         <View style={cs.header}>
           <Pressable onPress={() => setShowProfile(true)}>
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={cs.myAvatar} />
+              <Image source={{ uri: avatarUrl }} style={cs.myAvatar} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[cs.myAvatar, cs.myAvatarFallback]}>
                 <Text style={cs.myAvatarText}>{(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase()}</Text>
@@ -3105,7 +3048,7 @@ export default function ChatScreen() {
               renderItem={({ item }) => (
                 <Pressable style={cs.contactItem} onPress={() => setViewProfileUserId(item.id)}>
                   {item.avatar_url ? (
-                    <Image source={{ uri: item.avatar_url }} style={cs.contactAvatar} />
+                    <Image source={{ uri: item.avatar_url }} style={cs.contactAvatar} transition={200} cachePolicy="memory-disk" />
                   ) : (
                     <View style={[cs.contactAvatar, cs.contactAvatarFallback]}>
                       <Text style={cs.contactAvatarText}>{item.full_name[0]?.toUpperCase()}</Text>
@@ -3127,8 +3070,6 @@ export default function ChatScreen() {
             onRefresh={handleManualRefresh}
             contentContainerStyle={{ paddingTop: 32, paddingBottom: 160 }}
             showsVerticalScrollIndicator={false}
-            viewabilityConfig={viewabilityConfig}
-            onViewableItemsChanged={onViewableItemsChanged}
             ListEmptyComponent={
               loading ? (
                 <ConversationSkeleton />
@@ -3146,7 +3087,7 @@ export default function ChatScreen() {
                 onPress={() => openChat(item)}
               >
                 {item.avatar_url ? (
-                  <Image source={{ uri: item.avatar_url }} style={cs.convAvatar} />
+                  <Image source={{ uri: item.avatar_url }} style={cs.convAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
                   <View style={[cs.convAvatar, cs.convAvatarFallback]}>
                     <Text style={cs.convAvatarText}>{item.name[0]?.toUpperCase()}</Text>
@@ -3173,7 +3114,7 @@ export default function ChatScreen() {
             )}
           />
         </FadeMask>
-      </Animated.View>
+      </View>
 
       {/* ── Chat detail overlay (slides in from right) ── */}
       {showingChat && currentConv && (
@@ -3202,10 +3143,7 @@ export default function ChatScreen() {
             otherUserId={currentConv.other_user_id}
             onProfilePress={currentConv.other_user_id ? () => setViewProfileUserId(currentConv.other_user_id) : undefined}
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
-            onGiftPress={currentConv.type === 'group' ? () => {
-              Keyboard.dismiss();
-              setShowGiftOverlay(true);
-            } : undefined}
+            onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
           />
         </Animated.View>

@@ -5,7 +5,6 @@ import {
   Text,
   Pressable,
   TextInput,
-  Image,
   ScrollView,
   Alert,
   Animated,
@@ -13,10 +12,12 @@ import {
   PanResponder,
   LayoutAnimation,
   Modal,
+  TouchableWithoutFeedback,
   Platform,
   UIManager,
 } from 'react-native';
 import type { GestureResponderEvent, LayoutRectangle } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -174,10 +175,8 @@ function CategoryBadgeSelector({
   }, []);
 
   const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => isDragModeRef.current,
-    onMoveShouldSetPanResponder: () => isDragModeRef.current,
-    onStartShouldSetPanResponderCapture: () => isDragModeRef.current,
-    onMoveShouldSetPanResponderCapture: () => isDragModeRef.current,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (evt: GestureResponderEvent) => {
       if (!isDragModeRef.current) return;
       const fingerY = evt.nativeEvent.pageY;
@@ -197,7 +196,6 @@ function CategoryBadgeSelector({
       }
     },
     onPanResponderRelease: () => {
-      if (!isDragModeRef.current) return;
       if (hoveredCatRef.current !== null) {
         handleSelect(hoveredCatRef.current);
       } else {
@@ -228,7 +226,9 @@ function CategoryBadgeSelector({
 
       <Modal visible={expanded} transparent statusBarTranslucent animationType="fade" onRequestClose={handleClose}>
         <View style={cbs.modalRoot} {...panResponder.panHandlers}>
-          <Pressable style={cbs.scrim} onPress={handleClose} pointerEvents={isDragMode ? 'none' : 'auto'} />
+          <TouchableWithoutFeedback onPress={isDragMode ? undefined : handleClose}>
+            <View style={cbs.scrim} />
+          </TouchableWithoutFeedback>
 
           <View style={[cbs.chipList, { top: listTop }]} pointerEvents={isDragMode ? 'none' : 'auto'}>
             {enabledCategories.map((cat) => {
@@ -272,7 +272,7 @@ const cbs = StyleSheet.create({
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20 },
+  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40, borderRadius: 20, alignSelf: 'flex-start' },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
   chipLabel: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '500' },
 });
@@ -560,6 +560,7 @@ export default function SettingsOverlay({
           useNativeDriver: true,
         }).start();
       }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return next;
     });
   };
@@ -696,7 +697,7 @@ export default function SettingsOverlay({
           {/* Group avatar */}
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
             {groupAvatarUrl ? (
-              <Image source={{ uri: groupAvatarUrl }} style={s.avatar} />
+              <Image source={{ uri: groupAvatarUrl }} style={s.avatar} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[s.avatar, s.avatarFallback]}>
                 <Text style={s.avatarText}>{group?.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -851,7 +852,7 @@ export default function SettingsOverlay({
                   {i > 0 && <View style={s.divider} />}
                   <Pressable style={({ pressed }) => [s.memberRow, pressed && { opacity: 0.7 }]} onPress={() => toggleExpandMember(member.user_id)} accessibilityLabel={`${name} details`} accessibilityRole="button">
                     {member.profile?.avatar_url ? (
-                      <Image source={{ uri: member.profile.avatar_url }} style={s.memberAvatar} />
+                      <Image source={{ uri: member.profile.avatar_url }} style={s.memberAvatar} transition={200} cachePolicy="memory-disk" />
                     ) : (
                       <View style={[s.memberAvatar, s.memberAvatarFallback]}>
                         <Text style={s.memberAvatarText}>{name[0]?.toUpperCase()}</Text>

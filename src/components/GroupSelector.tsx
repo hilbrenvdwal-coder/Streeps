@@ -5,7 +5,6 @@ import {
   Text,
   Pressable,
   TextInput,
-  Image,
   ScrollView,
   Alert,
   Animated,
@@ -16,6 +15,7 @@ import {
   Keyboard,
   Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -233,7 +233,7 @@ export default function GroupSelector({
             <Pressable style={st.headerReplica} onPress={handleClose} pointerEvents="auto">
               <View style={st.headerRow}>
                 {currentGroup?.avatar_url ? (
-                  <Image source={{ uri: currentGroup.avatar_url }} style={st.headerAvatar} />
+                  <Image source={{ uri: currentGroup.avatar_url }} style={st.headerAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
                   <View style={[st.headerAvatar, st.headerAvatarFallback]}>
                     <Text style={st.headerAvatarText}>{currentGroup?.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -261,7 +261,7 @@ export default function GroupSelector({
                   {otherGroups.map((group) => (
                     <Pressable key={group.id} style={st.groupRow} onPress={() => handleSelect(group.id)}>
                       {group.avatar_url ? (
-                        <Image source={{ uri: group.avatar_url }} style={st.groupAvatar} />
+                        <Image source={{ uri: group.avatar_url }} style={st.groupAvatar} transition={200} cachePolicy="memory-disk" />
                       ) : (
                         <View style={[st.groupAvatar, st.groupAvatarFallback]}>
                           <Text style={st.groupAvatarText}>{group.name[0]?.toUpperCase()}</Text>

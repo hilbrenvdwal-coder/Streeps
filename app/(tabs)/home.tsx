@@ -26,7 +26,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Image,
   LayoutAnimation,
   Modal,
   PanResponder,
@@ -40,6 +39,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -245,7 +245,6 @@ export default function HomeScreen() {
   }, [selectedGroupId]);
 
   const profileAnim = useRef(new Animated.Value(0)).current;
-  const profilePhotoAnim = useRef(new Animated.Value(0)).current;
   const profileSwipeX = useRef(new Animated.Value(0)).current;
   const closeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -374,19 +373,14 @@ export default function HomeScreen() {
     if (selectedMemberData) {
       setShowProfile(true);
       profileAnim.setValue(0);
-      profilePhotoAnim.setValue(0);
       profileSwipeX.setValue(0);
       Animated.spring(profileAnim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
-      setTimeout(() => {
-        Animated.spring(profilePhotoAnim, { toValue: 1, damping: 18, stiffness: 180, mass: 1, useNativeDriver: true }).start();
-      }, 150);
     }
   }, [selectedMemberId]);
 
   const closeProfile = useCallback(() => {
     const anim = Animated.parallel([
       Animated.timing(profileAnim, { toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-      Animated.timing(profilePhotoAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(profileSwipeX, { toValue: SCREEN_W, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true }),
     ]);
     closeAnimRef.current = anim;
@@ -462,7 +456,7 @@ export default function HomeScreen() {
                 <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined}>
                   <View ref={avatarRef} collapsable={false}>
                     {(group as any)?.avatar_url ? (
-                      <Image source={{ uri: (group as any).avatar_url }} style={s.avatar} />
+                      <Image source={{ uri: (group as any).avatar_url }} style={s.avatar} transition={200} cachePolicy="memory-disk" />
                     ) : (
                       <View style={[s.avatar, s.avatarFallback]}>
                         <Text style={s.avatarText}>{group.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -549,7 +543,7 @@ export default function HomeScreen() {
                     }}>
                       <View ref={(r) => { memberAvatarRefs[member.user_id] = r; }} collapsable={false} style={s.lidAvatarWrap}>
                         {member.profile?.avatar_url ? (
-                          <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} />
+                          <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} transition={200} cachePolicy="memory-disk" />
                         ) : (
                           <View style={[s.lidAvatar, s.lidAvatarFallback]}>
                             <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
@@ -696,7 +690,7 @@ export default function HomeScreen() {
             pointerEvents="none"
           >
             {(group as any)?.avatar_url ? (
-              <Image source={{ uri: (group as any).avatar_url }} style={s.avatarPreviewImg} />
+              <Image source={{ uri: (group as any).avatar_url }} style={s.avatarPreviewImg} transition={200} cachePolicy="memory-disk" />
             ) : (
               <View style={[s.avatarPreviewImg, s.avatarFallback]}>
                 <Text style={s.avatarPreviewText}>{group.name?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -719,18 +713,12 @@ export default function HomeScreen() {
         onClose={() => setShowGroupSelector(false)}
         currentGroup={group}
         activeCount={members.filter((m) => m.is_active).length}
-        onCreated={(g) => {
-          setWizardGroup(g);
-          Animated.timing(navBarAnim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
-        }}
+        onCreated={(g) => setWizardGroup(g)}
       />
 
       <GroupSetupWizard
         visible={!!wizardGroup}
-        onClose={() => {
-          setWizardGroup(null);
-          Animated.timing(navBarAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }).start();
-        }}
+        onClose={() => setWizardGroup(null)}
         groupId={wizardGroup?.id ?? ''}
         groupName={wizardGroup?.name ?? ''}
         inviteCode={wizardGroup?.invite_code ?? ''}
@@ -818,17 +806,16 @@ export default function HomeScreen() {
             </Pressable>
 
             <ScrollView contentContainerStyle={s.profileScroll} showsVerticalScrollIndicator={false} pointerEvents="auto">
-              {/* Avatar zooms from list position with delayed start */}
+              {/* Avatar animates from list position to center */}
               <Animated.View style={{
-                opacity: profilePhotoAnim,
                 transform: [
-                  { translateX: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.x - SCREEN_W / 2, 0] }) },
-                  { translateY: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.y - 200, 0] }) },
-                  { scale: profilePhotoAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.size / 160, 1] }) },
+                  { translateX: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.x - SCREEN_W / 2, 0] }) },
+                  { translateY: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.y - 200, 0] }) },
+                  { scale: profileAnim.interpolate({ inputRange: [0, 1], outputRange: [memberAvatarOrigin.size / 160, 1] }) },
                 ],
               }}>
                 {selectedMemberData.member.profile?.avatar_url ? (
-                  <Image source={{ uri: selectedMemberData.member.profile.avatar_url }} style={s.profileAvatar} />
+                  <Image source={{ uri: selectedMemberData.member.profile.avatar_url }} style={s.profileAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
                   <View style={[s.profileAvatar, s.avatarFallback]}>
                     <Text style={s.profileAvatarText}>

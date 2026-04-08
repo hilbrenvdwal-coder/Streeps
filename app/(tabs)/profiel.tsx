@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Image, Dimensions, Animated, Easing } from 'react-native';
+import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Dimensions, Animated, Easing } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -193,7 +194,7 @@ export default function ProfielScreen() {
         {/* Avatar + info header */}
         <Pressable style={styles.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} transition={200} cachePolicy="memory-disk" />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Text style={styles.avatarInitial}>
