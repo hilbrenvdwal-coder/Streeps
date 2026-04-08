@@ -10,6 +10,20 @@
 
 import { Platform } from 'react-native';
 
+// ─── Streeps Brand Color Tokens ─────────────────────────────────────────────
+//
+// | Token           | Hex     | Usage                                              |
+// |-----------------|---------|-----------------------------------------------------|
+// | streepsGreen    | #00FE96 | Actief/online indicator dot, active status text     |
+// | streepsCyan     | #00BEAE | Opslaan knoppen, accenten, admin shield, toast ok   |
+// | streepsMagenta  | #FF0085 | Navbar pill, primaire actie knoppen, send button    |
+// | streepsRed      | #EB5466 | Openstaande rekening, danger/destructive acties     |
+//
+export const streepsGreen   = '#00FE96';
+export const streepsCyan    = '#00BEAE';
+export const streepsMagenta = '#FF0085';
+export const streepsRed     = '#EB5466';
+
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
