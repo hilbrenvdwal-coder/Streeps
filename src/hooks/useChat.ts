@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { getPreloadedMessages } from './useMessagePreloadCache';
 
 const PAGE_SIZE = 30;
 const MAX_MESSAGES_IN_MEMORY = 200;
@@ -285,7 +286,18 @@ export function useChatMessages(conversationId: string | null) {
     convIdRef.current = conversationId;
     profileCacheRef.current = {};
 
-    // Step 1: Show cached messages instantly
+    // Step 0: Check in-memory preload cache (instant, no async)
+    const preloaded = getPreloadedMessages(conversationId);
+    if (preloaded) {
+      setMessages(preloaded.messages);
+      oldestCursorRef.current = preloaded.oldestCursor;
+      hasMoreRef.current = preloaded.hasMore;
+      setHasMore(preloaded.hasMore);
+      setLoading(false);
+      Object.assign(profileCacheRef.current, preloaded.profileCache);
+    }
+
+    // Step 1: Show cached messages instantly (AsyncStorage fallback)
     const cached = await loadCache(conversationId);
     if (cached && cached.messages.length > 0) {
       setMessages(cached.messages);

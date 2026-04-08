@@ -24,6 +24,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
+import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
+import type { ViewToken } from 'react-native';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -2787,6 +2789,25 @@ export default function ChatScreen() {
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
+  // Preload message cache: start loading messages for visible conversations
+  const viewabilityConfig = useRef({
+    viewAreaCoveragePercentThreshold: 50,
+    minimumViewTime: 300,
+  }).current;
+
+  const onViewableItemsChanged = useRef(({ changed }: { viewableItems: ViewToken[]; changed: ViewToken[] }) => {
+    changed.forEach((token) => {
+      const convId = token.item?.id;
+      if (!convId) return;
+      if (token.isViewable) {
+        cancelUnload(convId);
+        preloadConversation(convId);
+      } else {
+        scheduleUnload(convId);
+      }
+    });
+  }).current;
+
   // Fetch pending incoming friend request count
   useEffect(() => {
     if (!user) return;
@@ -3106,6 +3127,8 @@ export default function ChatScreen() {
             onRefresh={handleManualRefresh}
             contentContainerStyle={{ paddingTop: 32, paddingBottom: 160 }}
             showsVerticalScrollIndicator={false}
+            viewabilityConfig={viewabilityConfig}
+            onViewableItemsChanged={onViewableItemsChanged}
             ListEmptyComponent={
               loading ? (
                 <ConversationSkeleton />
