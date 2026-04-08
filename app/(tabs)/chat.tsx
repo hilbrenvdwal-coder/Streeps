@@ -3144,7 +3144,15 @@ export default function ChatScreen() {
             otherUserId={currentConv.other_user_id}
             onProfilePress={currentConv.other_user_id ? () => setViewProfileUserId(currentConv.other_user_id) : undefined}
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
-            onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
+            onGiftPress={currentConv.type === 'group' ? () => {
+              const cachedMembers = currentConv.group_id ? groupProfileCache[currentConv.group_id]?.members : undefined;
+              if (cachedMembers !== undefined && cachedMembers.length < 2) {
+                Alert.alert('Groep te klein', 'Voeg mensen toe aan deze groep om weg te geven!');
+                return;
+              }
+              Keyboard.dismiss();
+              setShowGiftOverlay(true);
+            } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
           />
         </Animated.View>
