@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -270,14 +271,17 @@ export function useChatMessages(conversationId: string | null) {
   const convIdRef = useRef(conversationId);
   const profileCacheRef = useRef<Record<string, any>>({});
 
-  // Mark conversation as read on open
+  // Mark conversation as read on open — deferred to not block slide animation
   useEffect(() => {
     if (!conversationId || !user) return;
-    supabase.from('conversation_members')
-      .update({ last_read_at: new Date().toISOString() })
-      .eq('conversation_id', conversationId)
-      .eq('user_id', user.id)
-      .then(() => {});
+    const handle = InteractionManager.runAfterInteractions(() => {
+      supabase.from('conversation_members')
+        .update({ last_read_at: new Date().toISOString() })
+        .eq('conversation_id', conversationId)
+        .eq('user_id', user.id)
+        .then(() => {});
+    });
+    return () => handle.cancel();
   }, [conversationId, user]);
 
   // ── Initial load: cache first, then server ──
@@ -397,6 +401,7 @@ export function useChatMessages(conversationId: string | null) {
   }, [conversationId]);
 
   // ── Reset & fetch on conversation change ──
+  // Defer data loading until after slide-in animation completes to prevent jitter
   useEffect(() => {
     setMessages([]);
     setLoading(true);
@@ -406,54 +411,61 @@ export function useChatMessages(conversationId: string | null) {
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
     profileCacheRef.current = {};
-    fetchInitial();
+
+    const handle = InteractionManager.runAfterInteractions(() => {
+      fetchInitial();
+    });
+    return () => handle.cancel();
   }, [fetchInitial]);
 
-  // ── Realtime: new messages ──
+  // ── Realtime: new messages — deferred to not block slide animation ──
   useEffect(() => {
     if (!conversationId) return;
-    const channel = supabase
-      .channel(`messages:${conversationId}`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      }, (payload) => {
-        const newId = payload.new.id;
-        supabase.from('messages')
-          .select('*')
-          .eq('id', newId)
-          .single()
-          .then(({ data: msg }) => {
-            if (!msg) return;
-            // Mark as read if message is from someone else
-            if (msg.user_id !== user?.id) {
-              supabase.from('conversation_members')
-                .update({ last_read_at: new Date().toISOString() })
-                .eq('conversation_id', conversationId)
-                .eq('user_id', user?.id)
-                .then(() => {});
-            }
-            supabase.from('profiles')
-              .select('id, full_name, avatar_url')
-              .eq('id', msg.user_id)
-              .single()
-              .then(({ data: profile }) => {
-                setMessages((prev) => {
-                  const exists = prev.some((m) => m.id === newId);
-                  if (exists) return prev;
-                  const tempIdx = prev.findIndex((m) => m.id.startsWith('temp-') && m.user_id === msg.user_id && m.content === msg.content);
-                  if (tempIdx >= 0) {
-                    const updated = [...prev];
-                    updated[tempIdx] = { ...msg, profile: profile || null };
-                    return updated;
-                  }
-                  return [{ ...msg, profile: profile || null }, ...prev];
+    let channel: any = null;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      channel = supabase
+        .channel(`messages:${conversationId}`)
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        }, (payload) => {
+          const newId = payload.new.id;
+          supabase.from('messages')
+            .select('*')
+            .eq('id', newId)
+            .single()
+            .then(({ data: msg }) => {
+              if (!msg) return;
+              // Mark as read if message is from someone else
+              if (msg.user_id !== user?.id) {
+                supabase.from('conversation_members')
+                  .update({ last_read_at: new Date().toISOString() })
+                  .eq('conversation_id', conversationId)
+                  .eq('user_id', user?.id)
+                  .then(() => {});
+              }
+              supabase.from('profiles')
+                .select('id, full_name, avatar_url')
+                .eq('id', msg.user_id)
+                .single()
+                .then(({ data: profile }) => {
+                  setMessages((prev) => {
+                    const exists = prev.some((m) => m.id === newId);
+                    if (exists) return prev;
+                    const tempIdx = prev.findIndex((m) => m.id.startsWith('temp-') && m.user_id === msg.user_id && m.content === msg.content);
+                    if (tempIdx >= 0) {
+                      const updated = [...prev];
+                      updated[tempIdx] = { ...msg, profile: profile || null };
+                      return updated;
+                    }
+                    return [{ ...msg, profile: profile || null }, ...prev];
+                  });
                 });
-              });
-          });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+            });
+        })
+        .subscribe();
+    });
+    return () => { handle.cancel(); if (channel) supabase.removeChannel(channel); };
   }, [conversationId]);
 
   // ── Reactions: fetch & realtime ──
@@ -478,32 +490,35 @@ export function useChatMessages(conversationId: string | null) {
     if (ids.length > 0) fetchReactions(ids);
   }, [messages.length]);
 
-  // Realtime reactions
+  // Realtime reactions — deferred to not block slide animation
   useEffect(() => {
     if (!conversationId) return;
-    const channel = supabase
-      .channel(`reactions:${conversationId}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'message_reactions',
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const { message_id, user_id } = payload.new as any;
-          setReactions((prev) => {
-            const existing = prev[message_id] || [];
-            if (existing.includes(user_id)) return prev;
-            return { ...prev, [message_id]: [...existing, user_id] };
-          });
-        } else if (payload.eventType === 'DELETE') {
-          const { message_id, user_id } = payload.old as any;
-          setReactions((prev) => {
-            const existing = prev[message_id];
-            if (!existing) return prev;
-            return { ...prev, [message_id]: existing.filter((id) => id !== user_id) };
-          });
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    let channel: any = null;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      channel = supabase
+        .channel(`reactions:${conversationId}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'message_reactions',
+        }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const { message_id, user_id } = payload.new as any;
+            setReactions((prev) => {
+              const existing = prev[message_id] || [];
+              if (existing.includes(user_id)) return prev;
+              return { ...prev, [message_id]: [...existing, user_id] };
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const { message_id, user_id } = payload.old as any;
+            setReactions((prev) => {
+              const existing = prev[message_id];
+              if (!existing) return prev;
+              return { ...prev, [message_id]: existing.filter((id) => id !== user_id) };
+            });
+          }
+        })
+        .subscribe();
+    });
+    return () => { handle.cancel(); if (channel) supabase.removeChannel(channel); };
   }, [conversationId]);
 
   // ── Toggle like (optimistic) ──

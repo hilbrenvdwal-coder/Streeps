@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   StyleSheet, View, Text, Pressable, FlatList, TextInput,
   Dimensions, Animated, Easing, ScrollView, Alert, Platform, PanResponder,
-  Keyboard, Share, ActivityIndicator, Switch, Modal,
+  Keyboard, Share, ActivityIndicator, Switch, Modal, InteractionManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -774,6 +774,9 @@ function BotIcon({ size = 22, color = '#FFFFFF' }: { size?: number; color?: stri
   const blinkOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    let lookAnim: Animated.CompositeAnimation | null = null;
+    let blinkAnim: Animated.CompositeAnimation | null = null;
+    const handle = InteractionManager.runAfterInteractions(() => {
     const look = Animated.loop(Animated.sequence([
       Animated.delay(1200),
       Animated.timing(eyeX, { toValue: 2.5, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
@@ -814,7 +817,10 @@ function BotIcon({ size = 22, color = '#FFFFFF' }: { size?: number; color?: stri
 
     look.start();
     blink.start();
-    return () => { look.stop(); blink.stop(); };
+    lookAnim = look;
+    blinkAnim = blink;
+    });
+    return () => { handle.cancel(); lookAnim?.stop(); blinkAnim?.stop(); };
   }, []);
 
   return (
@@ -2855,7 +2861,7 @@ export default function ChatScreen() {
 
   // ── Open / close chat with animation ──
   const openChat = useCallback((conv: ConversationPreview) => {
-    markAsRead(conv.id);
+    InteractionManager.runAfterInteractions(() => markAsRead(conv.id));
     setActiveConv(conv);
     activeConvRef.current = conv;
     setShowingChat(true);
