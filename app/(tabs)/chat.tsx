@@ -1056,7 +1056,9 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
           );
         }}
         ListEmptyComponent={
-          <Text style={dt.empty}>Nog geen berichten</Text>
+          <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40 }}>
+            <Text style={dt.empty}>Nog geen berichten</Text>
+          </View>
         }
       />
     </FadeMask>

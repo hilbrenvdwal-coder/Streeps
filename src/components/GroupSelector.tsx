@@ -14,6 +14,7 @@ import {
   UIManager,
   Platform,
   Keyboard,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -85,6 +86,24 @@ export default function GroupSelector({
   const inputRef = useRef<TextInput>(null);
   const spinAnim = useRef(new Animated.Value(0)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const actionRowRef = useRef<View>(null);
+
+  // Auto-scroll to input when keyboard opens
+  useEffect(() => {
+    if (keyboardHeight > 0 && inlineMode !== 'none') {
+      setTimeout(() => {
+        actionRowRef.current?.measureInWindow((_x, y, _w, h) => {
+          const actionBottom = y + h;
+          const screenH = Dimensions.get('window').height;
+          const visibleBottom = screenH - keyboardHeight;
+          if (actionBottom > visibleBottom) {
+            scrollRef.current?.scrollToEnd({ animated: true });
+          }
+        });
+      }, 100);
+    }
+  }, [keyboardHeight, inlineMode]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -128,6 +147,7 @@ export default function GroupSelector({
   }, []);
 
   const handleClose = useCallback(() => {
+    Keyboard.dismiss();
     Animated.parallel([
       Animated.timing(scrimOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(listAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
@@ -188,6 +208,14 @@ export default function GroupSelector({
   const isJoin = inlineMode === 'join';
   const isActive = inlineMode !== 'none';
 
+  const screenH = Dimensions.get('window').height;
+  const overlayTop = insets.top + 13;
+  const reservedSpace = 240;
+  const availableForList = keyboardHeight > 0
+    ? screenH - overlayTop - keyboardHeight - reservedSpace
+    : 300;
+  const scrollMaxHeight = Math.max(80, Math.min(availableForList, 300));
+
   return (
     <>
       {showOpen && (
@@ -220,7 +248,7 @@ export default function GroupSelector({
             {/* Groups list */}
             <Animated.View style={[st.groupsList, listStyle]} pointerEvents="auto">
               <MaskedView
-                style={{ maxHeight: 300 }}
+                style={{ maxHeight: scrollMaxHeight }}
                 maskElement={
                   <View style={{ flex: 1 }}>
                     <LinearGradient colors={['transparent', '#000']} style={{ height: 20 }} />
@@ -229,7 +257,7 @@ export default function GroupSelector({
                   </View>
                 }
               >
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8, paddingBottom: keyboardHeight > 0 ? keyboardHeight : 8 }}>
+                <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingVertical: 8 }}>
                   {otherGroups.map((group) => (
                     <Pressable key={group.id} style={st.groupRow} onPress={() => handleSelect(group.id)}>
                       {group.avatar_url ? (
@@ -252,7 +280,7 @@ export default function GroupSelector({
               </MaskedView>
 
               {/* ── Action row ── */}
-              <View style={st.actionRow}>
+              <View ref={actionRowRef} style={st.actionRow}>
                 {/* Input field — always mounted, flex 0 or 1 */}
                 {isActive && (
                   <View style={st.inlineInputWrap}>

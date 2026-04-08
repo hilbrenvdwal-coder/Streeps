@@ -13,6 +13,8 @@ import {
   Share,
   Platform,
   Switch,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -345,7 +347,7 @@ export default function GroupSetupWizard({
       <Text style={ws.stepTitle}>Drankjes</Text>
       <Text style={ws.stepSubtitle}>Beheer de drankjes in je groep</Text>
 
-      <ScrollView style={ws.drinksList} showsVerticalScrollIndicator={false}>
+      <ScrollView style={ws.drinksList} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {drinks.map((drink, i) => (
           <React.Fragment key={drink.id}>
             {i > 0 && <View style={ws.divider} />}
@@ -485,7 +487,11 @@ export default function GroupSetupWizard({
         {renderProgress()}
 
         <Animated.View style={[ws.stepContainer, { opacity: stepOpacity }]}>
-          {renderCurrentStep()}
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={{ flex: 1 }}>
+              {renderCurrentStep()}
+            </View>
+          </TouchableWithoutFeedback>
         </Animated.View>
 
         {renderBottomBar()}
