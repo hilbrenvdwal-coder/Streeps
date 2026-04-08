@@ -691,7 +691,7 @@ export default function SettingsOverlay({
         </View>
 
         <FadeMask>
-        <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={scrollEnabled} contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={scrollEnabled} contentContainerStyle={{ paddingTop: 32, paddingBottom: 120 }}>
           {/* Group avatar */}
           <Pressable style={s.avatarSection} onPress={handleOpenCamera} disabled={uploadingAvatar}>
             {groupAvatarUrl ? (
