@@ -9,6 +9,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
 import { ThemeProvider as StreepsThemeProvider } from '@/src/contexts/ThemeContext';
 import { getTheme } from '@/src/theme';
+import { useHeartbeat } from '@/src/hooks/useHeartbeat';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -52,6 +53,8 @@ function RootLayoutNav() {
   const t = getTheme(mode);
   const { session, loading } = useAuth();
   const segments = useSegments();
+
+  useHeartbeat(session?.user?.id);
   const router = useRouter();
 
   const navTheme = mode === 'dark'

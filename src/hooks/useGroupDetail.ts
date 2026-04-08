@@ -38,8 +38,18 @@ export function useGroupDetail(groupId: string) {
 
     if (groupRes.data) setGroup(groupRes.data);
     if (membersRes.data) {
-      setMembers(membersRes.data as any);
-      const me = membersRes.data.find((m: any) => m.user_id === user.id);
+      const enrichedMembers = membersRes.data.map((m: any) => {
+        if (m.is_active && m.last_seen) {
+          const lastSeen = new Date(m.last_seen).getTime();
+          const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
+          if (lastSeen < thirtyMinAgo) {
+            return { ...m, is_active: false };
+          }
+        }
+        return m;
+      });
+      setMembers(enrichedMembers as any);
+      const me = enrichedMembers.find((m: any) => m.user_id === user.id);
       setIsAdmin(me?.is_admin ?? false);
     }
     if (drinksRes.data) setDrinks(drinksRes.data as any);
@@ -180,7 +190,7 @@ export function useGroupDetail(groupId: string) {
 
     await supabase
       .from('group_members')
-      .update({ is_active: becomingActive })
+      .update({ is_active: becomingActive, last_seen: new Date().toISOString() })
       .eq('group_id', groupId)
       .eq('user_id', user.id);
   };
@@ -309,7 +319,7 @@ export function useGroupDetail(groupId: string) {
     // Activate in this group
     await supabase
       .from('group_members')
-      .update({ is_active: true })
+      .update({ is_active: true, last_seen: new Date().toISOString() })
       .eq('group_id', groupId)
       .eq('user_id', user.id);
   };

@@ -34,6 +34,7 @@ export interface GroupMember {
   user_id: string;
   is_admin: boolean;
   is_active: boolean; // currently present/active
+  last_seen?: string; // heartbeat timestamp for auto-inactivity
   joined_at: string;
   profile?: Profile;
 }
