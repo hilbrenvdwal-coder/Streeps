@@ -2875,7 +2875,7 @@ export default function ChatScreen() {
     swipeX.setValue(0);
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+        toValue: 1, duration: 350, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
       }),
       Animated.timing(navBarAnim, {
         toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
@@ -2914,10 +2914,10 @@ export default function ChatScreen() {
     setClosingConv(activeConv);
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true,
+        toValue: 0, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
       }),
       Animated.timing(navBarAnim, {
-        toValue: 0, duration: 250, easing: Easing.in(Easing.ease), useNativeDriver: true,
+        toValue: 0, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true,
       }),
     ]).start(() => {
       swipeX.setValue(0);
@@ -2998,7 +2998,22 @@ export default function ChatScreen() {
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
       {/* ── Conversation list (always mounted) ── */}
-      <View style={{ flex: 1, paddingTop: insets.top }}>
+      <Animated.View style={{
+        flex: 1,
+        paddingTop: insets.top,
+        transform: [{
+          translateX: Animated.add(
+            slideAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, -SCREEN_W * 0.3],
+            }),
+            swipeX.interpolate({
+              inputRange: [0, SCREEN_W],
+              outputRange: [0, SCREEN_W * 0.3],
+            })
+          ),
+        }],
+      }}>
         {/* Aurora */}
         <View style={cs.auroraWrap} pointerEvents="none">
           <AuroraPresetView preset="header" colors={CHAT_AURORA_COLORS} animated gentle />
@@ -3126,7 +3141,7 @@ export default function ChatScreen() {
             )}
           />
         </FadeMask>
-      </View>
+      </Animated.View>
 
       {/* ── Chat detail overlay (slides in from right) ── */}
       {showingChat && currentConv && (
