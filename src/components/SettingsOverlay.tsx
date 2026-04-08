@@ -560,7 +560,6 @@ export default function SettingsOverlay({
           useNativeDriver: true,
         }).start();
       }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return next;
     });
   };
