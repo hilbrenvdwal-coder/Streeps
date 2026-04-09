@@ -762,12 +762,18 @@ export default function HomeScreen() {
         onClose={() => setShowGroupSelector(false)}
         currentGroup={group}
         activeCount={members.filter((m) => m.is_active).length}
-        onCreated={(g) => setWizardGroup(g)}
+        onCreated={(g) => {
+          setWizardGroup(g);
+          Animated.timing(navBarAnim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
+        }}
       />
 
       <GroupSetupWizard
         visible={!!wizardGroup}
-        onClose={() => setWizardGroup(null)}
+        onClose={() => {
+          setWizardGroup(null);
+          Animated.timing(navBarAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }).start();
+        }}
         groupId={wizardGroup?.id ?? ''}
         groupName={wizardGroup?.name ?? ''}
         inviteCode={wizardGroup?.invite_code ?? ''}
