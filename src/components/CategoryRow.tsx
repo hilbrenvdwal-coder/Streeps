@@ -29,10 +29,10 @@ const CATEGORY_PRESETS: Record<number, AuroraPreset> = {
 
 // Per-category aurora colors: [outermost → innermost ellipse]
 const CATEGORY_AURORA: Record<number, string[]> = {
-  1: ['#00BEAE', '#4A6CF7', '#00FE96', '#8B5CF6'],
-  2: ['#FF004D', '#FF00F5', '#FF6B00', '#8B5CF6'],
-  3: ['#4A6CF7', '#00BEAE', '#8B5CF6', '#00FE96'],
-  4: ['#8B5CF6', '#FF004D', '#4A6CF7', '#FF00F5'],
+  1: ['#00BEAE', '#00D9A3', '#4A6CF7', '#00FE96'],  // cyan dominant
+  2: ['#FF0085', '#FF00F5', '#FF3377', '#FF6B6B'],  // streepsRed dominant
+  3: ['#00FE96', '#00BEAE', '#34D399', '#6BFFF0'],  // green dominant
+  4: ['#FF004D', '#FF0085', '#8B5CF6', '#FF00F5'],  // magenta dominant
 };
 
 export default function CategoryRow({

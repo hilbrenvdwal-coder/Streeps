@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Animated, Easing, StyleSheet, View, Text, Pressable, Modal, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { AuroraPresetView } from './AuroraBackground';
 const FLASH_AURORA_COLORS = ['#00FE96', '#F1F1F1', '#00BEAE', '#FFFFFF'];
 
@@ -18,15 +21,26 @@ export default function StreepjesVerificatieModal({
   visible,
   count,
   categoryName,
+  categoryColor,
   credit = 0,
   onConfirm,
   onCancel,
 }: Props) {
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(300)).current;
+
+  // Press scale for confirm button
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () => {
+    Animated.spring(pressScale, { toValue: 0.97, useNativeDriver: true, damping: 15, stiffness: 200 }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(pressScale, { toValue: 1, useNativeDriver: true, damping: 15, stiffness: 200 }).start();
+  };
 
   // Aurora flash
   const flashScale = useRef(new Animated.Value(0)).current;
@@ -40,9 +54,10 @@ export default function StreepjesVerificatieModal({
       slideY.setValue(300);
       flashScale.setValue(0);
       flashOpacity.setValue(0);
+      pressScale.setValue(1);
       Animated.parallel([
         Animated.timing(overlayOpacity, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(slideY, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.spring(slideY, { toValue: 0, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }),
       ]).start();
     } else if (show && !confirming) {
       Animated.parallel([
@@ -53,6 +68,7 @@ export default function StreepjesVerificatieModal({
   }, [visible]);
 
   const handleConfirm = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setConfirming(true);
 
     flashScale.setValue(0);
@@ -92,7 +108,16 @@ export default function StreepjesVerificatieModal({
   return (
     <Modal visible transparent animationType="none">
       <Pressable style={{ flex: 1 }} onPress={confirming ? undefined : onCancel}>
-        <Animated.View style={[s.overlayBg, { opacity: overlayOpacity }]} />
+        {/* Scrim: BlurView + dark overlay */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: overlayOpacity }]} pointerEvents="none">
+          <BlurView
+            intensity={30}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={s.scrimOverlay} />
+        </Animated.View>
 
         {/* Aurora flash — real aurora preset, scaled to fill screen */}
         <Animated.View style={[s.flashWrap, { top: SCREEN_H / 2 - 16, left: SCREEN_W / 2 - 180 }, flashTransform]} pointerEvents="none">
@@ -105,10 +130,19 @@ export default function StreepjesVerificatieModal({
 
         <View style={{ flex: 1 }} />
         <Animated.View style={{ transform: [{ translateY: slideY }] }}>
-          <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[s.sheet, { paddingBottom: insets.bottom + 16 }]} onPress={(e) => e.stopPropagation()}>
+            {/* Handle */}
             <View style={s.handle} />
+
+            {/* Title */}
             <Text style={s.title}>Weet je zeker dat je</Text>
-            <View style={s.counterBox}>
+
+            {/* Counter box with category glow */}
+            <View style={[s.counterBox, Platform.select({
+              ios: { shadowColor: categoryColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 12 },
+              android: { elevation: 4 },
+              default: {},
+            })]}>
               <Text style={s.counterValue}>{count}</Text>
               {credit > 0 && (
                 <View style={s.creditBadge}>
@@ -116,11 +150,33 @@ export default function StreepjesVerificatieModal({
                 </View>
               )}
             </View>
-            <Text style={s.subtitle}>
-              {categoryName} streepjes wilt toevoegen?
-            </Text>
-            <Pressable style={s.confirmBtn} onPress={handleConfirm} disabled={confirming}>
-              <Ionicons name="checkmark-sharp" size={80} color="#FFFFFF" style={s.checkIcon} />
+
+            {/* Subtitle with category badge */}
+            <View style={s.subtitleWrap}>
+              <View style={[s.catBadge, { backgroundColor: categoryColor + '20' }]}>
+                <Text style={[s.catBadgeText, { color: categoryColor }]}>{categoryName}</Text>
+              </View>
+              <Text style={s.subtitleText}> streepjes</Text>
+            </View>
+            <Text style={[s.subtitleText, { marginBottom: 32 }]}>wilt toevoegen?</Text>
+
+            {/* Confirm button with press scale */}
+            <Animated.View style={{ alignSelf: 'stretch', transform: [{ scale: pressScale }] }}>
+              <Pressable
+                style={s.confirmBtn}
+                onPress={handleConfirm}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                disabled={confirming}
+              >
+                <Ionicons name="checkmark-circle" size={22} color="#0F0F1E" style={{ marginRight: 8 }} />
+                <Text style={s.confirmText}>Bevestigen</Text>
+              </Pressable>
+            </Animated.View>
+
+            {/* Cancel button */}
+            <Pressable style={s.cancelBtn} onPress={confirming ? undefined : onCancel}>
+              <Text style={s.cancelText}>Annuleren</Text>
             </Pressable>
           </Pressable>
         </Animated.View>
@@ -130,47 +186,45 @@ export default function StreepjesVerificatieModal({
 }
 
 const s = StyleSheet.create({
-  overlayBg: {
+  scrimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {
-    backgroundColor: 'rgba(21, 21, 21, 0.92)',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    backgroundColor: 'rgba(30,30,50,0.85)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   handle: {
-    width: 142,
+    width: 36,
     height: 4,
     borderRadius: 3,
-    backgroundColor: 'rgba(217, 217, 217, 0.46)',
-    marginTop: 8,
-    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginTop: 12,
+    marginBottom: 28,
   },
   title: {
     fontFamily: 'Unbounded',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '400',
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 20,
   },
   counterBox: {
-    width: 75,
-    height: 75,
-    borderRadius: 16,
-    backgroundColor: 'rgba(61, 61, 61, 0.3)',
+    width: 70,
+    height: 70,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: '#FF0085', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 12 },
-      android: { elevation: 4 },
-      default: {},
-    }),
   },
   counterValue: {
     fontFamily: 'Unbounded',
@@ -193,40 +247,63 @@ const s = StyleSheet.create({
     color: '#00BEAE',
     fontWeight: '600',
   },
-  subtitle: {
+  subtitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  catBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  catBadgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  subtitleText: {
     fontFamily: 'Unbounded',
     fontSize: 16,
     fontWeight: '400',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 22,
   },
   confirmBtn: {
+    flexDirection: 'row',
     alignSelf: 'stretch',
-    marginHorizontal: 20,
-    height: 180,
-    borderRadius: 25,
+    height: 56,
+    borderRadius: 9999,
     backgroundColor: '#00FE96',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
-      ios: { shadowColor: '#00FE96', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15.5 },
+      ios: { shadowColor: '#00FE96', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 16 },
       android: { elevation: 8 },
       default: {},
     }),
   },
-  checkIcon: {
-    // Make the checkmark visually bolder with text shadow
-    ...Platform.select({
-      ios: { shadowColor: 'rgba(255,255,255,0.5)', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 4 },
-      default: {},
-    }),
+  confirmText: {
+    fontFamily: 'Unbounded',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F0F1E',
+  },
+  cancelBtn: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  cancelText: {
+    fontFamily: 'Unbounded',
+    fontSize: 16,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.5)',
   },
 
-  // Aurora flash — scale transforms from view center (245, 185).
-  // Blobs sit at ~(180, 16), which is 169px above view center.
-  // So place view center 169px below screen center to compensate.
+  // Aurora flash
   flashWrap: {
     position: 'absolute',
     width: 490,

@@ -494,6 +494,12 @@ export default function SettingsOverlay({
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [tallyAdj, setTallyAdj] = useState<Record<string, Record<number, number>>>({});
   const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(new Set());
+  const [pendingDeletes, setPendingDeletes] = useState<
+    { tallyId: string; userId: string; category: number }[]
+  >([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const pendingDeletesRef = useRef(pendingDeletes);
+  useEffect(() => { pendingDeletesRef.current = pendingDeletes; }, [pendingDeletes]);
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -513,8 +519,16 @@ export default function SettingsOverlay({
     enabledCats: Set<number>;
   } | null>(null);
 
-  // Reset optimistic adjustments when real data arrives
-  useEffect(() => { setTallyAdj({}); setPendingRemoveIds(new Set()); }, [recentTallies]);
+  // Reset optimistic adjustments when real data arrives (preserve pending deletes)
+  useEffect(() => {
+    const adj: Record<string, Record<number, number>> = {};
+    pendingDeletesRef.current.forEach(({ userId, category }) => {
+      if (!adj[userId]) adj[userId] = {};
+      adj[userId][category] = (adj[userId][category] || 0) - 1;
+    });
+    setTallyAdj(adj);
+    setPendingRemoveIds(new Set());
+  }, [recentTallies]);
 
   // Reset newDrinkCat when selected category is no longer enabled
   useEffect(() => {
@@ -532,6 +546,8 @@ export default function SettingsOverlay({
   // Init form when opened
   useEffect(() => {
     if (visible && group) {
+      setPendingDeletes([]);
+      setShowDeleteConfirm(false);
       setGroupName(group.name);
       setGroupAvatarUrl(group.avatar_url ?? null);
       setPrice1(centsToEuroStr(group.price_category_1));
@@ -585,6 +601,7 @@ export default function SettingsOverlay({
   }, [visible]);
 
   const isDirty = (): boolean => {
+    if (pendingDeletes.length > 0) return true;
     const iv = initialValues.current;
     if (!iv) return false;
     const setsEqual = (a: Set<number>, b: Set<number>) =>
@@ -646,10 +663,7 @@ export default function SettingsOverlay({
     }
   };
 
-  const handleSave = async () => {
-    if (isSaving) return;
-
-    // Validate prices
+  const validatePrices = (): { p1: number | null; p2: number | null; p3: number | null; p4: number | null } | null => {
     const p1 = euroStrToCents(price1);
     const p2 = euroStrToCents(price2);
     const p3 = price3.trim() ? euroStrToCents(price3) : null;
@@ -663,17 +677,26 @@ export default function SettingsOverlay({
 
     if (Object.values(errors).some(Boolean)) {
       setPriceErrors(errors);
-      return;
+      return null;
     }
+    return { p1, p2, p3, p4 };
+  };
 
+  const executeSave = async (prices: { p1: number | null; p2: number | null; p3: number | null; p4: number | null }) => {
     setIsSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    if (pendingDeletes.length > 0 && removeTally) {
+      await Promise.all(pendingDeletes.map(d => removeTally(d.tallyId)));
+      setPendingDeletes([]);
+    }
+
     await updateGroupPrices({
       ...(groupName.trim() ? { name: groupName.trim() } : {}),
-      price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
-      price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
-      price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
-      price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
+      price_category_1: enabledCats.has(1) ? (prices.p1 ?? 150) : null,
+      price_category_2: enabledCats.has(2) ? (prices.p2 ?? 300) : null,
+      price_category_3: enabledCats.has(3) ? (prices.p3 ?? 150) : null,
+      price_category_4: enabledCats.has(4) ? (prices.p4 ?? 150) : null,
       name_category_1: catName1.trim() || 'Categorie 1',
       name_category_2: catName2.trim() || 'Categorie 2',
       name_category_3: catName3.trim() || 'Categorie 3',
@@ -685,6 +708,26 @@ export default function SettingsOverlay({
       setSavedOk(false);
       performClose();
     }, 600);
+  };
+
+  const handleConfirmDeletes = async () => {
+    setShowDeleteConfirm(false);
+    const prices = validatePrices();
+    if (!prices) return;
+    await executeSave(prices);
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    const prices = validatePrices();
+    if (!prices) return;
+
+    if (pendingDeletes.length > 0) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+
+    await executeSave(prices);
   };
 
   const toggleCategory = (cat: number) => {
@@ -976,7 +1019,7 @@ export default function SettingsOverlay({
               </Pressable>
             </View>
             {/* Category badge selector: hold to expand, drag to pick */}
-            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8, alignItems: 'center' }]}>
+            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8, alignItems: 'center', flexDirection: 'column', gap: 6 }]}>
               <CategoryBadgeSelector
                 value={parseInt(newDrinkCat) || 1}
                 onChange={(v) => setNewDrinkCat(String(v))}
@@ -985,7 +1028,7 @@ export default function SettingsOverlay({
                 getCategoryName={getCategoryName}
                 onScrollEnable={setScrollEnabled}
               />
-              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Unbounded', marginLeft: 10 }}>Houd ingedrukt</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Unbounded' }}>Houd ingedrukt</Text>
             </View>
           </View>
 
@@ -1048,26 +1091,24 @@ export default function SettingsOverlay({
                             {removeTally && count > 0 && (
                               <Pressable
                                 onPress={() => {
+                                  const alreadyPendingIds = new Set(pendingDeletes.map(d => d.tallyId));
                                   const memberRecentTallies = (recentTallies || []).filter(
                                     (t: any) =>
                                       t.user_id === member.user_id &&
                                       t.category === cat &&
                                       !t.removed &&
-                                      !pendingRemoveIds.has(t.id)
+                                      !alreadyPendingIds.has(t.id)
                                   );
                                   if (memberRecentTallies.length > 0) {
-                                    const tallyToRemove = memberRecentTallies[0];
-                                    Alert.alert('Streepje verwijderen', `1x ${catName} van ${name}?`, [
-                                      { text: 'Annuleren', style: 'cancel' },
-                                      { text: 'Verwijderen', style: 'destructive', onPress: () => {
-                                        setPendingRemoveIds((prev) => new Set([...prev, tallyToRemove.id]));
-                                        setTallyAdj((prev) => ({
-                                          ...prev,
-                                          [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
-                                        }));
-                                        removeTally(tallyToRemove.id);
-                                      } },
+                                    setTallyAdj((prev) => ({
+                                      ...prev,
+                                      [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
+                                    }));
+                                    setPendingDeletes((prev) => [
+                                      ...prev,
+                                      { tallyId: memberRecentTallies[0].id, userId: member.user_id, category: cat },
                                     ]);
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                   }
                                 }}
                                 style={({ pressed }) => [s.tallyBtn, pressed && { opacity: 0.7 }]}
@@ -1138,6 +1179,51 @@ export default function SettingsOverlay({
         </ScrollView>
         </FadeMask>
       </Animated.View>
+
+      {/* Delete confirmation modal */}
+      <Modal visible={showDeleteConfirm} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setShowDeleteConfirm(false)}>
+        <View style={s.confirmOverlay}>
+          <View style={s.confirmCard}>
+            <Text style={s.confirmTitle}>Streepjes verwijderen</Text>
+            <Text style={s.confirmSubtitle}>De volgende streepjes worden verwijderd:</Text>
+            {(() => {
+              const grouped: Record<string, Record<number, number>> = {};
+              pendingDeletes.forEach(({ userId, category }) => {
+                if (!grouped[userId]) grouped[userId] = {};
+                grouped[userId][category] = (grouped[userId][category] || 0) + 1;
+              });
+              return Object.entries(grouped).map(([userId, cats]) => {
+                const member = members.find(m => m.user_id === userId);
+                const memberName = userId === currentUserId ? 'Jij' : (member?.profile?.full_name || 'Onbekend');
+                return (
+                  <View key={userId} style={s.confirmMemberRow}>
+                    <Text style={s.confirmMemberName}>{memberName}</Text>
+                    {Object.entries(cats).map(([catStr, count]) => {
+                      const cat = Number(catStr);
+                      const catColor = categoryColors[(cat - 1) % 4];
+                      const catName = getCategoryName?.(cat) ?? `Cat ${cat}`;
+                      return (
+                        <View key={cat} style={s.confirmCatRow}>
+                          <View style={[s.tallyDot, { backgroundColor: catColor }]} />
+                          <Text style={s.confirmCatText}>-{count} {catName}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              });
+            })()}
+            <View style={s.confirmButtons}>
+              <Pressable onPress={() => setShowDeleteConfirm(false)} style={({ pressed }) => [s.confirmBtnCancel, pressed && { opacity: 0.7 }]}>
+                <Text style={s.confirmBtnCancelText}>Annuleren</Text>
+              </Pressable>
+              <Pressable onPress={handleConfirmDeletes} style={({ pressed }) => [s.confirmBtnConfirm, pressed && { opacity: 0.7 }]}>
+                <Text style={s.confirmBtnConfirmText}>Bevestigen</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <CameraModal
         visible={cameraVisible}
@@ -1261,4 +1347,19 @@ const s = StyleSheet.create({
   // Danger
   dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
   dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
+
+  // Delete confirmation modal
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  confirmCard: { backgroundColor: '#1A1A1A', borderRadius: 16, padding: 20, width: '85%', maxWidth: 360 },
+  confirmTitle: { fontFamily: 'Unbounded', fontSize: 18, color: '#FFFFFF', marginBottom: 8 },
+  confirmSubtitle: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginBottom: 16 },
+  confirmMemberRow: { marginBottom: 12 },
+  confirmMemberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', marginBottom: 4 },
+  confirmCatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2, paddingLeft: 8 },
+  confirmCatText: { fontFamily: 'Unbounded', fontSize: 12, color: '#FFFFFF', marginLeft: 8 },
+  confirmButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  confirmBtnCancel: { flex: 1, height: 44, borderRadius: 22, backgroundColor: '#3A3A3A', alignItems: 'center', justifyContent: 'center' },
+  confirmBtnConfirm: { flex: 1, height: 44, borderRadius: 22, backgroundColor: '#EB5466', alignItems: 'center', justifyContent: 'center' },
+  confirmBtnCancelText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
+  confirmBtnConfirmText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', fontWeight: '600' },
 });
