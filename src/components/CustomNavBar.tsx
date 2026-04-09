@@ -1,5 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Pressable, Animated, Dimensions, Platform } from 'react-native';
+import { StyleSheet, View, Pressable, Dimensions, Platform } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withDelay,
+} from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +41,7 @@ const PILL_LEFTS = PILL_POSITIONS.map((x) => scale(x));
 const PILL_RIGHTS = PILL_POSITIONS.map((x) => scale(x + PILL_W));
 
 const SPRING_CONF = { damping: 20, stiffness: 300, mass: 1 };
+const SQUEEZE_CONF = { damping: 100, stiffness: 2000, mass: 1 };
 
 export default function CustomNavBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -46,45 +54,38 @@ export default function CustomNavBar({ state, navigation }: any) {
   const PILL_H_THIN = 38;
 
   const prevTab = useRef(activeTab);
-  const pillLeft = useRef(new Animated.Value(PILL_LEFTS[activeTab])).current;
-  const pillRight = useRef(new Animated.Value(PILL_RIGHTS[activeTab])).current;
-  const pillHeight = useRef(new Animated.Value(PILL_H)).current;
+  const pillLeft = useSharedValue(PILL_LEFTS[activeTab]);
+  const pillRight = useSharedValue(PILL_RIGHTS[activeTab]);
+  const pillHeight = useSharedValue(PILL_H);
 
   useEffect(() => {
     const goingRight = activeTab > prevTab.current;
     const changed = activeTab !== prevTab.current;
-    const spring = (v: Animated.Value, to: number) =>
-      Animated.spring(v, { toValue: to, ...SPRING_CONF, useNativeDriver: false });
 
     if (changed) {
-      // Instantly squeeze, then spring back alongside the move
-      pillHeight.setValue(PILL_H_THIN);
-      Animated.spring(pillHeight, { toValue: PILL_H, ...SPRING_CONF, useNativeDriver: false }).start();
+      pillHeight.value = withSequence(
+        withSpring(PILL_H_THIN, SQUEEZE_CONF),
+        withSpring(PILL_H, SPRING_CONF),
+      );
     }
 
     if (goingRight) {
-      spring(pillRight, PILL_RIGHTS[activeTab]).start();
-      Animated.sequence([
-        Animated.delay(100),
-        spring(pillLeft, PILL_LEFTS[activeTab]),
-      ]).start();
+      pillRight.value = withSpring(PILL_RIGHTS[activeTab], SPRING_CONF);
+      pillLeft.value = withDelay(100, withSpring(PILL_LEFTS[activeTab], SPRING_CONF));
     } else {
-      spring(pillLeft, PILL_LEFTS[activeTab]).start();
-      Animated.sequence([
-        Animated.delay(100),
-        spring(pillRight, PILL_RIGHTS[activeTab]),
-      ]).start();
+      pillLeft.value = withSpring(PILL_LEFTS[activeTab], SPRING_CONF);
+      pillRight.value = withDelay(100, withSpring(PILL_RIGHTS[activeTab], SPRING_CONF));
     }
 
     prevTab.current = activeTab;
   }, [activeTab]);
 
-  const pillWidth = Animated.subtract(pillRight, pillLeft);
-  // Center vertically: offset top so pill stays centered
-  const pillTop = pillHeight.interpolate({
-    inputRange: [PILL_H_THIN, PILL_H],
-    outputRange: [14 + (PILL_H - PILL_H_THIN) / 2, 14],
-  });
+  const pillAnimStyle = useAnimatedStyle(() => ({
+    left: pillLeft.value,
+    width: pillRight.value - pillLeft.value,
+    height: pillHeight.value,
+    top: 14 + (PILL_H - pillHeight.value) / 2,
+  }));
 
   const icons: Array<{ name: keyof typeof Ionicons.glyphMap; nameFocused: keyof typeof Ionicons.glyphMap }> = [
     { name: 'people-outline', nameFocused: 'people' },
@@ -118,7 +119,7 @@ export default function CustomNavBar({ state, navigation }: any) {
 
       <View style={styles.bar}>
         {/* Animated pill */}
-        <Animated.View style={[styles.pill, { left: pillLeft, width: pillWidth, height: pillHeight, top: pillTop }]} />
+        <Animated.View style={[styles.pill, pillAnimStyle]} />
 
         {/* Icons at exact Figma positions */}
         {TAB_ORDER.map((routeName, index) => {

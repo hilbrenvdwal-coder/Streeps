@@ -3,7 +3,7 @@ import { InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { getPreloadedMessages } from './useMessagePreloadCache';
+import { getPreloadedMessages, getPendingPreload, updateCacheWithNewMessage } from './useMessagePreloadCache';
 
 const PAGE_SIZE = 30;
 const MAX_MESSAGES_IN_MEMORY = 200;
@@ -290,7 +290,9 @@ export function useChatMessages(conversationId: string | null) {
     convIdRef.current = conversationId;
     profileCacheRef.current = {};
 
-    // Step 0: Check in-memory preload cache (instant, no async)
+    // Step 0: Await in-flight preload (if any), then check cache
+    const pending = getPendingPreload(conversationId);
+    if (pending) await pending;
     const preloaded = getPreloadedMessages(conversationId);
     if (preloaded) {
       setMessages(preloaded.messages);
@@ -302,14 +304,17 @@ export function useChatMessages(conversationId: string | null) {
     }
 
     // Step 1: Show cached messages instantly (AsyncStorage fallback)
-    const cached = await loadCache(conversationId);
-    if (cached && cached.messages.length > 0) {
-      setMessages(cached.messages);
-      oldestCursorRef.current = cached.oldestCursor;
-      hasMoreRef.current = cached.hasMore;
-      setHasMore(cached.hasMore);
-      setLoading(false);
-      cached.messages.forEach((m: any) => { if (m.profile) profileCacheRef.current[m.user_id] = m.profile; });
+    // Skip if preload cache already provided fresh data — avoids overwriting with stale AsyncStorage data
+    if (!preloaded) {
+      const cached = await loadCache(conversationId);
+      if (cached && cached.messages.length > 0) {
+        setMessages(cached.messages);
+        oldestCursorRef.current = cached.oldestCursor;
+        hasMoreRef.current = cached.hasMore;
+        setHasMore(cached.hasMore);
+        setLoading(false);
+        cached.messages.forEach((m: any) => { if (m.profile) profileCacheRef.current[m.user_id] = m.profile; });
+      }
     }
 
     // Step 2: Fetch fresh first page from server
@@ -403,9 +408,11 @@ export function useChatMessages(conversationId: string | null) {
   // ── Reset & fetch on conversation change ──
   // Defer data loading until after slide-in animation completes to prevent jitter
   useEffect(() => {
-    setLoading(true);
+    const preloaded = conversationId ? getPreloadedMessages(conversationId) : null;
+    if (!preloaded) setLoading(true);
     setLoadingMore(false);
     setHasMore(true);
+    setReactions({});
     oldestCursorRef.current = null;
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
@@ -459,6 +466,7 @@ export function useChatMessages(conversationId: string | null) {
                     }
                     return [{ ...msg, profile: profile || null }, ...prev];
                   });
+                  updateCacheWithNewMessage(conversationId, { ...msg, profile: profile || null });
                 });
             });
         })
@@ -521,9 +529,12 @@ export function useChatMessages(conversationId: string | null) {
   }, [conversationId]);
 
   // ── Toggle like (optimistic) ──
+  // Use ref to avoid re-creating callback on every reaction change (prevents ChatBubble re-renders)
+  const reactionsRef = useRef(reactions);
+  reactionsRef.current = reactions;
   const toggleLike = useCallback(async (messageId: string) => {
     if (!user || !messageId || messageId.startsWith('temp-')) return;
-    const current = reactions[messageId] || [];
+    const current = reactionsRef.current[messageId] || [];
     const alreadyLiked = current.includes(user.id);
 
     // Optimistic update
@@ -544,7 +555,7 @@ export function useChatMessages(conversationId: string | null) {
       await supabase.from('message_reactions')
         .insert({ message_id: messageId, user_id: user.id });
     }
-  }, [user, reactions]);
+  }, [user]);
 
   // ── Send message (optimistic) ──
   const sendMessage = useCallback(async (content: string) => {

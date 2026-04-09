@@ -9,10 +9,10 @@ type CachedConversation = {
 };
 
 const preloadCache = new Map<string, CachedConversation>();
-const pendingLoads = new Set<string>();
+const pendingLoads = new Map<string, Promise<void>>();
 const unloadTimers = new Map<string, NodeJS.Timeout>();
 
-const PRELOAD_PAGE_SIZE = 20;
+const PRELOAD_PAGE_SIZE = 30;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const UNLOAD_DELAY_MS = 30_000;
 
@@ -27,12 +27,11 @@ export function getPreloadedMessages(convId: string): CachedConversation | null 
 }
 
 export async function preloadConversation(convId: string): Promise<void> {
-  if (pendingLoads.has(convId)) return;
+  if (pendingLoads.has(convId)) return pendingLoads.get(convId)!;
   const existing = preloadCache.get(convId);
   if (existing && Date.now() - existing.loadedAt < CACHE_TTL_MS) return;
 
-  pendingLoads.add(convId);
-  try {
+  const promise = (async () => {
     const { data: messages } = await supabase
       .from('messages')
       .select('*, profiles:user_id(id, full_name, avatar_url)')
@@ -42,21 +41,32 @@ export async function preloadConversation(convId: string): Promise<void> {
 
     if (messages) {
       const profileCache: Record<string, any> = {};
-      messages.forEach((m: any) => {
-        if (m.profiles) profileCache[m.user_id] = m.profiles;
+      const normalized = messages.map((m: any) => {
+        const { profiles, ...rest } = m;
+        if (profiles) profileCache[m.user_id] = profiles;
+        return { ...rest, profile: profiles || null };
       });
 
+      const oldestCursor = normalized.length > 0
+        ? normalized[normalized.length - 1].created_at
+        : null;
+
       preloadCache.set(convId, {
-        messages: messages.reverse(),
-        oldestCursor: messages.length > 0 ? messages[0].created_at : null,
+        messages: normalized,
+        oldestCursor,
         hasMore: messages.length >= PRELOAD_PAGE_SIZE,
         loadedAt: Date.now(),
         profileCache,
       });
     }
-  } finally {
-    pendingLoads.delete(convId);
-  }
+  })().finally(() => pendingLoads.delete(convId));
+
+  pendingLoads.set(convId, promise);
+  return promise;
+}
+
+export function getPendingPreload(convId: string): Promise<void> | null {
+  return pendingLoads.get(convId) ?? null;
 }
 
 export function scheduleUnload(convId: string): void {
@@ -79,7 +89,8 @@ export function cancelUnload(convId: string): void {
 export function updateCacheWithNewMessage(convId: string, message: any): void {
   const cached = preloadCache.get(convId);
   if (cached) {
-    cached.messages.push(message);
+    // Prepend: messages are stored newest-first (descending order)
+    cached.messages.unshift(message);
     cached.loadedAt = Date.now();
   }
 }

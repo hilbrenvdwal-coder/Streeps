@@ -25,6 +25,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Dimensions,
   Easing,
   Modal,
   PanResponder,
@@ -44,17 +45,92 @@ import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg'
 import { useRouter } from 'expo-router';
 import { useNavBarAnim } from './_layout';
 
-// ── SlideModal: frosted scrim + content slides ──
+// ── SlideModal: frosted scrim + content slides + swipe-to-dismiss ──
 function SlideModal({ visible, onClose, children }: { visible: boolean; onClose: () => void; children: React.ReactNode }) {
   const [show, setShow] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(300)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const isDragging = useRef(false);
+  const SCREEN_HEIGHT = Dimensions.get('window').height;
+  const DISMISS_THRESHOLD = 150;
+  const VELOCITY_THRESHOLD = 0.5;
+
+  // Combined translateY: slide-in animation + drag offset
+  const combinedY = useRef(Animated.add(slideY, dragY)).current;
+
+  // Backdrop opacity fades as user drags down
+  const backdropOpacity = dragY.interpolate({
+    inputRange: [0, SCREEN_HEIGHT * 0.4],
+    outputRange: [1, 0.2],
+    extrapolate: 'clamp',
+  });
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const dismissModal = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(dragY, { toValue: SCREEN_HEIGHT, duration: 250, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => {
+      setShow(false);
+      dragY.setValue(0);
+      onCloseRef.current();
+    });
+  }, [SCREEN_HEIGHT]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => {
+        // Only capture vertical downward swipes (avoid interfering with horizontal scroll)
+        return gs.dy > 8 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5;
+      },
+      onPanResponderGrant: () => {
+        isDragging.current = true;
+      },
+      onPanResponderMove: (_, gs) => {
+        // Only allow dragging downward (clamp at 0)
+        if (gs.dy > 0) {
+          dragY.setValue(gs.dy);
+        }
+      },
+      onPanResponderRelease: (_, gs) => {
+        isDragging.current = false;
+        if (gs.dy > DISMISS_THRESHOLD || gs.vy > VELOCITY_THRESHOLD) {
+          // Dismiss
+          dismissModal();
+        } else {
+          // Spring back
+          Animated.spring(dragY, {
+            toValue: 0,
+            damping: 20,
+            stiffness: 300,
+            mass: 1,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        isDragging.current = false;
+        Animated.spring(dragY, {
+          toValue: 0,
+          damping: 20,
+          stiffness: 300,
+          mass: 1,
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (visible) {
       setShow(true);
       overlayOpacity.setValue(0);
       slideY.setValue(300);
+      dragY.setValue(0);
       Animated.parallel([
         Animated.timing(overlayOpacity, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
         Animated.timing(slideY, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -72,14 +148,17 @@ function SlideModal({ visible, onClose, children }: { visible: boolean; onClose:
   return (
     <Modal visible transparent animationType="none">
       <Pressable style={{ flex: 1 }} onPress={onClose}>
-        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: overlayOpacity }]}>
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: Animated.multiply(overlayOpacity, backdropOpacity) }]}>
           <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
           <View style={styles.modalOverlay} />
         </Animated.View>
         <View style={{ flex: 1 }} />
-        <Animated.View style={{ transform: [{ translateY: slideY }] }}>
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+        <Animated.View style={[styles.modalSheet, { transform: [{ translateY: combinedY }] }]}>
+          {/* Drag handle zone — above title, captures swipe-to-dismiss */}
+          <Pressable onPress={(e) => e.stopPropagation()} {...panResponder.panHandlers} style={styles.modalHandleZone}>
             <View style={styles.modalHandle} />
+          </Pressable>
+          <Pressable onPress={(e) => e.stopPropagation()}>
             {children}
           </Pressable>
         </Animated.View>
@@ -169,23 +248,38 @@ export default function HomeScreen() {
   }, [group?.id, selectedGroupId]);
 
   // Expand/collapse animations
-  const membersExpandAnim = useRef(new Animated.Value(0)).current;
-  const drinksExpandAnim = useRef(new Animated.Value(0)).current;
+  const membersExpandAnim = useRef(new Animated.Value(1)).current;
+  const drinksExpandAnim = useRef(new Animated.Value(1)).current;
+  const membersExtraAnim = useRef(new Animated.Value(0)).current;
+  const drinksExtraAnim = useRef(new Animated.Value(0)).current;
 
   const toggleMembers = useCallback(() => {
-    // Fade out tekst, toggle items direct, fade in tekst
     Animated.timing(membersExpandAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => {
-      setShowMembers((prev) => !prev);
+      setShowMembers((prev) => {
+        const next = !prev;
+        if (next) {
+          membersExtraAnim.setValue(0);
+          Animated.timing(membersExtraAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+        }
+        return next;
+      });
       Animated.timing(membersExpandAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     });
-  }, [membersExpandAnim]);
+  }, [membersExpandAnim, membersExtraAnim]);
 
   const toggleDrinks = useCallback(() => {
     Animated.timing(drinksExpandAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => {
-      setShowAllDrinks((prev) => !prev);
+      setShowAllDrinks((prev) => {
+        const next = !prev;
+        if (next) {
+          drinksExtraAnim.setValue(0);
+          Animated.timing(drinksExtraAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+        }
+        return next;
+      });
       Animated.timing(drinksExpandAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     });
-  }, [drinksExpandAnim]);
+  }, [drinksExpandAnim, drinksExtraAnim]);
 
   // Member detail modal
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -575,41 +669,45 @@ export default function HomeScreen() {
                     </AnimatedCard>
                   );
                 })}
-                {showMembers && members.slice(4).map((member, i) => {
-                  const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
-                  return (
-                    <AnimatedCard key={member.id} index={i} enabled={true}>
-                    <Pressable style={s.lidRow} onPress={() => {
-                      const ref = memberAvatarRefs[member.user_id];
-                      if (ref) {
-                        ref.measureInWindow((x, y, w, h) => {
-                          setMemberAvatarOrigin({ x: x + w / 2, y: y + h / 2, size: w });
-                          selectMember(member.user_id);
-                        });
-                      } else {
-                        selectMember(member.user_id);
-                      }
-                    }}>
-                      <View ref={(r) => { memberAvatarRefs[member.user_id] = r; }} collapsable={false} style={s.lidAvatarWrap}>
-                        {member.profile?.avatar_url ? (
-                          <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} transition={200} cachePolicy="memory-disk" />
-                        ) : (
-                          <View style={[s.lidAvatar, s.lidAvatarFallback]}>
-                            <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
+                {showMembers && (
+                  <Animated.View style={{ opacity: membersExtraAnim }}>
+                    {members.slice(4).map((member, i) => {
+                      const mName = member.user_id === user?.id ? 'Jij' : (member.profile?.full_name || 'Onbekend');
+                      return (
+                        <AnimatedCard key={`${member.id}-${showMembers}`} index={i} enabled={true}>
+                        <Pressable style={s.lidRow} onPress={() => {
+                          const ref = memberAvatarRefs[member.user_id];
+                          if (ref) {
+                            ref.measureInWindow((x, y, w, h) => {
+                              setMemberAvatarOrigin({ x: x + w / 2, y: y + h / 2, size: w });
+                              selectMember(member.user_id);
+                            });
+                          } else {
+                            selectMember(member.user_id);
+                          }
+                        }}>
+                          <View ref={(r) => { memberAvatarRefs[member.user_id] = r; }} collapsable={false} style={s.lidAvatarWrap}>
+                            {member.profile?.avatar_url ? (
+                              <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} transition={200} cachePolicy="memory-disk" />
+                            ) : (
+                              <View style={[s.lidAvatar, s.lidAvatarFallback]}>
+                                <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
+                              </View>
+                            )}
+                            {member.is_active && (
+                              <View style={s.onlineBadge}>
+                                <View style={s.onlineDot} />
+                              </View>
+                            )}
                           </View>
-                        )}
-                        {member.is_active && (
-                          <View style={s.onlineBadge}>
-                            <View style={s.onlineDot} />
-                          </View>
-                        )}
-                      </View>
-                      <Text style={s.lidName}>{mName}</Text>
-                      {member.is_admin && <Ionicons name="shield" size={14} color="#00BEAE" style={{ marginLeft: 6 }} />}
-                    </Pressable>
-                    </AnimatedCard>
-                  );
-                })}
+                          <Text style={s.lidName}>{mName}</Text>
+                          {member.is_admin && <Ionicons name="shield" size={14} color="#00BEAE" style={{ marginLeft: 6 }} />}
+                        </Pressable>
+                        </AnimatedCard>
+                      );
+                    })}
+                  </Animated.View>
+                )}
               </View>
               {members.length > 4 && (
                 <Pressable onPress={toggleMembers} style={s.bekijkMeer}>
@@ -639,7 +737,7 @@ export default function HomeScreen() {
                   <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
                 </View>
                 <View style={s.drankenlijstList}>
-                  {drinks.slice(0, showAllDrinks ? drinks.length : 4).map((drink, i) => {
+                  {drinks.slice(0, 4).map((drink, i) => {
                     const catColor = t.categoryColors[(drink.category - 1) % 4];
                     return (
                       <AnimatedCard key={drink.id} index={i} enabled={contentReady}>
@@ -653,6 +751,24 @@ export default function HomeScreen() {
                       </AnimatedCard>
                     );
                   })}
+                  {showAllDrinks && (
+                    <Animated.View style={{ opacity: drinksExtraAnim }}>
+                      {drinks.slice(4).map((drink, i) => {
+                        const catColor = t.categoryColors[(drink.category - 1) % 4];
+                        return (
+                          <AnimatedCard key={`${drink.id}-${showAllDrinks}`} index={i} enabled={true}>
+                            <View style={s.drinkRow}>
+                              <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
+                              <Text style={s.drinkName}>{drink.name}</Text>
+                              <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                                <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                              </View>
+                            </View>
+                          </AnimatedCard>
+                        );
+                      })}
+                    </Animated.View>
+                  )}
                 </View>
                 {drinks.length > 4 && (
                   <Pressable onPress={toggleDrinks} style={s.bekijkMeer}>
@@ -1362,11 +1478,13 @@ const styles = StyleSheet.create({
   modalSheet: {
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 8,
     paddingBottom: 40,
     backgroundColor: 'rgba(21, 21, 21, 0.95)',
   },
-  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16, backgroundColor: 'rgba(255,255,255,0.15)' },
+  modalHandleZone: { width: '100%', alignItems: 'center', paddingTop: 12, paddingBottom: 28, marginBottom: -12 },
+  modalHandle: { width: 40, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.35)' },
   modalTitle: { fontFamily: 'Unbounded', fontSize: 22, fontWeight: '400', color: '#FFFFFF', marginBottom: 16 },
   modalOverline: { fontFamily: 'Unbounded', fontSize: 11, fontWeight: '600', letterSpacing: 1, color: '#848484', marginBottom: 12 },
   modalEmpty: { fontFamily: 'Unbounded', color: '#848484', fontSize: 14 },
