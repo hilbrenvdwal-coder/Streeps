@@ -306,6 +306,16 @@ export function useGroupDetail(groupId: string) {
     });
   };
 
+  const addTallyForMemberByCategory = async (category: number, userId: string) => {
+    if (!user) return;
+    await supabase.from('tallies').insert({
+      group_id: groupId,
+      user_id: userId,
+      category,
+      added_by: user.id,
+    });
+  };
+
   const activateMe = async () => {
     if (!user) return;
 
@@ -345,6 +355,7 @@ export function useGroupDetail(groupId: string) {
     isAdmin,
     addTally,
     addTallyForMember,
+    addTallyForMemberByCategory,
     activateMe,
     removeOwnAdmin,
     toggleActive,

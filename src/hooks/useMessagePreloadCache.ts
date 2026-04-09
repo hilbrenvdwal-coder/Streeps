@@ -12,7 +12,7 @@ const preloadCache = new Map<string, CachedConversation>();
 const pendingLoads = new Map<string, Promise<void>>();
 const unloadTimers = new Map<string, NodeJS.Timeout>();
 
-const PRELOAD_PAGE_SIZE = 30;
+const PRELOAD_PAGE_SIZE = 15;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const UNLOAD_DELAY_MS = 30_000;
 

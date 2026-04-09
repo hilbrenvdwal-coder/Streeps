@@ -297,8 +297,8 @@ export function useChatMessages(conversationId: string | null) {
     if (preloaded) {
       setMessages(preloaded.messages);
       oldestCursorRef.current = preloaded.oldestCursor;
-      hasMoreRef.current = preloaded.hasMore;
-      setHasMore(preloaded.hasMore);
+      // Don't set hasMore from preload — preload uses smaller page size,
+      // let the server fetch (Step 2) determine the real hasMore
       setLoading(false);
       Object.assign(profileCacheRef.current, preloaded.profileCache);
     }

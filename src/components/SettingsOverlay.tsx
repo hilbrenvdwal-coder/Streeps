@@ -14,6 +14,11 @@ import {
   TouchableWithoutFeedback,
   Platform,
 } from 'react-native';
+import ReanimatedModule, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -376,6 +381,50 @@ const cbs = StyleSheet.create({
   hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
 
+const ReanimatedView = ReanimatedModule.View;
+
+/**
+ * AnimatedCollapse: smoothly animates height + opacity for expand/collapse.
+ * Uses onLayout to measure content height, then animates between 0 and measured height.
+ */
+function AnimatedCollapse({ expanded, children }: { expanded: boolean; children: React.ReactNode }) {
+  const measuredHeight = useSharedValue(0);
+  const animProgress = useSharedValue(expanded ? 1 : 0);
+  const hasRendered = useRef(false);
+
+  // When expanded changes, animate
+  useEffect(() => {
+    if (!hasRendered.current) {
+      // First render: set instantly without animation
+      hasRendered.current = true;
+      animProgress.value = expanded ? 1 : 0;
+      return;
+    }
+    animProgress.value = withTiming(expanded ? 1 : 0, { duration: 280 });
+  }, [expanded]);
+
+  const containerStyle = useAnimatedStyle(() => ({
+    height: animProgress.value * measuredHeight.value,
+    opacity: animProgress.value,
+    overflow: 'hidden' as const,
+  }));
+
+  const onLayout = useCallback((e: any) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) {
+      measuredHeight.value = h;
+    }
+  }, []);
+
+  return (
+    <ReanimatedView style={containerStyle}>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }} onLayout={onLayout}>
+        {children}
+      </View>
+    </ReanimatedView>
+  );
+}
+
 function FadeMask({ children }: { children: React.ReactNode }) {
   return (
     <MaskedView
@@ -444,6 +493,7 @@ export default function SettingsOverlay({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [tallyAdj, setTallyAdj] = useState<Record<string, Record<number, number>>>({});
+  const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(new Set());
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -464,7 +514,7 @@ export default function SettingsOverlay({
   } | null>(null);
 
   // Reset optimistic adjustments when real data arrives
-  useEffect(() => { setTallyAdj({}); }, [recentTallies]);
+  useEffect(() => { setTallyAdj({}); setPendingRemoveIds(new Set()); }, [recentTallies]);
 
   // Reset newDrinkCat when selected category is no longer enabled
   useEffect(() => {
@@ -926,7 +976,7 @@ export default function SettingsOverlay({
               </Pressable>
             </View>
             {/* Category badge selector: hold to expand, drag to pick */}
-            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
+            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8, alignItems: 'center' }]}>
               <CategoryBadgeSelector
                 value={parseInt(newDrinkCat) || 1}
                 onChange={(v) => setNewDrinkCat(String(v))}
@@ -935,6 +985,7 @@ export default function SettingsOverlay({
                 getCategoryName={getCategoryName}
                 onScrollEnable={setScrollEnabled}
               />
+              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Unbounded', marginLeft: 10 }}>Houd ingedrukt</Text>
             </View>
           </View>
 
@@ -963,8 +1014,8 @@ export default function SettingsOverlay({
                     </View>
                     <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#848484" />
                   </Pressable>
-                  {/* Expanded: tally counts + admin actions */}
-                  {isExpanded && (
+                  {/* Expanded: tally counts + admin actions (animated) */}
+                  <AnimatedCollapse expanded={isExpanded}>
                     <View style={s.memberExpanded}>
                       {/* Tally counts per category */}
                       {activeCategories.map((cat) => {
@@ -998,17 +1049,23 @@ export default function SettingsOverlay({
                               <Pressable
                                 onPress={() => {
                                   const memberRecentTallies = (recentTallies || []).filter(
-                                    (t: any) => t.user_id === member.user_id && t.category === cat && !t.removed
+                                    (t: any) =>
+                                      t.user_id === member.user_id &&
+                                      t.category === cat &&
+                                      !t.removed &&
+                                      !pendingRemoveIds.has(t.id)
                                   );
                                   if (memberRecentTallies.length > 0) {
+                                    const tallyToRemove = memberRecentTallies[0];
                                     Alert.alert('Streepje verwijderen', `1x ${catName} van ${name}?`, [
                                       { text: 'Annuleren', style: 'cancel' },
                                       { text: 'Verwijderen', style: 'destructive', onPress: () => {
+                                        setPendingRemoveIds((prev) => new Set([...prev, tallyToRemove.id]));
                                         setTallyAdj((prev) => ({
                                           ...prev,
                                           [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
                                         }));
-                                        removeTally(memberRecentTallies[0].id);
+                                        removeTally(tallyToRemove.id);
                                       } },
                                     ]);
                                   }
@@ -1038,7 +1095,7 @@ export default function SettingsOverlay({
                         </View>
                       )}
                     </View>
-                  )}
+                  </AnimatedCollapse>
                 </React.Fragment>
               );
             })}

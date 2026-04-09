@@ -3,19 +3,18 @@ import { StyleSheet, Text, Pressable, View, Animated, Easing, Platform } from 'r
 import { AuroraPresetView, type AuroraPreset } from './AuroraBackground';
 
 /**
- * Category Row — Figma nodes 122:36, 122:89, 122:80, 122:71
+ * Category Row — badge-style selector
  *
- * 350×50, borderRadius 25, aurora blob background per category.
- * Font: Unbounded 20px regular, white. Name left, price right.
- * Gap between rows: 9px (handled by parent via marginBottom).
+ * Unselected: small pill/badge with category name (left) + subtle price (right)
+ * Selected: badge lights up, aurora glow flows from badge rightward behind the row
  *
- * Selected state: animated glow border + shadow (same pattern as AI chat input glow).
+ * Uses AuroraPresetView (PNG-based aurora) for the glow effect.
  */
 
 interface CategoryRowProps {
   name: string;
   price: number;       // cents
-  color: string;       // kept for selected glow color
+  color: string;       // category color for badge tinting
   categoryIndex?: number; // 1–4 → selects aurora preset
   selected?: boolean;
   onPress: () => void;
@@ -29,27 +28,11 @@ const CATEGORY_PRESETS: Record<number, AuroraPreset> = {
 };
 
 // Per-category aurora colors: [outermost → innermost ellipse]
-// Each layer is a different hue — real aurora color combos, not just lighter variants
 const CATEGORY_AURORA: Record<number, string[]> = {
-  1: ['#00BEAE', '#4A6CF7', '#00FE96', '#8B5CF6'],  // teal → blauw → groen → paars
-  2: ['#FF004D', '#FF00F5', '#FF6B00', '#8B5CF6'],  // rood → magenta → oranje → paars
-  3: ['#4A6CF7', '#00BEAE', '#8B5CF6', '#00FE96'],  // blauw → teal → paars → groen
-  4: ['#8B5CF6', '#FF004D', '#4A6CF7', '#FF00F5'],  // paars → rood → blauw → magenta
-};
-
-// Glow shadow + border colors per category (theme color)
-const GLOW_COLORS: Record<number, string> = {
-  1: '#00BEAE',
-  2: '#FF004D',
-  3: '#4A6CF7',
-  4: '#8B5CF6',
-};
-
-const GLOW_BORDER_COLORS: Record<number, string> = {
-  1: '#00D9A3',
-  2: '#FF3377',
-  3: '#6B8AFF',
-  4: '#A47BFF',
+  1: ['#00BEAE', '#4A6CF7', '#00FE96', '#8B5CF6'],
+  2: ['#FF004D', '#FF00F5', '#FF6B00', '#8B5CF6'],
+  3: ['#4A6CF7', '#00BEAE', '#8B5CF6', '#00FE96'],
+  4: ['#8B5CF6', '#FF004D', '#4A6CF7', '#FF00F5'],
 };
 
 export default function CategoryRow({
@@ -64,25 +47,47 @@ export default function CategoryRow({
   const preset = CATEGORY_PRESETS[((categoryIndex - 1) % 4) + 1];
   const catKey = ((categoryIndex - 1) % 4) + 1;
 
-  // Shared glow animation value
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  // Animation for aurora glow fade in/out
+  const glowAnim = useRef(new Animated.Value(selected ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.timing(glowAnim, {
       toValue: selected ? 1 : 0,
-      duration: 150,
+      duration: 200,
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: false,
     }).start();
   }, [selected]);
 
-  // Glow interpolations (same pattern as AI chat input)
-  const glowBorderWidth = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1.5] });
-  const glowBorderColor = glowAnim.interpolate({
+  // Badge background interpolation: transparent-ish → fuller color
+  const badgeBg = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['transparent', GLOW_BORDER_COLORS[catKey]],
+    outputRange: [color + '20', color + '55'],
   });
-  const glowShadowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] });
+
+  // Badge text color interpolation: category color → white
+  const badgeTextColor = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [color, '#FFFFFF'],
+  });
+
+  // Price text color interpolation: subtle → bright white
+  const priceColor = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#666680', '#FFFFFF'],
+  });
+
+  // Aurora container opacity
+  const auroraOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  // Glow shadow opacity for selected state
+  const shadowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.5],
+  });
 
   // Press feedback: subtle scale
   const pressScale = useRef(new Animated.Value(1)).current;
@@ -95,88 +100,85 @@ export default function CategoryRow({
 
   return (
     <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={s.wrapper}>
-      {/* Press scale wrapper (native driver) — must be separate from glow (non-native) */}
       <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-        {/* Glow wrapper — shadow animates in (non-native driver) */}
         <Animated.View
           style={[
-            s.glowWrap,
+            s.row,
             {
-              shadowColor: GLOW_COLORS[catKey],
-              shadowOpacity: glowShadowOpacity,
-              ...(Platform.OS === 'android' ? { elevation: selected ? 8 : 0 } : {}),
+              shadowColor: color,
+              shadowOpacity: shadowOpacity,
+              ...(Platform.OS === 'android' ? { elevation: selected ? 6 : 0 } : {}),
             },
           ]}
         >
-          {/* Bar — fixed size, no animated margin/border */}
-          <View style={s.bar}>
-            <View style={s.auroraContainer} pointerEvents="none">
-              <AuroraPresetView preset={preset} colors={CATEGORY_AURORA[catKey]} animated={selected} noMask />
-            </View>
-            <Text style={s.name}>{name}</Text>
-            <Text style={s.price}>{priceStr}</Text>
-          </View>
-          {/* Absolute border overlay — does NOT affect layout */}
-          <Animated.View
-            style={[
-              s.borderOverlay,
-              {
-                borderWidth: glowBorderWidth,
-                borderColor: glowBorderColor,
-              },
-            ]}
-            pointerEvents="none"
-          />
+          {/* Aurora glow background — fades in on selection */}
+          <Animated.View style={[s.auroraWrap, { opacity: auroraOpacity }]} pointerEvents="none">
+            <AuroraPresetView
+              preset={preset}
+              colors={CATEGORY_AURORA[catKey]}
+              animated={selected}
+              noMask
+            />
+          </Animated.View>
+
+          {/* Badge pill with category name */}
+          <Animated.View style={[s.badge, { backgroundColor: badgeBg }]}>
+            <Animated.Text style={[s.badgeText, { color: badgeTextColor }]}>
+              {name}
+            </Animated.Text>
+          </Animated.View>
+
+          {/* Price */}
+          <Animated.Text style={[s.price, { color: priceColor }]}>
+            {priceStr}
+          </Animated.Text>
         </Animated.View>
       </Animated.View>
     </Pressable>
   );
 }
 
+const ROW_HEIGHT = 44;
+const ROW_RADIUS = 22;
+
 const s = StyleSheet.create({
   wrapper: { marginBottom: 9 },
-  glowWrap: {
-    borderRadius: 25,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 8,
-  },
-  borderOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 25,
-  },
-  bar: {
-    width: 350,
-    maxWidth: '100%',
-    alignSelf: 'center',
-    height: 50,
-    borderRadius: 25,
+  row: {
+    height: ROW_HEIGHT,
+    borderRadius: ROW_RADIUS,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingRight: 20,
     overflow: 'hidden',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
   },
-  auroraContainer: {
+  auroraWrap: {
     position: 'absolute',
-    // Aurora is 380x80 (mask bbox), bar is 350x50
-    // Center: left = (350-380)/2 = -15, top = (50-80)/2 = -15
-    top: -15,
-    left: -15,
+    // Aurora preset for category is 380x80 container
+    // Center vertically: (44-80)/2 = -18, shift left so glow flows from badge rightward
+    top: -18,
+    left: -30,
     width: 380,
     height: 80,
   },
-  name: {
-    fontFamily: 'Unbounded',
-    fontSize: 20,
-    fontWeight: '400',
-    color: '#FFFFFF',
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
     zIndex: 1,
+  },
+  badgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    fontWeight: '400',
   },
   price: {
     fontFamily: 'Unbounded',
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: '400',
-    color: '#FFFFFF',
     zIndex: 1,
   },
 });

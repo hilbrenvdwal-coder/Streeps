@@ -198,7 +198,7 @@ export default function HomeScreen() {
 
   const {
     group, members, drinks, tallyCounts, tallyCategoryCounts, recentTallies, credits,
-    loading: detailLoading, isAdmin, addTally, addTallyForMember, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
+    loading: detailLoading, isAdmin, addTally, addTallyForMember, addTallyForMemberByCategory, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
     updateGroupPrices, updateGroupName, addDrink, removeDrink, deleteGroup, regenerateInviteCode, refresh: refreshGroup,
   } = useGroupDetail(selectedGroupId ?? '');
 
@@ -921,7 +921,7 @@ export default function HomeScreen() {
           refresh={refreshGroup}
           tallyCounts={tallyCategoryCounts}
           recentTallies={recentTallies}
-          addTally={addTallyForMember}
+          addTally={addTallyForMemberByCategory}
           removeTally={removeTally}
           activeCategories={activeCategories as number[]}
           getCategoryName={getCategoryName}
