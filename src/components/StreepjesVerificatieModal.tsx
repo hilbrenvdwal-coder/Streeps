@@ -421,10 +421,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   countContainer: {
-    width: 64,
+    minWidth: 64,
     height: 64,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   countGlow: {
     position: 'absolute',
