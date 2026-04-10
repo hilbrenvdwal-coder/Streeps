@@ -108,10 +108,10 @@ function usePressScale() {
 function useSwipeDismiss(onDismiss: () => void, overlayAnim?: Animated.Value) {
   const swipeX = useRef(new Animated.Value(0)).current;
   const scrimOpacity = useMemo(() => {
-    if (!overlayAnim) return swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.5, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' });
+    if (!overlayAnim) return swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.3, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' });
     return Animated.multiply(
       overlayAnim,
-      swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.5, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' })
+      swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.3, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' })
     );
   }, [overlayAnim, swipeX]);
   const pan = useRef(
