@@ -297,10 +297,11 @@ export default function ActiviteitScreen() {
                 ]}>
                   {/* Left: count container */}
                   <View style={styles.historyCountBox}>
-                    {item.type === 'gift_sent' ? (
-                      <Ionicons name="gift" size={28} color="#00BEAE" />
-                    ) : (
-                      <Text style={styles.historyCountText}>{displayCount}</Text>
+                    <Text style={styles.historyCountText}>{displayCount}</Text>
+                    {item.type === 'gift_sent' && (
+                      <View style={styles.giftIconOverlay}>
+                        <Ionicons name="gift" size={14} color="#00BEAE" />
+                      </View>
                     )}
                   </View>
                   {/* Right: badge + meta */}
@@ -621,6 +622,14 @@ function createStyles(t: Theme) {
       height: 64,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
+    },
+    giftIconOverlay: {
+      position: 'absolute' as const,
+      top: 2,
+      right: 2,
+      backgroundColor: 'rgba(0, 190, 174, 0.15)',
+      borderRadius: 10,
+      padding: 3,
     },
     historyCountText: {
       fontFamily: 'Unbounded-SemiBold',
