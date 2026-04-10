@@ -409,7 +409,7 @@ const s = StyleSheet.create({
   // Info Card
   infoCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     backgroundColor: '#1A1A1C',
     borderRadius: 16,
     padding: 16,
@@ -456,7 +456,7 @@ const s = StyleSheet.create({
   },
   infoRight: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'space-evenly',
   },
   catBadge: {
     paddingHorizontal: 12,
