@@ -99,8 +99,25 @@ export function useGroupDetail(groupId: string) {
       setTallyCounts(counts);
     }
 
-    // Compute credits (empty for now — no credits table in database yet)
-    setCredits({});
+    // Fetch tally_gifts where current user is recipient
+    const { data: gifts } = await supabase
+      .from('tally_gifts')
+      .select('category, quantity, redeemed')
+      .eq('group_id', groupId)
+      .eq('recipient_id', user.id);
+
+    if (gifts && gifts.length > 0) {
+      const creditMap: Record<number, number> = {};
+      gifts.forEach((g: any) => {
+        const remaining = (g.quantity ?? 0) - (g.redeemed ?? 0);
+        if (remaining > 0) {
+          creditMap[g.category] = (creditMap[g.category] || 0) + remaining;
+        }
+      });
+      setCredits(creditMap);
+    } else {
+      setCredits({});
+    }
 
     setLoading(false);
   }, [user, groupId]);
@@ -151,11 +168,22 @@ export function useGroupDetail(groupId: string) {
       }, () => fetchAll())
       .subscribe();
 
+    const giftsChannel = supabase
+      .channel(`tally_gifts:${groupId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tally_gifts',
+        filter: `group_id=eq.${groupId}`,
+      }, () => fetchAll())
+      .subscribe();
+
     return () => {
       supabase.removeChannel(talliesChannel);
       supabase.removeChannel(membersChannel);
       supabase.removeChannel(drinksChannel);
       supabase.removeChannel(groupChannel);
+      supabase.removeChannel(giftsChannel);
     };
   }, [fetchAll]);
 

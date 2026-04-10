@@ -73,6 +73,42 @@ export function useSettlements(groupId: string) {
       member.amount = total;
     });
 
+    // Fetch credits for all members in this group
+    const { data: allGifts } = await supabase
+      .from('tally_gifts')
+      .select('recipient_id, category, quantity, redeemed')
+      .eq('group_id', groupId);
+
+    // Build credit map and subtract from amounts
+    if (allGifts) {
+      const creditsByUser: Record<string, Record<number, number>> = {};
+      allGifts.forEach((g: any) => {
+        const remaining = (g.quantity ?? 0) - (g.redeemed ?? 0);
+        if (remaining > 0) {
+          if (!creditsByUser[g.recipient_id]) creditsByUser[g.recipient_id] = {};
+          creditsByUser[g.recipient_id][g.category] =
+            (creditsByUser[g.recipient_id][g.category] || 0) + remaining;
+        }
+      });
+
+      Object.values(memberMap).forEach((member: any) => {
+        const userCredits = creditsByUser[member.user_id];
+        if (!userCredits) return;
+        for (const [cat, creditCount] of Object.entries(userCredits)) {
+          const catNum = parseInt(cat);
+          let price = 0;
+          switch (catNum) {
+            case 1: price = group.price_category_1; break;
+            case 2: price = group.price_category_2; break;
+            case 3: price = group.price_category_3 ?? 0; break;
+            case 4: price = group.price_category_4 ?? 0; break;
+          }
+          member.amount -= (creditCount as number) * price;
+        }
+        member.amount = Math.max(0, member.amount);
+      });
+    }
+
     return Object.values(memberMap);
   }, [groupId]);
 
