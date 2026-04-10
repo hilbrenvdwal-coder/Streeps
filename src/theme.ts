@@ -15,20 +15,20 @@ import { Platform } from 'react-native';
 // | Token           | Hex     | Usage                                              |
 // |-----------------|---------|-----------------------------------------------------|
 // | streepsGreen    | #00FE96 | Actief indicator, categorie 1                       |
-// | streepsRed      | #FF0085 | Nav pill, send button, categorie 2                  |
+// | streepsMagenta  | #FF0085 | Nav pill, send button, categorie 2                  |
 // | streepsCyan     | #00BEAE | Opslaan knop, admin acties, categorie 3             |
-// | streepsMagenta  | #FF004D | Openstaande rekening, activiteit, categorie 4       |
+// | streepsRed      | #FF004D | Openstaande rekening, activiteit, categorie 4       |
 //
 export const streepsGreen   = '#00FE96';
-export const streepsRed     = '#FF0085';
+export const streepsMagenta = '#FF0085';
 export const streepsCyan    = '#00BEAE';
-export const streepsMagenta = '#FF004D';
+export const streepsRed     = '#FF004D';
 
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
-  magenta: '#FF004D',      // Openstaande rekening, activiteit, categorie 4
-  streepsRed: '#FF0085',   // Nav pill, send button, categorie 2
+  magenta: '#FF0085',      // Nav pill, send button, categorie 2
+  streepsRed: '#FF004D',   // Openstaande rekening, activiteit, categorie 4
   cyan: '#00BEAE',         // Opslaan knop, admin acties, join buttons
   green: '#00FE96',        // Actief indicator (groene bolletje)
   blue: '#4A6CF7',
@@ -51,9 +51,9 @@ export const aurora = {
 
 export const categoryColors = [
   brand.green,
-  brand.streepsRed,
-  brand.cyan,
   brand.magenta,
+  brand.cyan,
+  brand.streepsRed,
 ] as const;
 
 // ─── Semantic Colors (theme-independent) ────────────────────────────────────
