@@ -1113,7 +1113,7 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
 
   // Inputs
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 25, marginHorizontal: 12, marginVertical: 8 },
   inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
 
   // Categories
