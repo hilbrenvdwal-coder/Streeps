@@ -666,10 +666,11 @@ function createStyles(t: Theme) {
     historyCard: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
-      backgroundColor: '#1A1A1C',
-      borderRadius: 16,
+      backgroundColor: 'transparent',
       padding: 16,
       marginBottom: 0,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.06)',
     },
     historyCountBox: {
       width: 64,
