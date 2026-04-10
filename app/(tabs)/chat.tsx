@@ -25,7 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
-import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
+import { usePrefetchMessages } from '@/src/hooks/usePrefetchMessages';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -2795,16 +2795,9 @@ export default function ChatScreen() {
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
-  // Preload messages for visible conversations
+  // Prefetch messages for visible conversations into SQLite
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
-  const onViewableItemsChanged = useCallback(({ changed }: { viewableItems: any[]; changed: any[] }) => {
-    changed.forEach((token: any) => {
-      const convId = token.item?.id;
-      if (!convId) return;
-      if (token.isViewable) { cancelUnload(convId); preloadConversation(convId); }
-      else { scheduleUnload(convId); }
-    });
-  }, []);
+  const { onViewableItemsChanged } = usePrefetchMessages();
 
   // Fetch pending incoming friend request count
   useEffect(() => {
