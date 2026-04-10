@@ -459,15 +459,15 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   catBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
     marginBottom: 4,
     alignSelf: 'flex-start',
   },
   catBadgeText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
+    fontSize: 15,
   },
   pricePerUnit: {
     fontFamily: 'Unbounded',
