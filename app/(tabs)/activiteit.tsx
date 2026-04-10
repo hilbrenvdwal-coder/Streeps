@@ -297,7 +297,7 @@ export default function ActiviteitScreen() {
                   item.removed && { opacity: 0.4 },
                 ]}>
                   {/* Left: count container */}
-                  <View style={[styles.historyCountBox, { backgroundColor: catColor + '15' }]}>
+                  <View style={styles.historyCountBox}>
                     {item.type === 'gift_sent' ? (
                       <Ionicons name="gift" size={28} color="#00BEAE" />
                     ) : (
@@ -669,12 +669,11 @@ function createStyles(t: Theme) {
       backgroundColor: '#1A1A1C',
       borderRadius: 16,
       padding: 16,
-      marginBottom: s(10),
+      marginBottom: 0,
     },
     historyCountBox: {
       width: 64,
       height: 64,
-      borderRadius: 16,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
     },
