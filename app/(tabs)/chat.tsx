@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, streepsMagenta, brand } from '@/src/theme';
+import { getTheme, streepsMagenta } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
@@ -25,15 +25,15 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
-import { usePrefetchMessages } from '@/src/hooks/usePrefetchMessages';
+import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
 
-const CHAT_AURORA_COLORS = [brand.streepsRed, brand.cyan, '#FF00F5', brand.green];
+const CHAT_AURORA_COLORS = ['#FF0085', '#00BEAE', '#FF00F5', '#00FE96'];
 
 const SENDER_COLORS = [
-  brand.cyan, '#FF6B6B', brand.blue, '#FFD93D', '#FF85C8',
+  '#00BEAE', '#FF6B6B', '#4A6CF7', '#FFD93D', '#FF85C8',
   '#6BFFF0', '#C084FC', '#F97316', '#34D399', '#F472B6',
   '#38BDF8', '#FACC15', '#A78BFA', '#FB923C', '#2DD4BF',
 ];
@@ -265,7 +265,6 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
   const { swipeX: goSwipeX, panHandlers: goPan } = useSwipeDismiss(onClose, anim);
 
   const [members, setMembers] = useState<any[]>([]);
-  const [membersLoaded, setMembersLoaded] = useState(false);
   const [activeCategories, setActiveCategories] = useState<{ category: number; name: string }[]>([]);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set(otherUserId ? [otherUserId] : []));
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -323,7 +322,6 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
 
   useEffect(() => {
     anim.setValue(0);
-    setMembersLoaded(false);
     Animated.spring(anim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
     if (cachedData) {
       // Use prefetched data — instant display
@@ -333,7 +331,6 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
         .filter((m: any) => m.user_id !== user?.id)
         .map((m: any) => m.profile || { id: m.user_id, full_name: 'Onbekend', avatar_url: null });
       setMembers(otherMembers);
-      setMembersLoaded(true);
       if (type === 'dm' && otherUserId) {
         setSelectedRecipients(new Set([otherUserId]));
       }
@@ -369,7 +366,6 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
         setSelectedRecipients(new Set([otherUserId]));
       }
     }
-    setMembersLoaded(true);
   };
 
   const handleClose = () => {
@@ -436,45 +432,35 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={go.sectionHeader}>AAN WIE?</Text>
-                {members.length > 0 && (
-                  <Pressable onPress={selectAll} hitSlop={8}>
-                    <Text style={[go.selectAllText, allSelected && { color: brand.cyan }]}>{allSelected ? 'Deselecteer' : 'Iedereen'}</Text>
-                  </Pressable>
-                )}
+                <Pressable onPress={selectAll} hitSlop={8}>
+                  <Text style={[go.selectAllText, allSelected && { color: '#00BEAE' }]}>{allSelected ? 'Deselecteer' : 'Iedereen'}</Text>
+                </Pressable>
               </View>
               <View style={go.card}>
-                {membersLoaded && members.length === 0 ? (
-                  <View style={{ paddingHorizontal: 16, paddingVertical: 20, alignItems: 'center' }}>
-                    <Text style={{ fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive, textAlign: 'center', lineHeight: 18 }}>
-                      Voeg meer leden toe aan de groep om te doneren
-                    </Text>
-                  </View>
-                ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 14 }}>
-                    {members.map((m) => {
-                      const selected = selectedRecipients.has(m.id);
-                      return (
-                        <Pressable key={m.id} style={[go.recipientItem, selected && go.recipientSelected]} onPress={() => toggleRecipient(m.id)}>
-                          <View>
-                            {m.avatar_url ? (
-                              <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} transition={200} cachePolicy="memory-disk" />
-                            ) : (
-                              <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
-                                <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
-                              </View>
-                            )}
-                            {selected && (
-                              <View style={go.checkBadge}>
-                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                              </View>
-                            )}
-                          </View>
-                          <Text style={[go.recipientName, selected && { color: '#FFFFFF' }]} numberOfLines={1}>{m.full_name?.split(' ')[0]}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                )}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingVertical: 14 }}>
+                  {members.map((m) => {
+                    const selected = selectedRecipients.has(m.id);
+                    return (
+                      <Pressable key={m.id} style={[go.recipientItem, selected && go.recipientSelected]} onPress={() => toggleRecipient(m.id)}>
+                        <View>
+                          {m.avatar_url ? (
+                            <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} transition={200} cachePolicy="memory-disk" />
+                          ) : (
+                            <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
+                              <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
+                            </View>
+                          )}
+                          {selected && (
+                            <View style={go.checkBadge}>
+                              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[go.recipientName, selected && { color: '#FFFFFF' }]} numberOfLines={1}>{m.full_name?.split(' ')[0]}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
             </>
           )}
@@ -542,29 +528,29 @@ const go = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   title: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF' },
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: brand.inactive, marginLeft: 4, marginTop: 24, marginBottom: 8 },
+  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
   card: { backgroundColor: 'rgba(78,78,78,0.2)', borderRadius: 25, overflow: 'hidden' },
   recipientItem: { alignItems: 'center', width: 64, paddingVertical: 4, borderRadius: 16 },
   recipientSelected: { backgroundColor: 'rgba(0,217,163,0.2)' },
   recipientAvatar: { width: 44, height: 44, borderRadius: 22 },
-  recipientAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  recipientAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   recipientAvatarText: { color: '#333', fontSize: 16, fontWeight: '600' },
-  recipientName: { fontFamily: 'Unbounded', fontSize: 10, color: brand.inactive, marginTop: 4, textAlign: 'center' },
-  checkBadge: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: brand.cyan, alignItems: 'center', justifyContent: 'center' },
-  selectAllText: { fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive, marginRight: 4, marginTop: 24, marginBottom: 8 },
+  recipientName: { fontFamily: 'Unbounded', fontSize: 10, color: '#848484', marginTop: 4, textAlign: 'center' },
+  checkBadge: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center' },
+  selectAllText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginRight: 4, marginTop: 24, marginBottom: 8 },
   dmRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   dmName: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF' },
   catRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   catPill: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)' },
-  catPillActive: { backgroundColor: brand.cyan },
-  catPillText: { fontFamily: 'Unbounded', fontSize: 14, color: brand.inactive },
+  catPillActive: { backgroundColor: '#00BEAE' },
+  catPillText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484' },
   catPillTextActive: { color: '#FFFFFF' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28, marginTop: 8 },
   qtyBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' },
   qtyDisplay: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   qtyValue: { fontFamily: 'Unbounded', fontSize: 36, color: '#FFFFFF', textAlign: 'center' },
   qtyValueOverlay: { position: 'absolute' },
-  confirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, borderRadius: 25, backgroundColor: brand.cyan, marginTop: 28 },
+  confirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, borderRadius: 25, backgroundColor: '#00BEAE', marginTop: 28 },
   confirmText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF' },
 });
 
@@ -597,8 +583,8 @@ function ShimmerText({ text, style }: { text: string; style: any }) {
   }, []);
   const translateX = shimmerX.interpolate({ inputRange: [0, 1], outputRange: [-150, 150] });
   return (
-    <MaskedView maskElement={<Text style={[style, { color: brand.cyan }]}>{text}</Text>}>
-      <Text style={[style, { color: brand.cyan }]}>{text}</Text>
+    <MaskedView maskElement={<Text style={[style, { color: '#00BEAE' }]}>{text}</Text>}>
+      <Text style={[style, { color: '#00BEAE' }]}>{text}</Text>
       <Animated.View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX }] }]}>
         <LinearGradient
           colors={['transparent', 'rgba(255,255,255,0.8)', 'white', 'rgba(255,255,255,0.8)', 'transparent']}
@@ -697,7 +683,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
           <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
             {isBot ? (
               <View style={[dt.bubbleAvatar, { backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }]}>
-                <BotIcon size={20} color={brand.cyan} />
+                <BotIcon size={20} color="#00BEAE" />
               </View>
             ) : item.profile?.avatar_url ? (
               <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
@@ -747,10 +733,10 @@ function SkeletonBotBubble() {
       <ShimmerText text="Streeps Bot" style={[dt.bubbleSender, { marginLeft: 28 }]} />
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={[dt.bubbleAvatar, { backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }]}>
-          <BotIcon size={20} color={brand.cyan} />
+          <BotIcon size={20} color="#00BEAE" />
         </View>
         <Animated.View style={[dt.bubble, dt.bubbleOther, {
-          shadowColor: brand.green,
+          shadowColor: '#00FE96',
           shadowOffset: { width: 0, height: 0 },
           shadowRadius: 8,
           shadowOpacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.5] }),
@@ -966,7 +952,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   const toggleAiMode = () => { setBotSplash(BOT_SPLASH_TEXTS[Math.floor(Math.random() * BOT_SPLASH_TEXTS.length)]); setAiMode(prev => !prev); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
 
   const glowBorderWidth = aiModeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1.5] });
-  const glowBorderColor = aiModeAnim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', brand.cyan] });
+  const glowBorderColor = aiModeAnim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', '#00BEAE'] });
   const glowMargin = aiModeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -1.5] });
   const glowShadowOpacity = aiModeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.6] });
 
@@ -992,7 +978,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
             value={text}
             onChangeText={setText}
             placeholder={aiMode ? botSplash : 'Bericht...'}
-            placeholderTextColor={aiMode ? brand.cyan : brand.inactive}
+            placeholderTextColor={aiMode ? '#00BEAE' : '#848484'}
             multiline
           />
           {onGiftPress ? (
@@ -1001,12 +987,12 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
               {botEnabled !== false && (
                 <Animated.View style={[dt.actionBtn, { position: 'absolute', right: 98, bottom: 0, transform: [{ translateX: aiSlide }, { scale: aiPress.scale }] }]}>
                   <Pressable style={dt.actionBtnInner} onPress={toggleAiMode} onPressIn={aiPress.onPressIn} onPressOut={aiPress.onPressOut}>
-                    <BotIcon size={22} color={aiMode ? brand.cyan : '#FFFFFF'} />
+                    <BotIcon size={22} color={aiMode ? '#00BEB4' : '#FFFFFF'} />
                   </Pressable>
                 </Animated.View>
               )}
               {/* Gift button — middle (fades out when typing) */}
-              <Animated.View style={[dt.actionBtn, { backgroundColor: brand.cyan, position: 'absolute', right: 52, bottom: 0, opacity: giftOpacity, transform: [{ scale: giftPress.scale }] }]} pointerEvents={hasText ? 'none' : 'auto'}>
+              <Animated.View style={[dt.actionBtn, { backgroundColor: '#00BEAE', position: 'absolute', right: 52, bottom: 0, opacity: giftOpacity, transform: [{ scale: giftPress.scale }] }]} pointerEvents={hasText ? 'none' : 'auto'}>
                 <Pressable style={dt.actionBtnInner} onPress={onGiftPress} onPressIn={giftPress.onPressIn} onPressOut={giftPress.onPressOut}>
                   <Ionicons name="gift-outline" size={20} color="#FFFFFF" />
                 </Pressable>
@@ -1018,7 +1004,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
                 </Pressable>
               </Animated.View>
               {/* Send button (fades in when typing, overlays camera position) */}
-              <Animated.View style={[dt.actionBtn, { backgroundColor: brand.streepsRed, position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
+              <Animated.View style={[dt.actionBtn, { backgroundColor: '#FF0085', position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
                 <Pressable style={dt.actionBtnInner} onPress={handleSend} onPressIn={sendPress.onPressIn} onPressOut={sendPress.onPressOut}>
                   <Ionicons name="send" size={20} color="#FFFFFF" />
                 </Pressable>
@@ -1026,7 +1012,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
             </>
           ) : (
             /* DM: send button appears inside input when typing */
-            <Animated.View style={[dt.actionBtn, { backgroundColor: brand.streepsRed, position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendDmPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
+            <Animated.View style={[dt.actionBtn, { backgroundColor: '#FF0085', position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendDmPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
               <Pressable style={dt.actionBtnInner} onPress={handleSend} onPressIn={sendDmPress.onPressIn} onPressOut={sendDmPress.onPressOut}>
                 <Ionicons name="send" size={20} color="#FFFFFF" />
               </Pressable>
@@ -1056,7 +1042,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         ListHeaderComponent={waitingForBot ? <SkeletonBotBubble /> : null}
         ListFooterComponent={loadingMore ? (
           <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-            <ActivityIndicator size="small" color={brand.streepsRed} />
+            <ActivityIndicator size="small" color="#FF0085" />
           </View>
         ) : null}
         renderItem={({ item, index }) => {
@@ -1081,7 +1067,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
           messagesLoading ? null : (
             <View style={{ transform: [{ scaleY: -1 }], alignItems: 'center', paddingTop: 40, paddingBottom: 20 }}>
               <Text style={dt.empty}>Nog geen berichten</Text>
-              <Text style={[dt.empty, { fontSize: 13, color: brand.cyan, marginTop: 2 }]}>Start het gesprek!</Text>
+              <Text style={[dt.empty, { fontSize: 13, color: '#00BEAE', marginTop: 2 }]}>Start het gesprek!</Text>
             </View>
           )
         }
@@ -1125,30 +1111,30 @@ const dt = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
   headerProfile: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
-  headerAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   headerAvatarText: { color: '#333', fontSize: 14, fontWeight: '600' },
   headerName: { fontFamily: 'Unbounded', fontSize: 18, color: '#FFFFFF', flex: 1 },
   bubble: { maxWidth: '82%', marginBottom: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: brand.streepsRed, borderBottomRightRadius: 4 },
+  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#FF0085', borderBottomRightRadius: 4 },
   bubbleOther: { alignSelf: 'flex-start', backgroundColor: 'rgba(78,78,78,0.3)', borderBottomLeftRadius: 4 },
-  bubbleSender: { fontFamily: 'Unbounded', fontSize: 11, color: brand.cyan, marginBottom: 4, marginLeft: 28 },
+  bubbleSender: { fontFamily: 'Unbounded', fontSize: 11, color: '#00BEAE', marginBottom: 4, marginLeft: 28 },
   bubbleAvatar: { width: 20, height: 20, borderRadius: 10, marginRight: 8 },
-  bubbleAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  bubbleAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   bubbleAvatarText: { fontSize: 9, fontWeight: '600', color: '#333' },
   bubbleText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', lineHeight: 20 },
-  timeSeparator: { fontFamily: 'Unbounded', fontSize: 10, color: brand.inactive, textAlign: 'center', marginVertical: 12 },
-  empty: { fontFamily: 'Unbounded', color: brand.inactive, textAlign: 'center', paddingTop: 60, fontSize: 14 },
+  timeSeparator: { fontFamily: 'Unbounded', fontSize: 10, color: '#848484', textAlign: 'center', marginVertical: 12 },
+  empty: { fontFamily: 'Unbounded', color: '#848484', textAlign: 'center', paddingTop: 60, fontSize: 14 },
   inputBarWrap: { position: 'absolute', left: 0, right: 0 },
   inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
-  inputGlowWrap: { flex: 1, borderRadius: 27, shadowColor: brand.green, shadowOffset: { width: 0, height: 0 }, shadowRadius: 6.5, elevation: 8 },
+  inputGlowWrap: { flex: 1, borderRadius: 27, shadowColor: '#00FE96', shadowOffset: { width: 0, height: 0 }, shadowRadius: 6.5, elevation: 8 },
   inputBlurWrap: { flex: 1, borderRadius: 25, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' },
   input: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 16, minHeight: 50, maxHeight: 120 },
-  sendBtn: { width: 52, height: 52, borderRadius: 25, backgroundColor: brand.streepsRed, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 52, height: 52, borderRadius: 25, backgroundColor: '#FF0085', alignItems: 'center', justifyContent: 'center' },
   actionBtn: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', margin: 6 },
   actionBtnInner: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   giftWrap: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginVertical: 20, width: 390, height: 165 },
   giftTitle: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '600', color: '#FFFFFF', textAlign: 'center', lineHeight: 18, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 },
-  giftSubtitle: { fontFamily: 'Unbounded', fontSize: 10, color: brand.inactive, textAlign: 'center', marginTop: -5, marginBottom: 16, alignSelf: 'center' },
+  giftSubtitle: { fontFamily: 'Unbounded', fontSize: 10, color: '#848484', textAlign: 'center', marginTop: -5, marginBottom: 16, alignSelf: 'center' },
   heartBadge: { position: 'absolute', bottom: -14, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(40,40,40,0.9)', borderRadius: 12, paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.3)' },
   heartBadgeMine: { right: 8 },
   heartBadgeOther: { left: 8 },
@@ -1319,7 +1305,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
             {editingName ? (
               <View style={po.row}>
                 <Ionicons name="person-outline" size={20} color="#FFFFFF" style={po.rowIcon} />
-                <TextInput style={po.editInput} value={newName} onChangeText={setNewName} autoFocus placeholder="Naam" placeholderTextColor={brand.inactive} />
+                <TextInput style={po.editInput} value={newName} onChangeText={setNewName} autoFocus placeholder="Naam" placeholderTextColor="#848484" />
                 <Pressable onPress={handleSaveName} disabled={saving} style={po.editBtn}>
                   <Text style={po.editBtnText}>{saving ? '...' : 'Opslaan'}</Text>
                 </Pressable>
@@ -1402,31 +1388,31 @@ const po = StyleSheet.create({
   avatar: { width: 105, height: 105, borderRadius: 9999 },
   avatarFallback: { backgroundColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontFamily: 'Unbounded', fontSize: 36, fontWeight: '600', color: '#333' },
-  fotoWijzigen: { fontFamily: 'Unbounded', fontSize: 14, color: brand.cyan, marginTop: 12 },
+  fotoWijzigen: { fontFamily: 'Unbounded', fontSize: 14, color: '#00BEAE', marginTop: 12 },
   displayName: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF', textAlign: 'center', marginTop: 8 },
 
   // Sections
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: brand.inactive, marginLeft: 4, marginTop: 24, marginBottom: 8 },
+  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
   card: { backgroundColor: 'rgba(78,78,78,0.2)', borderRadius: 25, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: 'rgba(78,78,78,0.3)', marginLeft: 48 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 55 },
   rowIcon: { marginRight: 12, width: 20 },
   rowLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1 },
-  rowValue: { fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive, flexShrink: 1 },
+  rowValue: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', flexShrink: 1 },
 
   // Edit name
   editInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', marginRight: 8 },
   editBtn: { paddingHorizontal: 8, paddingVertical: 4 },
-  editBtnText: { fontFamily: 'Unbounded', color: brand.cyan, fontSize: 12, fontWeight: '600' },
-  editCancelText: { fontFamily: 'Unbounded', color: brand.inactive, fontSize: 12 },
-  nameWarning: { fontFamily: 'Unbounded', color: brand.inactive, fontSize: 11, paddingHorizontal: 48, paddingBottom: 8 },
+  editBtnText: { fontFamily: 'Unbounded', color: '#00BEAE', fontSize: 12, fontWeight: '600' },
+  editCancelText: { fontFamily: 'Unbounded', color: '#848484', fontSize: 12 },
+  nameWarning: { fontFamily: 'Unbounded', color: '#848484', fontSize: 11, paddingHorizontal: 48, paddingBottom: 8 },
 
   // Theme
   segmented: { flexDirection: 'row', borderRadius: 8, backgroundColor: 'rgba(78,78,78,0.3)', padding: 2 },
   segIndicator: { position: 'absolute', top: 2, bottom: 2, borderRadius: 6, backgroundColor: 'rgba(0,190,174,0.2)' },
   segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  segText: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive },
-  segActiveText: { color: brand.cyan, fontWeight: '600' },
+  segText: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484' },
+  segActiveText: { color: '#00BEAE', fontWeight: '600' },
 
   // Logout
   logoutBtn: { marginTop: 32, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' },
@@ -1665,14 +1651,14 @@ const up = StyleSheet.create({
   avatarFallback: { backgroundColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontFamily: 'Unbounded', fontSize: 36, fontWeight: '600', color: '#333' },
   displayName: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF', textAlign: 'center', marginTop: 8 },
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: brand.inactive, marginLeft: 4, marginTop: 24, marginBottom: 8 },
+  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
   card: { backgroundColor: 'rgba(78,78,78,0.2)', borderRadius: 25, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: 'rgba(78,78,78,0.3)', marginLeft: 16 },
   groupRow: { paddingHorizontal: 16, paddingVertical: 14 },
   groupName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
   friendBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 8 },
-  friendBadgeText: { fontFamily: 'Unbounded', fontSize: 14, color: brand.cyan },
-  addFriendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, height: 50, borderRadius: 25, backgroundColor: brand.streepsRed },
+  friendBadgeText: { fontFamily: 'Unbounded', fontSize: 14, color: '#00BEAE' },
+  addFriendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, height: 50, borderRadius: 25, backgroundColor: '#FF0085' },
   addFriendBtnText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
 });
 
@@ -1715,7 +1701,7 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
   }, [userId, status]);
 
   const btnWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [280, 250] });
-  const btnBg = progress.interpolate({ inputRange: [0, 1], outputRange: [brand.streepsRed, 'rgba(78,78,78,0.2)'] });
+  const btnBg = progress.interpolate({ inputRange: [0, 1], outputRange: ['#FF0085', 'rgba(78,78,78,0.2)'] });
   const btnHeight = progress.interpolate({ inputRange: [0, 1], outputRange: [50, 48] });
   const bounceScale = bounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
 
@@ -1726,12 +1712,12 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
     return (
       <View style={{ alignItems: 'center', marginTop: 24, gap: 12 }}>
         <View style={up.friendBadge}>
-          <Ionicons name="checkmark-circle" size={18} color={brand.cyan} />
+          <Ionicons name="checkmark-circle" size={18} color="#00BEAE" />
           <Text style={up.friendBadgeText}>Vrienden</Text>
         </View>
         {onRemove && (
           <Pressable onPress={onRemove} hitSlop={8}>
-            <Text style={{ fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive }}>Vriend verwijderen</Text>
+            <Text style={{ fontFamily: 'Unbounded', fontSize: 12, color: '#848484' }}>Vriend verwijderen</Text>
           </Pressable>
         )}
       </View>
@@ -1742,7 +1728,7 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
     return (
       <View style={{ alignSelf: 'center', marginTop: 24 }}>
         <Pressable onPress={onAccept} style={{
-          width: 280, height: 50, borderRadius: 25, backgroundColor: brand.cyan,
+          width: 280, height: 50, borderRadius: 25, backgroundColor: '#00BEAE',
           flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         }}>
           <Ionicons name="checkmark" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
@@ -1770,9 +1756,9 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
             <Text style={up.addFriendBtnText}>Voeg toe als vriend</Text>
           </Animated.View>
           <Animated.View style={{ position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pendingOpacity }}>
-            <Ionicons name="time-outline" size={18} color={brand.inactive} />
-            <Text style={[up.friendBadgeText, { color: brand.inactive }]}>Verzoek verstuurd</Text>
-            <Ionicons name="close" size={16} color={brand.inactive} />
+            <Ionicons name="time-outline" size={18} color="#848484" />
+            <Text style={[up.friendBadgeText, { color: '#848484' }]}>Verzoek verstuurd</Text>
+            <Ionicons name="close" size={16} color="#848484" />
           </Animated.View>
         </Animated.View>
       </Pressable>
@@ -1915,7 +1901,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                       <Text style={gp.adminBadgeText}>Admin</Text>
                     </View>
                   )}
-                  {m.user_id !== user?.id && <Ionicons name="chevron-forward" size={16} color={brand.inactive} />}
+                  {m.user_id !== user?.id && <Ionicons name="chevron-forward" size={16} color="#848484" />}
                 </Pressable>
               </React.Fragment>
             ))}
@@ -1930,7 +1916,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
             </View>
             <View style={gp.divider} />
             <Pressable style={gp.inviteRow} onPress={handleShare}>
-              <Ionicons name="share-outline" size={20} color={brand.cyan} style={{ marginRight: 12, width: 20 }} />
+              <Ionicons name="share-outline" size={20} color="#00BEAE" style={{ marginRight: 12, width: 20 }} />
               <Text style={gp.shareText}>Deel uitnodiging</Text>
             </Pressable>
           </View>
@@ -1948,7 +1934,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                   <Switch
                     value={botEnabled}
                     onValueChange={handleToggleBot}
-                    trackColor={{ false: 'rgba(78,78,78,0.4)', true: brand.cyan }}
+                    trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
                     thumbColor="#FFFFFF"
                     style={{ transform: [{ translateY: -1 }] }}
                   />
@@ -1977,24 +1963,24 @@ const gp = StyleSheet.create({
   avatarFallback: { backgroundColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontFamily: 'Unbounded', fontSize: 36, fontWeight: '600', color: '#333' },
   displayName: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF', textAlign: 'center', marginTop: 8 },
-  memberCount: { fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive, textAlign: 'center', marginTop: 4 },
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: brand.inactive, marginLeft: 4, marginTop: 24, marginBottom: 8 },
+  memberCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', textAlign: 'center', marginTop: 4 },
+  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
   card: { backgroundColor: 'rgba(78,78,78,0.2)', borderRadius: 25, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: 'rgba(78,78,78,0.3)', marginLeft: 64 },
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   memberAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12 },
-  memberAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  memberAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   memberAvatarText: { color: '#333', fontSize: 14, fontWeight: '600' },
   memberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1 },
-  youBadge: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, marginRight: 8 },
+  youBadge: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginRight: 8 },
   adminBadge: { backgroundColor: 'rgba(0,190,174,0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginRight: 8 },
-  adminBadgeText: { fontFamily: 'Unbounded', fontSize: 10, color: brand.cyan, fontWeight: '600' },
+  adminBadgeText: { fontFamily: 'Unbounded', fontSize: 10, color: '#00BEAE', fontWeight: '600' },
   inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 55 },
   inviteCode: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', letterSpacing: 2 },
-  shareText: { fontFamily: 'Unbounded', fontSize: 14, color: brand.cyan },
+  shareText: { fontFamily: 'Unbounded', fontSize: 14, color: '#00BEAE' },
   settingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 55 },
   settingLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1, lineHeight: 20 },
-  createdAt: { fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive, textAlign: 'center', marginTop: 24 },
+  createdAt: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center', marginTop: 24 },
 });
 
 // ── Animated row wrapper for fade-out + collapse ──
@@ -2057,7 +2043,7 @@ function AnimatedAcceptReject({ accepting, onAccept, onReject, onAnimationComple
   }, [accepting]);
 
   const btnWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 36] });
-  const btnBg = progress.interpolate({ inputRange: [0, 1], outputRange: ['rgba(0,0,0,0)', brand.cyan] });
+  const btnBg = progress.interpolate({ inputRange: [0, 1], outputRange: ['rgba(0,0,0,0)', '#00BEAE'] });
   const btnsOpacity = content.interpolate({ inputRange: [0, 0.3, 1], outputRange: [1, 0, 0] });
   const checkOpacity = content.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
   const bounceScale = bounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] });
@@ -2071,11 +2057,11 @@ function AnimatedAcceptReject({ accepting, onAccept, onReject, onAnimationComple
       }}>
         {/* Original buttons (fade out) */}
         <Animated.View style={{ position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 6, opacity: btnsOpacity }}>
-          <Pressable style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: brand.cyan, alignItems: 'center', justifyContent: 'center' }} onPress={onAccept} disabled={accepting}>
+          <Pressable style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center' }} onPress={onAccept} disabled={accepting}>
             <Ionicons name="checkmark" size={18} color="#FFFFFF" />
           </Pressable>
           <Pressable style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={onReject} disabled={accepting}>
-            <Ionicons name="close" size={18} color={brand.inactive} />
+            <Ionicons name="close" size={18} color="#848484" />
           </Pressable>
         </Animated.View>
         {/* Checkmark (fade in) */}
@@ -2123,7 +2109,7 @@ function AnimatedSuggestionButton({ pending, onAdd }: { pending: boolean; onAdd:
 
   // Button shape (JS driver)
   const btnWidth = progress.interpolate({ inputRange: [0, 1], outputRange: [ADD_BTN_W, SENT_BTN_W] });
-  const btnBg = progress.interpolate({ inputRange: [0, 1], outputRange: [brand.streepsRed, 'rgba(78,78,78,0.3)'] });
+  const btnBg = progress.interpolate({ inputRange: [0, 1], outputRange: ['#FF0085', 'rgba(78,78,78,0.3)'] });
 
   // Content opacity (native driver)
   const addContentOpacity = content.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] });
@@ -2152,7 +2138,7 @@ function AnimatedSuggestionButton({ pending, onAdd }: { pending: boolean; onAdd:
           </Animated.View>
           {/* Check content: checkmark */}
           <Animated.View style={{ position: 'absolute', opacity: checkOpacity }}>
-            <Ionicons name="checkmark" size={18} color={brand.inactive} />
+            <Ionicons name="checkmark" size={18} color="#848484" />
           </Animated.View>
         </Animated.View>
       </Pressable>
@@ -2625,7 +2611,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                               <Text style={ap.personReason}>Verzoek verstuurd</Text>
                             </View>
                             <Pressable style={ap.rejectBtn} onPress={() => handleCancelOutgoing(req.id, req.friend_id)}>
-                              <Ionicons name="close" size={18} color={brand.inactive} />
+                              <Ionicons name="close" size={18} color="#848484" />
                             </Pressable>
                           </Pressable>
                         </AnimatedRow>
@@ -2656,7 +2642,7 @@ const ap = StyleSheet.create({
   tabBar: { flexDirection: 'row', height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.4)', padding: 5, alignItems: 'center', marginBottom: 20 },
   tabIndicator: { position: 'absolute', top: 5, bottom: 5, borderRadius: 20, backgroundColor: streepsMagenta + '30' },
   tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%', borderRadius: 20 },
-  tabText: { fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive, fontWeight: '500' },
+  tabText: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', fontWeight: '500' },
   tabTextActive: { color: streepsMagenta },
 
   // Card
@@ -2666,20 +2652,20 @@ const ap = StyleSheet.create({
   // Person row
   personRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 16 },
   personAvatar: { width: 52, height: 52, borderRadius: 26, marginRight: 14 },
-  personAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  personAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   personAvatarText: { color: '#333', fontSize: 20, fontWeight: '600' },
   personName: { fontFamily: 'Unbounded', fontSize: 13, color: '#FFFFFF' },
-  personReason: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, marginTop: 2 },
+  personReason: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginTop: 2 },
 
   // Buttons
-  addBtn: { flexDirection: 'row', height: 36, borderRadius: 18, backgroundColor: brand.streepsRed, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, gap: 5 },
+  addBtn: { flexDirection: 'row', height: 36, borderRadius: 18, backgroundColor: '#FF0085', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, gap: 5 },
   addBtnText: { fontFamily: 'Unbounded', fontSize: 11, color: '#FFFFFF' },
   sentBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.3)', alignItems: 'center', justifyContent: 'center' },
-  acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: brand.cyan, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  acceptBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   rejectBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.3)', alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
 
-  sectionLabel: { fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive, marginBottom: 8, marginLeft: 4 },
-  emptyText: { fontFamily: 'Unbounded', fontSize: 14, color: brand.inactive, textAlign: 'center', paddingTop: 40 },
+  sectionLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginBottom: 8, marginLeft: 4 },
+  emptyText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', textAlign: 'center', paddingTop: 40 },
 });
 
 // ── Skeleton loading for conversation list ──
@@ -2795,9 +2781,16 @@ export default function ChatScreen() {
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
-  // Prefetch messages for visible conversations into SQLite
+  // Preload messages for visible conversations
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
-  const { onViewableItemsChanged } = usePrefetchMessages();
+  const onViewableItemsChanged = useCallback(({ changed }: { viewableItems: any[]; changed: any[] }) => {
+    changed.forEach((token: any) => {
+      const convId = token.item?.id;
+      if (!convId) return;
+      if (token.isViewable) { cancelUnload(convId); preloadConversation(convId); }
+      else { scheduleUnload(convId); }
+    });
+  }, []);
 
   // Fetch pending incoming friend request count
   useEffect(() => {
@@ -2872,6 +2865,24 @@ export default function ChatScreen() {
   const searchAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const swipeX = useRef(new Animated.Value(0)).current;
+
+  const OVERVIEW_PARALLAX = -SCREEN_W * 0.3;
+
+  const overviewTranslateX = useMemo(() => {
+    const baseSlide = slideAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, OVERVIEW_PARALLAX],
+    });
+
+    const swipeCorrection = swipeX.interpolate({
+      inputRange: [0, SCREEN_W],
+      outputRange: [0, -OVERVIEW_PARALLAX],
+      extrapolate: 'clamp',
+    });
+
+    return Animated.add(baseSlide, swipeCorrection);
+  }, [slideAnim, swipeX]);
+
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const navBarHeight = 77 + (insets.bottom || 12) / 2;
@@ -3015,7 +3026,7 @@ export default function ChatScreen() {
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
       {/* ── Conversation list (always mounted) ── */}
-      <View style={{ flex: 1, paddingTop: insets.top }}>
+      <Animated.View style={{ flex: 1, paddingTop: insets.top, transform: [{ translateX: overviewTranslateX }] }}>
         {/* Aurora */}
         <View style={cs.auroraWrap} pointerEvents="none">
           <AuroraPresetView preset="header" colors={CHAT_AURORA_COLORS} animated gentle />
@@ -3039,7 +3050,7 @@ export default function ChatScreen() {
               <View style={{
                 position: 'absolute', top: -4, right: -4,
                 width: 10, height: 10, borderRadius: 5,
-                backgroundColor: brand.cyan,
+                backgroundColor: '#00BEAE',
               }} />
             )}
           </Pressable>
@@ -3057,7 +3068,7 @@ export default function ChatScreen() {
           <TextInput
             style={cs.searchInput}
             placeholder="Zoek conversatie..."
-            placeholderTextColor={brand.inactive}
+            placeholderTextColor="#848484"
             value={searchText}
             onChangeText={setSearchText}
             autoFocus={searchVisible}
@@ -3126,9 +3137,9 @@ export default function ChatScreen() {
                 )}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {item.type === 'group' && <Ionicons name="people" size={14} color={brand.inactive} style={{ marginRight: 6 }} />}
+                    {item.type === 'group' && <Ionicons name="people" size={14} color="#848484" style={{ marginRight: 6 }} />}
                     <Text style={cs.convName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={[cs.convTime, item.unread > 0 && { color: brand.cyan }]}>{formatTime(item.last_message_at)}</Text>
+                    <Text style={[cs.convTime, item.unread > 0 && { color: '#00BEAE' }]}>{formatTime(item.last_message_at)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {item.last_message ? (
@@ -3145,7 +3156,7 @@ export default function ChatScreen() {
             )}
           />
         </FadeMask>
-      </View>
+      </Animated.View>
 
       {/* ── Chat detail overlay (slides in from right) ── */}
       {showingChat && currentConv && (
@@ -3213,7 +3224,7 @@ const cs = StyleSheet.create({
   // Header
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, gap: 14 },
   myAvatar: { width: 40, height: 40, borderRadius: 20 },
-  myAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  myAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   myAvatarText: { color: '#333', fontSize: 16, fontWeight: '600' },
   title: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF', flex: 1 },
 
@@ -3224,23 +3235,23 @@ const cs = StyleSheet.create({
   // Conversation list
   convRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   convAvatar: { width: 54, height: 54, borderRadius: 27, marginRight: 14 },
-  convAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  convAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   convAvatarText: { color: '#333', fontSize: 18, fontWeight: '600' },
   convName: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', flex: 1, marginRight: 8 },
-  convTime: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive },
-  convPreview: { fontFamily: 'Unbounded', fontSize: 12, color: brand.inactive, marginTop: 3, flex: 1 },
+  convTime: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484' },
+  convPreview: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 3, flex: 1 },
   convPreviewUnread: { color: '#FFFFFF', fontWeight: '600' },
-  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: brand.cyan, marginLeft: 10 },
+  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#00BEAE', marginLeft: 10 },
 
   // Contacts
-  contactsLabel: { fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive, paddingHorizontal: 20, marginBottom: 10 },
+  contactsLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', paddingHorizontal: 20, marginBottom: 10 },
   contactItem: { alignItems: 'center', width: 64 },
   contactAvatar: { width: 52, height: 52, borderRadius: 26 },
-  contactAvatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  contactAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   contactAvatarText: { color: '#333', fontSize: 18, fontWeight: '600' },
   contactName: { fontFamily: 'Unbounded', fontSize: 11, color: '#FFFFFF', marginTop: 6, textAlign: 'center' },
 
   // Empty
   emptyText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF' },
-  emptySubtext: { fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive, marginTop: 6 },
+  emptySubtext: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', marginTop: 6 },
 });
