@@ -10,46 +10,131 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  colors,
+  radius,
+  typography,
+  space,
+  components,
+  animation,
+  streepsMagenta,
+  streepsCyan,
+} from '../theme';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CameraModalProps {
   visible: boolean;
   onClose: () => void;
   onImageCaptured: (uri: string, mimeType?: string) => void;
+  title?: string;
 }
 
-export default function CameraModal({ visible, onClose, onImageCaptured }: CameraModalProps) {
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const SHEET_BG = colors.dark.background.secondary;
+const SURFACE = colors.dark.surface.default;
+const BORDER = colors.dark.border.default;
+const TEXT_PRIMARY = colors.dark.text.primary;
+const TEXT_SECONDARY = colors.dark.text.secondary;
+const SCRIM_COLOR = colors.dark.scrim;
+const SHEET_RADIUS = radius['2xl'];
+const CARD_RADIUS = radius.lg;
+const CARD_HEIGHT = 120;
+const HANDLE_WIDTH = components.modal.handleWidth;
+const HANDLE_HEIGHT = components.modal.handleHeight;
+const PRESS_SCALE = animation.press.scale;
+
+const MAGENTA = streepsMagenta;       // #FF0085
+const MAGENTA_BG = 'rgba(255, 0, 133, 0.12)';
+const CYAN = streepsCyan;             // #00BEAE
+const CYAN_BG = 'rgba(0, 190, 174, 0.12)';
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export default function CameraModal({
+  visible,
+  onClose,
+  onImageCaptured,
+  title = 'Kies een foto',
+}: CameraModalProps) {
   const insets = useSafeAreaInsets();
 
-  // Animations
+  // ─── Animation values ──────────────────────────────────────────────────
   const scrimAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim = useRef(new Animated.Value(0)).current;
+  const cameraScale = useRef(new Animated.Value(1)).current;
+  const galleryScale = useRef(new Animated.Value(1)).current;
   const [showModal, setShowModal] = React.useState(false);
 
-  // Open animation
+  // ─── Open animation ───────────────────────────────────────────────────
   React.useEffect(() => {
     if (visible) {
       setShowModal(true);
       scrimAnim.setValue(0);
       sheetAnim.setValue(0);
       Animated.parallel([
-        Animated.timing(scrimAnim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.spring(sheetAnim, { toValue: 1, damping: 22, stiffness: 300, mass: 1, useNativeDriver: true }),
+        Animated.timing(scrimAnim, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(sheetAnim, {
+          toValue: 1,
+          damping: 20,
+          stiffness: 280,
+          mass: 0.9,
+          useNativeDriver: true,
+        }),
       ]).start();
     }
   }, [visible]);
 
+  // ─── Close animation ──────────────────────────────────────────────────
   const animateClose = useCallback(() => {
     Animated.parallel([
-      Animated.timing(scrimAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-      Animated.timing(sheetAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(scrimAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.bezier(0.4, 0, 0.6, 1),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.bezier(0.4, 0, 0.6, 1),
+        useNativeDriver: true,
+      }),
     ]).start(() => {
       setShowModal(false);
       onClose();
     });
   }, [onClose]);
 
+  // ─── Press animations ─────────────────────────────────────────────────
+  const animatePressIn = useCallback((scaleRef: Animated.Value) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.spring(scaleRef, {
+      toValue: PRESS_SCALE,
+      damping: 15,
+      stiffness: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const animatePressOut = useCallback((scaleRef: Animated.Value) => {
+    Animated.spring(scaleRef, {
+      toValue: 1,
+      damping: 15,
+      stiffness: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // ─── Image picker handlers ────────────────────────────────────────────
   const handleCamera = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') return;
@@ -77,6 +162,7 @@ export default function CameraModal({ visible, onClose, onImageCaptured }: Camer
     }
   }, [onImageCaptured, animateClose]);
 
+  // ─── Early return ─────────────────────────────────────────────────────
   if (!showModal) return null;
 
   const sheetTranslate = sheetAnim.interpolate({
@@ -84,50 +170,75 @@ export default function CameraModal({ visible, onClose, onImageCaptured }: Camer
     outputRange: [300, 0],
   });
 
-  // ─── Action Sheet Mode ───
+  // ─── Render ────────────────────────────────────────────────────────────
   return (
     <Modal visible={showModal} transparent animationType="none" statusBarTranslucent>
       {/* Scrim */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimAnim }]}>
-        <Pressable style={styles.scrim} onPress={animateClose} />
+        <Pressable
+          style={styles.scrim}
+          onPress={animateClose}
+          accessibilityLabel="Sluiten"
+        />
       </Animated.View>
 
       {/* Bottom sheet */}
       <Animated.View
         style={[
           styles.sheet,
-          { paddingBottom: insets.bottom + 12, transform: [{ translateY: sheetTranslate }] },
+          {
+            paddingBottom: insets.bottom + 12,
+            transform: [{ translateY: sheetTranslate }],
+          },
         ]}
       >
+        {/* Drag handle */}
         <View style={styles.handle} />
 
-        <Text style={styles.sheetTitle}>Profielfoto</Text>
+        {/* Title */}
+        <Text style={styles.title}>{title}</Text>
 
-        <Pressable style={styles.option} onPress={handleCamera}>
-          <View style={styles.optionIcon}>
-            <Ionicons name="camera" size={24} color="#FF004D" />
-          </View>
-          <View style={styles.optionTextWrap}>
-            <Text style={styles.optionTitle}>Maak foto</Text>
-            <Text style={styles.optionSub}>Open de camera</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#848484" />
-        </Pressable>
+        {/* Option cards row */}
+        <View style={styles.cardsRow}>
+          {/* Camera card */}
+          <Animated.View style={[styles.cardWrapper, { transform: [{ scale: cameraScale }] }]}>
+            <Pressable
+              style={styles.card}
+              onPress={handleCamera}
+              onPressIn={() => animatePressIn(cameraScale)}
+              onPressOut={() => animatePressOut(cameraScale)}
+              accessibilityLabel="Maak een foto met de camera"
+            >
+              <View style={[styles.iconCircle, { backgroundColor: MAGENTA_BG }]}>
+                <Ionicons name="camera" size={28} color={MAGENTA} />
+              </View>
+              <Text style={styles.cardLabel}>Camera</Text>
+            </Pressable>
+          </Animated.View>
 
-        <View style={styles.divider} />
+          {/* Gallery card */}
+          <Animated.View style={[styles.cardWrapper, { transform: [{ scale: galleryScale }] }]}>
+            <Pressable
+              style={styles.card}
+              onPress={handleGallery}
+              onPressIn={() => animatePressIn(galleryScale)}
+              onPressOut={() => animatePressOut(galleryScale)}
+              accessibilityLabel="Kies een foto uit de galerij"
+            >
+              <View style={[styles.iconCircle, { backgroundColor: CYAN_BG }]}>
+                <Ionicons name="images" size={28} color={CYAN} />
+              </View>
+              <Text style={styles.cardLabel}>Galerij</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
 
-        <Pressable style={styles.option} onPress={handleGallery}>
-          <View style={[styles.optionIcon, { backgroundColor: 'rgba(0, 190, 174, 0.12)' }]}>
-            <Ionicons name="images" size={24} color="#00BEAE" />
-          </View>
-          <View style={styles.optionTextWrap}>
-            <Text style={styles.optionTitle}>Kies uit galerij</Text>
-            <Text style={styles.optionSub}>Selecteer een bestaande foto</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#848484" />
-        </Pressable>
-
-        <Pressable style={styles.cancelBtn} onPress={animateClose}>
+        {/* Cancel button */}
+        <Pressable
+          style={styles.cancelBtn}
+          onPress={animateClose}
+          accessibilityLabel="Annuleren"
+        >
           <Text style={styles.cancelText}>Annuleren</Text>
         </Pressable>
       </Animated.View>
@@ -135,90 +246,93 @@ export default function CameraModal({ visible, onClose, onImageCaptured }: Camer
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  // ─── Scrim ───
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: SCRIM_COLOR,
   },
 
-  // ─── Bottom Sheet ───
   sheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1A1A2E',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  sheetTitle: {
-    fontFamily: 'Unbounded',
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 20,
+    backgroundColor: SHEET_BG,
+    borderTopLeftRadius: SHEET_RADIUS,
+    borderTopRightRadius: SHEET_RADIUS,
+    paddingHorizontal: space[5],
+    paddingTop: space[3],
   },
 
-  // ─── Options ───
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
+  handle: {
+    width: HANDLE_WIDTH,
+    height: HANDLE_HEIGHT,
+    borderRadius: HANDLE_HEIGHT / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'center',
+    marginBottom: space[4],
   },
-  optionIcon: {
+
+  title: {
+    fontFamily: 'Unbounded',
+    fontSize: typography.heading3.fontSize,
+    lineHeight: typography.heading3.lineHeight,
+    fontWeight: typography.heading3.fontWeight,
+    color: TEXT_PRIMARY,
+    textAlign: 'center',
+    marginBottom: space[5],
+  },
+
+  cardsRow: {
+    flexDirection: 'row',
+    gap: space[3],
+    marginBottom: space[4],
+  },
+
+  cardWrapper: {
+    flex: 1,
+  },
+
+  card: {
+    height: CARD_HEIGHT,
+    backgroundColor: SURFACE,
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[3],
+  },
+
+  iconCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 0, 77, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-  },
-  optionTextWrap: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontFamily: 'Unbounded',
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
-  optionSub: {
-    fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#848484',
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginLeft: 62,
   },
 
-  // ─── Cancel ───
+  cardLabel: {
+    fontFamily: 'Unbounded',
+    fontSize: typography.bodySm.fontSize,
+    lineHeight: typography.bodySm.lineHeight,
+    fontWeight: typography.bodySm.fontWeight,
+    color: TEXT_PRIMARY,
+  },
+
   cancelBtn: {
-    marginTop: 16,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 9999,
     backgroundColor: 'rgba(78, 78, 78, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   cancelText: {
     fontFamily: 'Unbounded',
-    fontSize: 15,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: TEXT_SECONDARY,
   },
-
 });
