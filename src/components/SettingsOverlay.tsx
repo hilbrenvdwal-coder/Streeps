@@ -939,7 +939,7 @@ export default function SettingsOverlay({
                       <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
                     </View>
                     <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.7 }} accessibilityLabel={`${drink.name} verwijderen`} accessibilityRole="button">
-                      <Ionicons name="close-circle" size={20} color="#EB5466" />
+                      <Ionicons name="close-circle" size={20} color="#FF0085" />
                     </Pressable>
                   </View>
                 </React.Fragment>
@@ -1055,7 +1055,7 @@ export default function SettingsOverlay({
                                 accessibilityLabel="Streepje verwijderen"
                                 accessibilityRole="button"
                               >
-                                <Ionicons name="remove" size={16} color="#EB5466" />
+                                <Ionicons name="remove" size={16} color="#FF0085" />
                               </Pressable>
                             )}
                           </View>
@@ -1069,7 +1069,7 @@ export default function SettingsOverlay({
                             <Text style={s.memberActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
                           </Pressable>
                           <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={({ pressed }) => [s.memberActionBtnDanger, pressed && { opacity: 0.7 }]}>
-                            <Ionicons name="person-remove-outline" size={18} color="#EB5466" />
+                            <Ionicons name="person-remove-outline" size={18} color="#FF0085" />
                             <Text style={s.memberActionTextDanger}>Verwijderen</Text>
                           </Pressable>
                         </View>
@@ -1096,20 +1096,20 @@ export default function SettingsOverlay({
           <View style={[s.card, { marginTop: 24 }]}>
             {isAdmin && (
               <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleRemoveAdmin}>
-                <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                <Ionicons name="shield-outline" size={20} color="#FF0085" style={{ marginRight: 12 }} />
                 <Text style={s.dangerRowText}>Admin afstaan</Text>
               </Pressable>
             )}
             {isAdmin && <View style={s.divider} />}
             <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleLeaveGroup}>
-              <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+              <Ionicons name="exit-outline" size={20} color="#FF0085" style={{ marginRight: 12 }} />
               <Text style={s.dangerRowText}>Groep verlaten</Text>
             </Pressable>
             {isAdmin && (
               <>
                 <View style={s.divider} />
                 <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
-                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                  <Ionicons name="trash-outline" size={20} color="#FF0085" style={{ marginRight: 12 }} />
                   <Text style={s.dangerRowText}>Groep verwijderen</Text>
                 </Pressable>
               </>
@@ -1154,7 +1154,7 @@ const s = StyleSheet.create({
 
   // Inputs
   inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 25, marginHorizontal: 12, marginVertical: 8 },
-  inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
+  inputText: { flex: 1, fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
 
   // Categories
   catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
@@ -1188,12 +1188,12 @@ const s = StyleSheet.create({
     fontVariant: ['tabular-nums'] as any,
   },
   catPriceInputError: {
-    color: '#EB5466',
+    color: '#FF0085',
   },
   priceError: {
     fontFamily: 'Unbounded',
     fontSize: 10,
-    color: '#EB5466',
+    color: '#FF0085',
     textAlign: 'right' as const,
     paddingRight: 16,
     paddingBottom: 4,
@@ -1231,7 +1231,7 @@ const s = StyleSheet.create({
   memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(0,217,163,0.1)' },
   memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', flexShrink: 1 },
   memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(235,84,102,0.1)' },
-  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466', flexShrink: 1 },
+  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#FF0085', flexShrink: 1 },
 
   // Invite
   inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, minHeight: 52 },
@@ -1240,5 +1240,5 @@ const s = StyleSheet.create({
 
   // Danger
   dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
-  dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
+  dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FF0085', flex: 1 },
 });
