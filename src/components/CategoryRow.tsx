@@ -1,70 +1,33 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, Pressable, View, Animated, Easing, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
-import { AuroraPresetView, type AuroraPreset } from './AuroraBackground';
 
 /**
- * Category Row — Figma nodes 122:36, 122:89, 122:80, 122:71
+ * Category Row — pill-shaped row with left accent strip in category color.
  *
- * 350×50, borderRadius 25, aurora blob background per category.
+ * Height: 50, borderRadius: 25 (pill shape).
  * Font: Unbounded 20px regular, white. Name left, price right.
  * Gap between rows: 9px (handled by parent via marginBottom).
  *
- * Selected state: animated glow border + shadow (same pattern as AI chat input glow).
+ * Selected state: animated glow border + tinted background + shadow.
  */
 
 interface CategoryRowProps {
   name: string;
   price: number;       // cents
-  color: string;       // kept for selected glow color
-  categoryIndex?: number; // 1–4 → selects aurora preset
+  color: string;       // category color — used for accent, glow, selected tint
+  categoryIndex?: number; // kept for API compat, not used for styling anymore
   selected?: boolean;
   onPress: () => void;
 }
-
-const CATEGORY_PRESETS: Record<number, AuroraPreset> = {
-  1: 'normaal',
-  2: 'speciaal',
-  3: 'cat3',
-  4: 'cat4',
-};
-
-// Per-category aurora colors: [outermost → innermost ellipse]
-// Each layer is a different hue — real aurora color combos, not just lighter variants
-const CATEGORY_AURORA: Record<number, string[]> = {
-  1: ['#00BEAE', '#4A6CF7', '#00FE96', '#8B5CF6'],  // teal → blauw → groen → paars
-  2: ['#FF004D', '#FF00F5', '#FF6B00', '#8B5CF6'],  // rood → magenta → oranje → paars
-  3: ['#4A6CF7', '#00BEAE', '#8B5CF6', '#00FE96'],  // blauw → teal → paars → groen
-  4: ['#8B5CF6', '#FF004D', '#4A6CF7', '#FF00F5'],  // paars → rood → blauw → magenta
-};
-
-// Glow shadow + border colors per category (theme color)
-const GLOW_COLORS: Record<number, string> = {
-  1: '#00BEAE',
-  2: '#FF004D',
-  3: '#4A6CF7',
-  4: '#8B5CF6',
-};
-
-const GLOW_BORDER_COLORS: Record<number, string> = {
-  1: '#00D9A3',
-  2: '#FF3377',
-  3: '#6B8AFF',
-  4: '#A47BFF',
-};
 
 export default function CategoryRow({
   name,
   price,
   color,
-  categoryIndex = 1,
   selected,
   onPress,
 }: CategoryRowProps) {
   const priceStr = `\u20AC ${(price / 100).toFixed(2).replace('.', ',')}`;
-  const preset = CATEGORY_PRESETS[((categoryIndex - 1) % 4) + 1];
-  const catKey = ((categoryIndex - 1) % 4) + 1;
 
   // Shared glow animation value
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -78,13 +41,31 @@ export default function CategoryRow({
     }).start();
   }, [selected]);
 
-  // Glow interpolations (same pattern as AI chat input)
-  const glowBorderWidth = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1.5] });
-  const glowBorderColor = glowAnim.interpolate({
+  // Glow interpolations
+  const animatedBg = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['transparent', GLOW_BORDER_COLORS[catKey]],
+    outputRange: ['#252540', color + '15'],
   });
-  const glowShadowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] });
+  const animatedBorderColor = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#2D2D44', color],
+  });
+  const animatedBorderWidth = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.5],
+  });
+  const animatedAccentWidth = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [3, 4],
+  });
+  const animatedPriceColor = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#A0A0B8', color],
+  });
+  const animatedShadowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.3],
+  });
 
   // Press feedback: subtle scale
   const pressScale = useRef(new Animated.Value(1)).current;
@@ -104,49 +85,38 @@ export default function CategoryRow({
           style={[
             s.glowWrap,
             {
-              shadowColor: GLOW_COLORS[catKey],
-              shadowOpacity: glowShadowOpacity,
+              shadowColor: color,
+              shadowOpacity: animatedShadowOpacity,
               ...(Platform.OS === 'android' ? { elevation: selected ? 8 : 0 } : {}),
             },
           ]}
         >
-          {/* Bar — fixed size, no animated margin/border */}
-          <View style={s.bar}>
-            <Animated.View style={[s.auroraWrap, { opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }]} pointerEvents="none">
-              <MaskedView
-                style={StyleSheet.absoluteFillObject}
-                maskElement={
-                  <LinearGradient
-                    colors={['#fff', '#fff', 'transparent']}
-                    locations={[0, 0.35, 0.95]}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                }
-              >
-                <AuroraPresetView
-                  preset={preset}
-                  colors={CATEGORY_AURORA[catKey]}
-                  animated={selected}
-                  noMask
-                />
-              </MaskedView>
-            </Animated.View>
-            <Text style={s.name}>{name}</Text>
-            <Text style={s.price}>{priceStr}</Text>
-          </View>
-          {/* Absolute border overlay — does NOT affect layout */}
+          {/* Bar — responsive width, accent strip inside */}
           <Animated.View
             style={[
-              s.borderOverlay,
+              s.bar,
               {
-                borderWidth: glowBorderWidth,
-                borderColor: glowBorderColor,
+                backgroundColor: animatedBg,
+                borderColor: animatedBorderColor,
+                borderWidth: animatedBorderWidth,
               },
             ]}
-            pointerEvents="none"
-          />
+          >
+            {/* Left accent strip */}
+            <Animated.View
+              style={[
+                s.accentStrip,
+                {
+                  backgroundColor: color,
+                  width: animatedAccentWidth,
+                },
+              ]}
+            />
+            <Text style={s.name}>{name}</Text>
+            <Animated.Text style={[s.price, { color: animatedPriceColor }]}>
+              {priceStr}
+            </Animated.Text>
+          </Animated.View>
         </Animated.View>
       </Animated.View>
     </Pressable>
@@ -158,43 +128,35 @@ const s = StyleSheet.create({
   glowWrap: {
     borderRadius: 25,
     shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 8,
-  },
-  borderOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 25,
+    shadowRadius: 12,
   },
   bar: {
-    width: 350,
-    maxWidth: '100%',
-    alignSelf: 'center',
+    width: '100%',
     height: 50,
     borderRadius: 25,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
+    paddingLeft: 20,
     overflow: 'hidden',
   },
-  auroraWrap: {
+  accentStrip: {
     position: 'absolute',
-    top: -15,
-    left: -10,
-    width: 380,
-    height: 80,
+    left: 0,
+    top: 8,
+    bottom: 8,
+    borderRadius: 2,
   },
   name: {
     fontFamily: 'Unbounded',
     fontSize: 20,
     fontWeight: '400',
     color: '#FFFFFF',
-    zIndex: 1,
   },
   price: {
     fontFamily: 'Unbounded',
     fontSize: 20,
     fontWeight: '400',
-    color: '#FFFFFF',
-    zIndex: 1,
   },
 });
