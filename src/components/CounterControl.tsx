@@ -43,20 +43,29 @@ function useRepeatPress(onAction: () => void) {
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const fired = useRef(false);
+  const actionRef = useRef(onAction);
 
-  const start = useCallback(() => {
-    fired.current = false;
-    holdTimer.current = setTimeout(() => {
-      fired.current = true;
-      onAction();
-      repeatTimer.current = setInterval(onAction, 166);
-    }, 300);
-  }, [onAction]);
+  useEffect(() => { actionRef.current = onAction; }, [onAction]);
 
   const stop = useCallback(() => {
     if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
     if (repeatTimer.current) { clearInterval(repeatTimer.current); repeatTimer.current = null; }
   }, []);
+
+  const start = useCallback(() => {
+    fired.current = false;
+    stop(); // Clear any existing timers first
+    const startTime = Date.now();
+    holdTimer.current = setTimeout(() => {
+      fired.current = true;
+      actionRef.current();
+      repeatTimer.current = setInterval(() => {
+        // Safety valve: stop after 10 seconds
+        if (Date.now() - startTime > 10000) { stop(); return; }
+        actionRef.current();
+      }, 166);
+    }, 300);
+  }, [stop]);
 
   return { start, stop, fired };
 }
@@ -69,7 +78,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
 
   useEffect(() => {
     return () => { minusRepeat.stop(); plusRepeat.stop(); };
-  }, []);
+  }, [minusRepeat, plusRepeat]);
 
   // ── Number transition: overlapping layer stack ──
   // Each value gets its own layer that fades in/out independently — no interrupts needed
@@ -164,7 +173,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
   return (
     <View style={s.row}>
       {/* ── Minus button ── */}
-      <Pressable style={[s.glowWrap, s.minusGlow]} onPress={() => { if (!minusRepeat.fired.current) onDecrement(); }} onPressIn={() => { minus.fadeIn(); minusRepeat.start(); }} onPressOut={() => { minus.fadeOut(); minusRepeat.stop(); }} hitSlop={10}>
+      <Pressable style={[s.glowWrap, s.minusGlow]} onPress={() => { if (!minusRepeat.fired.current) onDecrement(); }} onPressIn={() => { minus.fadeIn(); minusRepeat.start(); }} onPressOut={() => { minus.fadeOut(); minusRepeat.stop(); }} onResponderTerminate={() => { minusRepeat.stop(); }} hitSlop={10}>
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(minus.opacity, 0.4) as any) as any }]}>
           <View style={s.minusLine} />
         </Animated.View>
@@ -217,7 +226,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
       </Pressable>
 
       {/* ── Plus button ── */}
-      <Pressable style={[s.glowWrap, s.plusGlow]} onPress={() => { if (!plusRepeat.fired.current) onIncrement(); }} onPressIn={() => { plus.fadeIn(); plusRepeat.start(); }} onPressOut={() => { plus.fadeOut(); plusRepeat.stop(); }} hitSlop={10}>
+      <Pressable style={[s.glowWrap, s.plusGlow]} onPress={() => { if (!plusRepeat.fired.current) onIncrement(); }} onPressIn={() => { plus.fadeIn(); plusRepeat.start(); }} onPressOut={() => { plus.fadeOut(); plusRepeat.stop(); }} onResponderTerminate={() => { plusRepeat.stop(); }} hitSlop={10}>
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(plus.opacity, 0.4) as any) as any }]}>
           <View style={s.iconWrap}>
             <View style={s.plusH} />
