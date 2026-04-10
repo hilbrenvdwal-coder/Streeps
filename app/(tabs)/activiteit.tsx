@@ -282,10 +282,9 @@ export default function ActiviteitScreen() {
               <Text style={styles.emptyText}>Nog geen streepjes gezet</Text>
             }
             renderItem={({ item, index }) => {
-              const catColor = item.type === 'gift_sent' ? '#00BEAE'
-                : t.categoryColors[(item.category - 1) % 4];
+              const catColor = t.categoryColors[(item.category - 1) % 4];
               const catLabel = item.type === 'gift_sent'
-                ? 'Gedoneerd'
+                ? `Gedoneerd · Cat ${item.category}`
                 : `Categorie ${item.category}`;
               const displayCount = item.type === 'gift_sent'
                 ? (item.gift_quantity ?? 1)
