@@ -10,6 +10,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { AuroraPresetView } from './AuroraBackground';
@@ -254,6 +255,12 @@ export default function StreepjesVerificatieModal({
         {/* Sheet */}
         <Animated.View style={{ transform: [{ translateY: slideY }] }}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
+            <BlurView
+              intensity={40}
+              tint="dark"
+              style={StyleSheet.absoluteFillObject}
+              experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+            />
             {/* Zone 1: Header */}
             <View style={s.handle} />
             <Text style={s.title}>Bevestig je streepjes</Text>
@@ -263,7 +270,6 @@ export default function StreepjesVerificatieModal({
               style={[
                 s.infoCard,
                 {
-                  borderLeftColor: categoryColor,
                   transform: [{ scale: cardScale }],
                   opacity: cardOpacity,
                 },
@@ -359,12 +365,13 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
-    backgroundColor: 'rgba(21, 21, 21, 0.95)',
+    backgroundColor: 'rgba(28, 28, 30, 0.85)',
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingHorizontal: 20,
     paddingBottom: 40,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   handle: {
     width: 36,
@@ -386,13 +393,11 @@ const s = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2D2D44',
+    backgroundColor: '#2C2C2E',
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
     alignSelf: 'stretch',
-    borderLeftWidth: 3,
-    borderLeftColor: '#00BEAE',
   },
   infoLeft: {
     marginRight: 16,
