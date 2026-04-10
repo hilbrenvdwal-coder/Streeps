@@ -2452,7 +2452,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
 
   const apScrimOpacity = Animated.multiply(
     anim,
-    apSwipeX.interpolate({ inputRange: [0, SCREEN_W], outputRange: [1, 0], extrapolate: 'clamp' })
+    apSwipeX.interpolate({ inputRange: [0, SCREEN_W * 0.5, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' })
   );
 
   if (!show) return null;
