@@ -360,7 +360,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
-    backgroundColor: 'rgba(28, 28, 30, 0.55)',
+    backgroundColor: 'rgba(10, 10, 12, 0.65)',
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingHorizontal: 20,
@@ -388,7 +388,7 @@ const s = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#1A1A1C',
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
