@@ -80,8 +80,24 @@ export function useHistory() {
       gift_other_name: recipientNames[g.recipient_id] ?? '?',
     }));
 
+    // Filter out tallies that overlap with a gift (same category, same time window)
+    // These are the "payment" tallies auto-created by sendGift — don't show them separately
+    const giftTimestamps = sentItems.map(g => ({
+      ts: new Date(g.created_at).getTime(),
+      category: g.category,
+      count: g.gift_quantity ?? 1,
+    }));
+    const filteredTallies = tallyItems.filter(t => {
+      const tTs = new Date(t.created_at).getTime();
+      return !giftTimestamps.some(g =>
+        g.category === t.category &&
+        Math.abs(tTs - g.ts) < 5000 &&
+        (t.count ?? 1) === g.count
+      );
+    });
+
     // Merge and sort by date (no received gifts — you don't pay for those)
-    const all = [...tallyItems, ...sentItems]
+    const all = [...filteredTallies, ...sentItems]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 50);
 
