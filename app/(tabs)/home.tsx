@@ -943,6 +943,7 @@ export default function HomeScreen() {
         count={tallyCount}
         categoryName={selectedCategory ? getCategoryName(selectedCategory) : ''}
         categoryColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : '#00BEAE'}
+        categoryPrice={selectedCategory ? getCategoryPrice(selectedCategory) : undefined}
         credit={selectedCategory ? (credits[selectedCategory] || 0) : 0}
         onConfirm={handleConfirmTally}
         onCancel={() => setShowVerification(false)}

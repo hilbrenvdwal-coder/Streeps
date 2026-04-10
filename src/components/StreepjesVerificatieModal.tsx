@@ -1,7 +1,19 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Animated, Easing, StyleSheet, View, Text, Pressable, Modal, Platform, useWindowDimensions } from 'react-native';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  Modal,
+  Platform,
+  useWindowDimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { AuroraPresetView } from './AuroraBackground';
+
 const FLASH_AURORA_COLORS = ['#00FE96', '#F1F1F1', '#00BEAE', '#FFFFFF'];
 
 interface Props {
@@ -9,6 +21,7 @@ interface Props {
   count: number;
   categoryName: string;
   categoryColor: string;
+  categoryPrice?: number; // price per tally in cents
   credit?: number;
   onConfirm: () => void;
   onCancel: () => void;
@@ -18,6 +31,8 @@ export default function StreepjesVerificatieModal({
   visible,
   count,
   categoryName,
+  categoryColor,
+  categoryPrice,
   credit = 0,
   onConfirm,
   onCancel,
@@ -25,50 +40,166 @@ export default function StreepjesVerificatieModal({
   const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const [show, setShow] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // Animations
+  const scrimOpacity = useRef(new Animated.Value(0)).current;
   const slideY = useRef(new Animated.Value(300)).current;
+  const cardScale = useRef(new Animated.Value(0.8)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const confirmScale = useRef(new Animated.Value(1)).current;
 
   // Aurora flash
   const flashScale = useRef(new Animated.Value(0)).current;
   const flashOpacity = useRef(new Animated.Value(0)).current;
 
+  // Price calculations (prices are in cents)
+  const hasPrice = categoryPrice != null && categoryPrice > 0;
+  const pricePerUnit = hasPrice ? (categoryPrice / 100).toFixed(2).replace('.', ',') : null;
+  const totalPrice = hasPrice ? ((categoryPrice * count) / 100).toFixed(2).replace('.', ',') : null;
+
   useEffect(() => {
     if (visible) {
       setShow(true);
       setConfirming(false);
-      overlayOpacity.setValue(0);
+      scrimOpacity.setValue(0);
       slideY.setValue(300);
+      cardScale.setValue(0.8);
+      cardOpacity.setValue(0);
+      confirmScale.setValue(1);
       flashScale.setValue(0);
       flashOpacity.setValue(0);
+
       Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(slideY, { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        // Scrim fade in
+        Animated.timing(scrimOpacity, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        // Sheet spring up
+        Animated.spring(slideY, {
+          toValue: 0,
+          damping: 20,
+          stiffness: 180,
+          mass: 1,
+          useNativeDriver: true,
+        }),
+        // Info card stagger
+        Animated.sequence([
+          Animated.delay(100),
+          Animated.parallel([
+            Animated.spring(cardScale, {
+              toValue: 1,
+              damping: 16,
+              stiffness: 160,
+              mass: 1,
+              useNativeDriver: true,
+            }),
+            Animated.timing(cardOpacity, {
+              toValue: 1,
+              duration: 250,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
       ]).start();
     } else if (show && !confirming) {
+      // Close cancel
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-        Animated.timing(slideY, { toValue: 300, duration: 250, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(slideY, {
+          toValue: 300,
+          duration: 250,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrimOpacity, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]).start(() => setShow(false));
     }
   }, [visible]);
 
   const handleConfirm = useCallback(() => {
     setConfirming(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     flashScale.setValue(0);
     flashOpacity.setValue(0);
 
-    // Aurora flash — sheet slides down, aurora fades in
+    // Confirm pulse + card shrink + sheet slide down + aurora flash
     Animated.sequence([
+      // Confirm button pulse
+      Animated.sequence([
+        Animated.spring(confirmScale, {
+          toValue: 1.05,
+          damping: 10,
+          stiffness: 300,
+          mass: 1,
+          useNativeDriver: true,
+        }),
+        Animated.spring(confirmScale, {
+          toValue: 1,
+          damping: 10,
+          stiffness: 300,
+          mass: 1,
+          useNativeDriver: true,
+        }),
+      ]),
+      // Card shrink + sheet slide + aurora
       Animated.parallel([
-        Animated.timing(slideY, { toValue: 600, duration: 300, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(flashOpacity, { toValue: 1, duration: 400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.spring(flashScale, { toValue: 1, damping: 14, stiffness: 120, mass: 1, useNativeDriver: true }),
+        Animated.timing(cardScale, {
+          toValue: 0.8,
+          duration: 200,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardOpacity, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideY, {
+          toValue: 600,
+          duration: 300,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(flashOpacity, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(flashScale, {
+          toValue: 1,
+          damping: 14,
+          stiffness: 120,
+          mass: 1,
+          useNativeDriver: true,
+        }),
       ]),
       Animated.delay(250),
+      // Fade out everything
       Animated.parallel([
-        Animated.timing(flashOpacity, { toValue: 0, duration: 400, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 400, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+        Animated.timing(flashOpacity, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrimOpacity, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]),
     ]).start(() => {
       setShow(false);
@@ -77,25 +208,40 @@ export default function StreepjesVerificatieModal({
     });
   }, [onConfirm]);
 
+  const handleCancel = useCallback(() => {
+    if (confirming) return;
+    onCancel();
+  }, [confirming, onCancel]);
+
   if (!show) return null;
 
   const flashTransform = {
     opacity: flashOpacity,
-    transform: [{
-      scale: flashScale.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.3, 2.5],
-      }),
-    }],
+    transform: [
+      {
+        scale: flashScale.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.3, 2.5],
+        }),
+      },
+    ],
   };
 
   return (
     <Modal visible transparent animationType="none">
-      <Pressable style={{ flex: 1 }} onPress={confirming ? undefined : onCancel}>
-        <Animated.View style={[s.overlayBg, { opacity: overlayOpacity }]} />
+      <Pressable style={{ flex: 1 }} onPress={handleCancel}>
+        {/* Scrim */}
+        <Animated.View style={[s.scrim, { opacity: scrimOpacity }]} />
 
-        {/* Aurora flash — real aurora preset, scaled to fill screen */}
-        <Animated.View style={[s.flashWrap, { top: SCREEN_H / 2 - 16, left: SCREEN_W / 2 - 180 }, flashTransform]} pointerEvents="none">
+        {/* Aurora flash -- real aurora preset, scaled to fill screen */}
+        <Animated.View
+          style={[
+            s.flashWrap,
+            { top: SCREEN_H / 2 - 16, left: SCREEN_W / 2 - 180 },
+            flashTransform,
+          ]}
+          pointerEvents="none"
+        >
           <AuroraPresetView
             preset="header"
             colors={FLASH_AURORA_COLORS}
@@ -104,23 +250,101 @@ export default function StreepjesVerificatieModal({
         </Animated.View>
 
         <View style={{ flex: 1 }} />
+
+        {/* Sheet */}
         <Animated.View style={{ transform: [{ translateY: slideY }] }}>
           <Pressable style={s.sheet} onPress={(e) => e.stopPropagation()}>
+            {/* Zone 1: Header */}
             <View style={s.handle} />
-            <Text style={s.title}>Weet je zeker dat je</Text>
-            <View style={s.counterBox}>
-              <Text style={s.counterValue}>{count}</Text>
-              {credit > 0 && (
-                <View style={s.creditBadge}>
-                  <Text style={s.creditText}>-{Math.min(credit, count)}</Text>
+            <Text style={s.title}>Bevestig je streepjes</Text>
+
+            {/* Zone 2: Info Card */}
+            <Animated.View
+              style={[
+                s.infoCard,
+                {
+                  borderLeftColor: categoryColor,
+                  transform: [{ scale: cardScale }],
+                  opacity: cardOpacity,
+                },
+              ]}
+            >
+              {/* Left: count with glow */}
+              <View style={s.infoLeft}>
+                <View style={s.countContainer}>
+                  {/* Glow behind count */}
+                  <View
+                    style={[
+                      s.countGlow,
+                      { backgroundColor: categoryColor },
+                    ]}
+                  />
+                  <Text style={s.countText}>{count}</Text>
                 </View>
-              )}
-            </View>
-            <Text style={s.subtitle}>
-              {categoryName} streepjes wilt toevoegen?
-            </Text>
-            <Pressable style={s.confirmBtn} onPress={handleConfirm} disabled={confirming}>
-              <Ionicons name="checkmark-sharp" size={80} color="#FFFFFF" style={s.checkIcon} />
+                {credit > 0 && (
+                  <View style={s.creditBadge}>
+                    <Text style={s.creditText}>-{Math.min(credit, count)}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Right: stacked info */}
+              <View style={s.infoRight}>
+                <Text
+                  style={[s.categoryNameText, { color: categoryColor }]}
+                  numberOfLines={1}
+                >
+                  {categoryName}
+                </Text>
+                {hasPrice && (
+                  <>
+                    <Text style={s.pricePerUnit}>
+                      {'\u20AC'}{pricePerUnit} per stuk
+                    </Text>
+                    <Text style={s.totalPrice}>
+                      Totaal: {'\u20AC'}{totalPrice}
+                    </Text>
+                  </>
+                )}
+              </View>
+            </Animated.View>
+
+            {/* Zone 3: Actions */}
+            <Animated.View
+              style={[
+                s.confirmBtn,
+                {
+                  transform: [{ scale: confirmScale }],
+                  ...Platform.select({
+                    ios: {
+                      shadowColor: '#00FE96',
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.5,
+                      shadowRadius: 16,
+                    },
+                    android: { elevation: 8 },
+                    default: {},
+                  }),
+                },
+              ]}
+            >
+              <Pressable
+                style={s.confirmBtnInner}
+                onPress={handleConfirm}
+                disabled={confirming}
+                android_ripple={{ color: 'rgba(0,0,0,0.15)' }}
+              >
+                <Ionicons name="checkmark-sharp" size={24} color="#1A1A2E" />
+                <Text style={s.confirmText}>Bevestig</Text>
+              </Pressable>
+            </Animated.View>
+
+            <Pressable
+              style={s.cancelBtn}
+              onPress={handleCancel}
+              disabled={confirming}
+            >
+              <Text style={s.cancelText}>Annuleren</Text>
             </Pressable>
           </Pressable>
         </Animated.View>
@@ -130,12 +354,12 @@ export default function StreepjesVerificatieModal({
 }
 
 const s = StyleSheet.create({
-  overlayBg: {
+  scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
-    backgroundColor: 'rgba(21, 21, 21, 0.92)',
+    backgroundColor: 'rgba(21, 21, 21, 0.95)',
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingHorizontal: 20,
@@ -143,46 +367,61 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   handle: {
-    width: 142,
+    width: 36,
     height: 4,
-    borderRadius: 3,
-    backgroundColor: 'rgba(217, 217, 217, 0.46)',
-    marginTop: 8,
-    marginBottom: 24,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginTop: 10,
+    marginBottom: 20,
   },
   title: {
-    fontFamily: 'Unbounded',
-    fontSize: 24,
-    fontWeight: '400',
+    fontFamily: 'Unbounded-SemiBold',
+    fontSize: 22,
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 20,
   },
-  counterBox: {
-    width: 75,
-    height: 75,
+
+  // Info Card
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2D2D44',
     borderRadius: 16,
-    backgroundColor: 'rgba(61, 61, 61, 0.3)',
+    padding: 16,
+    marginBottom: 24,
+    alignSelf: 'stretch',
+    borderLeftWidth: 3,
+    borderLeftColor: '#00BEAE',
+  },
+  infoLeft: {
+    marginRight: 16,
+    alignItems: 'center',
+  },
+  countContainer: {
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: '#FF0085', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 12 },
-      android: { elevation: 4 },
-      default: {},
-    }),
   },
-  counterValue: {
-    fontFamily: 'Unbounded',
-    fontSize: 32,
-    fontWeight: '400',
+  countGlow: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    opacity: 0.15,
+  },
+  countText: {
+    fontFamily: 'Unbounded-SemiBold',
+    fontSize: 48,
     color: '#FFFFFF',
+    lineHeight: 56,
   },
   creditBadge: {
     position: 'absolute',
-    top: -6,
-    right: -10,
-    backgroundColor: 'rgba(0,217,163,0.25)',
+    top: -4,
+    right: -8,
+    backgroundColor: 'rgba(0, 217, 163, 0.25)',
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -193,41 +432,64 @@ const s = StyleSheet.create({
     color: '#00BEAE',
     fontWeight: '600',
   },
-  subtitle: {
-    fontFamily: 'Unbounded',
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 22,
-  },
-  confirmBtn: {
-    alignSelf: 'stretch',
-    marginHorizontal: 20,
-    marginBottom: 24,
-    height: 180,
-    borderRadius: 25,
-    backgroundColor: '#00FE96',
-    alignItems: 'center',
+  infoRight: {
+    flex: 1,
     justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: '#00FE96', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15.5 },
-      android: { elevation: 8 },
-      default: {},
-    }),
   },
-  checkIcon: {
-    // Make the checkmark visually bolder with text shadow
-    ...Platform.select({
-      ios: { shadowColor: 'rgba(255,255,255,0.5)', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 4 },
-      default: {},
-    }),
+  categoryNameText: {
+    fontFamily: 'Unbounded-SemiBold',
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  pricePerUnit: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#A0A0B8',
+    marginBottom: 2,
+  },
+  totalPrice: {
+    fontFamily: 'Unbounded-Medium',
+    fontSize: 16,
+    color: '#00BEAE',
   },
 
-  // Aurora flash — scale transforms from view center (245, 185).
-  // Blobs sit at ~(180, 16), which is 169px above view center.
-  // So place view center 169px below screen center to compensate.
+  // Actions
+  confirmBtn: {
+    alignSelf: 'stretch',
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#00FE96',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  confirmBtnInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  confirmText: {
+    fontFamily: 'Unbounded-SemiBold',
+    fontSize: 16,
+    color: '#1A1A2E',
+  },
+  cancelBtn: {
+    alignSelf: 'stretch',
+    height: 48,
+    borderRadius: 9999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#A0A0B8',
+  },
+
+  // Aurora flash
   flashWrap: {
     position: 'absolute',
     width: 490,
