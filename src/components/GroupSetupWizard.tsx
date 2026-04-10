@@ -588,6 +588,7 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
+    minHeight: 72,
     paddingVertical: 14,
     paddingHorizontal: 4,
   },
