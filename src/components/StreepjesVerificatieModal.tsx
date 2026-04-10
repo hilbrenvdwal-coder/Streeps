@@ -487,8 +487,8 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 20,
+    marginBottom: 16,
   },
 
   // Actions
