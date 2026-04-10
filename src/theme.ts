@@ -14,21 +14,21 @@ import { Platform } from 'react-native';
 //
 // | Token           | Hex     | Usage                                              |
 // |-----------------|---------|-----------------------------------------------------|
-// | streepsGreen    | #00FE96 | Actief/online indicator dot, active status text     |
-// | streepsCyan     | #00BEAE | Opslaan knoppen, accenten, admin shield, toast ok   |
-// | streepsMagenta  | #FF0085 | Openstaande rekening, activiteit indicators         |
-// | streepsRed      | #FF0085 | Alias voor streepsMagenta (= brand.streepsRed)      |
+// | streepsGreen    | #00FE96 | Actief indicator, categorie 1                       |
+// | streepsRed      | #FF0085 | Nav pill, send button, categorie 2                  |
+// | streepsCyan     | #00BEAE | Opslaan knop, admin acties, categorie 3             |
+// | streepsMagenta  | #FF004D | Openstaande rekening, activiteit, categorie 4       |
 //
 export const streepsGreen   = '#00FE96';
-export const streepsCyan    = '#00BEAE';
-export const streepsMagenta = '#FF0085';
 export const streepsRed     = '#FF0085';
+export const streepsCyan    = '#00BEAE';
+export const streepsMagenta = '#FF004D';
 
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
-  magenta: '#FF004D',      // Openstaande rekening, activiteit indicators
-  streepsRed: '#FF0085',   // Nav pill, send button (= streepsMagenta)
+  magenta: '#FF004D',      // Openstaande rekening, activiteit, categorie 4
+  streepsRed: '#FF0085',   // Nav pill, send button, categorie 2
   cyan: '#00BEAE',         // Opslaan knop, admin acties, join buttons
   green: '#00FE96',        // Actief indicator (groene bolletje)
   blue: '#4A6CF7',
@@ -51,9 +51,9 @@ export const aurora = {
 
 export const categoryColors = [
   brand.green,
-  brand.magenta,
-  brand.cyan,
   brand.streepsRed,
+  brand.cyan,
+  brand.magenta,
 ] as const;
 
 // ─── Semantic Colors (theme-independent) ────────────────────────────────────
