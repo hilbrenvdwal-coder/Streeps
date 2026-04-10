@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image, Pressable } from 'react-native';
+import { StyleSheet, View, Text, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { getTheme, type Theme } from '@/src/theme';
 
 interface MemberRowProps {
@@ -25,7 +26,7 @@ export default function MemberRow({
     <Pressable style={styles.row} onPress={onPress}>
       <View style={styles.avatarWrap}>
         {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          <Image source={{ uri: avatarUrl }} style={styles.avatar} cachePolicy="memory-disk" transition={200} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: t.colors.surface.overlay }]}>
             <Text style={{ color: t.colors.text.secondary, fontSize: 14, fontWeight: '600' }}>

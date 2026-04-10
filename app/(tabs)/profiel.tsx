@@ -128,7 +128,7 @@ export default function ProfielScreen() {
     const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (uploadError) { Alert.alert('Upload mislukt', uploadError.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+    const publicUrl = urlData.publicUrl;
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
     setAvatarUrl(publicUrl);
     setUploadingAvatar(false);

@@ -140,7 +140,7 @@ export default function GroupSettingsScreen() {
     const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (uploadError) { Alert.alert('Upload mislukt', uploadError.message); setUploadingGroupAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+    const publicUrl = urlData.publicUrl;
     await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', id);
     setGroupAvatarUrl(publicUrl);
     setUploadingGroupAvatar(false);

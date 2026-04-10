@@ -34,8 +34,8 @@ interface CameraModalProps {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SHEET_BG = colors.dark.background.secondary;
-const SURFACE = colors.dark.surface.default;
+const SHEET_BG = '#1C1C1E';
+const SURFACE = '#2C2C2E';
 const BORDER = colors.dark.border.default;
 const TEXT_PRIMARY = colors.dark.text.primary;
 const TEXT_SECONDARY = colors.dark.text.secondary;
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   cancelBtn: {
     height: 48,
     borderRadius: 9999,
-    backgroundColor: 'rgba(78, 78, 78, 0.3)',
+    backgroundColor: '#2C2C2E',
     alignItems: 'center',
     justifyContent: 'center',
   },

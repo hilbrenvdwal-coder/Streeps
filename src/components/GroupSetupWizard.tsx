@@ -169,8 +169,8 @@ export default function GroupSetupWizard({
     goToStep(step + 1);
   }, [step, catName1, catName2, catName3, catName4, price1, price2, price3, price4, cat2Enabled, cat3Enabled, cat4Enabled, groupId, goToStep]);
 
-  const handleBack = useCallback(() => {
-    goToStep(step - 1);
+  const handleSkip = useCallback(() => {
+    goToStep(step + 1);
   }, [step, goToStep]);
 
   const handleFinish = useCallback(() => {
@@ -189,7 +189,7 @@ export default function GroupSetupWizard({
     const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (error) { Alert.alert('Upload mislukt', error.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+    const publicUrl = urlData.publicUrl;
     await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', groupId);
     setGroupAvatarUrl(publicUrl);
     setUploadingAvatar(false);
@@ -446,13 +446,12 @@ export default function GroupSetupWizard({
       );
     }
 
-    const showBack = step >= 2;
+    const showSkip = step === 1 || step === 4;
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {showBack ? (
-          <Pressable style={ws.backBtn} onPress={handleBack}>
-            <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.5)" />
-            <Text style={ws.backBtnText}>Terug</Text>
+        {showSkip ? (
+          <Pressable style={ws.skipBtn} onPress={handleSkip}>
+            <Text style={ws.skipBtnText}>Overslaan</Text>
           </Pressable>
         ) : (
           <View style={{ flex: 1 }} />
@@ -588,7 +587,6 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    minHeight: 72,
     paddingVertical: 14,
     paddingHorizontal: 4,
   },
@@ -793,19 +791,18 @@ const ws = StyleSheet.create({
     gap: 12,
     paddingTop: 16,
   },
-  backBtn: {
+  skipBtn: {
     flex: 1,
     height: 52,
     borderRadius: 26,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  backBtnText: {
+  skipBtnText: {
     fontFamily: 'Unbounded',
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    color: '#848484',
     fontWeight: '600',
   },
   nextBtn: {

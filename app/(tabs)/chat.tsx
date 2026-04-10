@@ -1262,7 +1262,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
     const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (error) { Alert.alert('Upload mislukt', error.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
+    const publicUrl = urlData.publicUrl;
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
     setAvatarUrl(publicUrl);
     setUploadingAvatar(false);
