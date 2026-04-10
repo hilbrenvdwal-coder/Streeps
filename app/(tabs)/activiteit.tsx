@@ -12,6 +12,7 @@ import {
   Animated,
   Easing,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -275,7 +276,7 @@ export default function ActiviteitScreen() {
             keyExtractor={(item) => item.id}
             onRefresh={refreshHistory}
             refreshing={historyLoading}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={styles.historyScrollContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <Text style={styles.emptyText}>Nog geen streepjes gezet</Text>
@@ -286,30 +287,34 @@ export default function ActiviteitScreen() {
               const title = item.type === 'gift_sent'
                 ? `Gedoneerd aan ${item.gift_other_name}`
                 : `Categorie ${item.category}${item.removed ? ' (verwijderd)' : ''}`;
+              const displayCount = item.count ?? item.gift_quantity ?? 1;
               return (
                 <AnimatedCard index={index} enabled={index < 15}>
                 <View style={[
-                  styles.historyItem,
-                  index === 0 && { borderTopLeftRadius: 25, borderTopRightRadius: 25 },
-                  index === history.length - 1 && { borderBottomLeftRadius: 25, borderBottomRightRadius: 25 },
+                  styles.historyCard,
                   item.removed && { opacity: 0.4 },
                 ]}>
-                  <View style={{ width: 30, alignItems: 'center', marginRight: 10 }}>
+                  <View style={[
+                    styles.countBox,
+                    Platform.OS === 'ios' && {
+                      shadowColor: catColor,
+                      shadowOpacity: 0.4,
+                      shadowRadius: 10,
+                      shadowOffset: { width: 0, height: 0 },
+                    },
+                  ]}>
                     {item.type === 'gift_sent' ? (
-                      <Ionicons name="gift" size={18} color="#00BEAE" />
+                      <Ionicons name="gift" size={22} color="#00BEAE" />
                     ) : (
-                      <View style={[styles.catDot, { backgroundColor: catColor }]} />
+                      <Text style={styles.countText}>{displayCount}</Text>
                     )}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyTitle}>{title}</Text>
-                    <Text style={styles.historyMeta}>
-                      {item.group_name} · {formatTimeAgo(item.created_at)}
+                  <View style={styles.infoSection}>
+                    <Text style={styles.cardTitleHistory}>{title}</Text>
+                    <Text style={styles.cardMeta}>
+                      {item.group_name}  ·  {formatTimeAgo(item.created_at)}
                     </Text>
                   </View>
-                  {((item.count ?? 1) > 1 || (item.gift_quantity ?? 0) > 0) && (
-                    <Text style={styles.historyCount}>{item.count ?? item.gift_quantity}</Text>
-                  )}
                 </View>
                 </AnimatedCard>
               );
@@ -497,6 +502,10 @@ function createStyles(t: Theme) {
       paddingTop: s(16),
       paddingBottom: 120,
     },
+    historyScrollContent: {
+      paddingTop: s(16),
+      paddingBottom: 120,
+    },
 
     // ── Total ──
     totalSection: {
@@ -655,31 +664,45 @@ function createStyles(t: Theme) {
       fontWeight: '600',
     },
 
-    // ── History list ──
-    historyItem: {
+    // ── History cards ──
+    historyCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: s(20),
-      paddingVertical: s(18),
-      backgroundColor: 'rgba(78, 78, 78, 0.2)',
+      backgroundColor: '#1A1A1C',
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 8,
+      marginHorizontal: 16,
     },
-    historyTitle: {
+    countBox: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      backgroundColor: 'rgba(61, 61, 61, 0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    countText: {
       fontFamily: 'Unbounded',
+      fontSize: 20,
       color: '#FFFFFF',
-      fontSize: 16,
+    },
+    infoSection: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    cardTitleHistory: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
       fontWeight: '500',
-    },
-    historyMeta: {
-      fontFamily: 'Unbounded',
-      color: '#848484',
-      fontSize: 12,
-      marginTop: 2,
-    },
-    historyCount: {
-      fontFamily: 'Unbounded',
-      fontSize: 18,
       color: '#FFFFFF',
-      marginLeft: 12,
+    },
+    cardMeta: {
+      fontFamily: 'Unbounded',
+      fontSize: 11,
+      color: '#848484',
+      marginTop: 3,
     },
 
     // ── Empty state ──
