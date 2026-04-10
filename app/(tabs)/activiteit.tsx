@@ -284,35 +284,33 @@ export default function ActiviteitScreen() {
             renderItem={({ item, index }) => {
               const catColor = item.type === 'gift_sent' ? '#00BEAE'
                 : t.categoryColors[(item.category - 1) % 4];
-              const title = item.type === 'gift_sent'
-                ? `Gedoneerd aan ${item.gift_other_name}`
-                : `Categorie ${item.category}${item.removed ? ' (verwijderd)' : ''}`;
-              const displayCount = item.count ?? item.gift_quantity ?? 1;
+              const catLabel = item.type === 'gift_sent'
+                ? 'Gedoneerd'
+                : `Categorie ${item.category}`;
+              const displayCount = item.type === 'gift_sent'
+                ? (item.gift_quantity ?? 1)
+                : (item.count ?? 1);
               return (
                 <AnimatedCard index={index} enabled={index < 15}>
                 <View style={[
                   styles.historyCard,
                   item.removed && { opacity: 0.4 },
                 ]}>
-                  <View style={[
-                    styles.countBox,
-                    Platform.OS === 'ios' && {
-                      shadowColor: catColor,
-                      shadowOpacity: 0.4,
-                      shadowRadius: 10,
-                      shadowOffset: { width: 0, height: 0 },
-                    },
-                  ]}>
+                  {/* Left: count container */}
+                  <View style={[styles.historyCountBox, { backgroundColor: catColor + '15' }]}>
                     {item.type === 'gift_sent' ? (
-                      <Ionicons name="gift" size={22} color="#00BEAE" />
+                      <Ionicons name="gift" size={28} color="#00BEAE" />
                     ) : (
-                      <Text style={styles.countText}>{displayCount}</Text>
+                      <Text style={styles.historyCountText}>{displayCount}</Text>
                     )}
                   </View>
-                  <View style={styles.infoSection}>
-                    <Text style={styles.cardTitleHistory}>{title}</Text>
-                    <Text style={styles.cardMeta}>
-                      {item.group_name}  ·  {formatTimeAgo(item.created_at)}
+                  {/* Right: badge + meta */}
+                  <View style={styles.historyRight}>
+                    <View style={[styles.historyCatBadge, { backgroundColor: catColor + '20' }]}>
+                      <Text style={[styles.historyCatBadgeText, { color: catColor }]}>{catLabel}</Text>
+                    </View>
+                    <Text style={styles.historyMeta}>
+                      {item.group_name} · {formatTimeAgo(item.created_at)}
                     </Text>
                   </View>
                 </View>
@@ -664,45 +662,48 @@ function createStyles(t: Theme) {
       fontWeight: '600',
     },
 
-    // ── History cards ──
+    // ── History card (matches confirmatie modal info card) ──
     historyCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
       backgroundColor: '#1A1A1C',
       borderRadius: 16,
-      padding: 14,
-      marginBottom: 8,
-      marginHorizontal: 16,
+      padding: 16,
+      marginBottom: s(10),
     },
-    countBox: {
-      width: 52,
-      height: 52,
-      borderRadius: 14,
-      backgroundColor: 'rgba(61, 61, 61, 0.3)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 14,
+    historyCountBox: {
+      width: 64,
+      height: 64,
+      borderRadius: 16,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
     },
-    countText: {
-      fontFamily: 'Unbounded',
-      fontSize: 20,
+    historyCountText: {
+      fontFamily: 'Unbounded-SemiBold',
+      fontSize: 36,
       color: '#FFFFFF',
     },
-    infoSection: {
+    historyRight: {
       flex: 1,
-      justifyContent: 'center',
+      marginLeft: 16,
+      justifyContent: 'space-evenly' as const,
+      height: 64,
     },
-    cardTitleHistory: {
-      fontFamily: 'Unbounded',
-      fontSize: 14,
-      fontWeight: '500',
-      color: '#FFFFFF',
+    historyCatBadge: {
+      alignSelf: 'flex-start' as const,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 10,
     },
-    cardMeta: {
+    historyCatBadgeText: {
       fontFamily: 'Unbounded',
-      fontSize: 11,
+      fontSize: 15,
+      fontWeight: '500' as const,
+    },
+    historyMeta: {
+      fontFamily: 'Unbounded',
       color: '#848484',
-      marginTop: 3,
+      fontSize: 11,
     },
 
     // ── Empty state ──
