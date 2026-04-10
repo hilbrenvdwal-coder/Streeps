@@ -360,7 +360,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
-    backgroundColor: 'rgba(28, 28, 30, 0.85)',
+    backgroundColor: 'rgba(28, 28, 30, 0.55)',
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     paddingHorizontal: 20,
