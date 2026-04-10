@@ -1230,7 +1230,7 @@ const s = StyleSheet.create({
   memberActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(0,217,163,0.1)' },
   memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', flexShrink: 1 },
-  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(235,84,102,0.1)' },
+  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(255,0,133,0.1)' },
   memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#FF0085', flexShrink: 1 },
 
   // Invite

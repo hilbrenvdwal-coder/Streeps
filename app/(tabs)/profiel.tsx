@@ -493,7 +493,7 @@ function createStyles(t: Theme) {
       fontFamily: 'Unbounded',
       fontSize: 16,
       fontWeight: '400',
-      color: '#EB5466',
+      color: '#FF0085',
     },
   });
 }

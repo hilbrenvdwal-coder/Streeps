@@ -16,18 +16,18 @@ import { Platform } from 'react-native';
 // |-----------------|---------|-----------------------------------------------------|
 // | streepsGreen    | #00FE96 | Actief/online indicator dot, active status text     |
 // | streepsCyan     | #00BEAE | Opslaan knoppen, accenten, admin shield, toast ok   |
-// | streepsMagenta  | #FF0085 | Openstaande rekening, activiteit indicator           |
-// | streepsRed      | #EB5466 | Openstaande rekening, danger/destructive acties     |
+// | streepsMagenta  | #FF0085 | Openstaande rekening, activiteit indicators         |
+// | streepsRed      | #FF0085 | Alias voor streepsMagenta (= brand.streepsRed)      |
 //
 export const streepsGreen   = '#00FE96';
 export const streepsCyan    = '#00BEAE';
 export const streepsMagenta = '#FF0085';
-export const streepsRed     = '#EB5466';
+export const streepsRed     = '#FF0085';
 
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
-  magenta: '#FF004D',      // Openstaande rekening, activiteit indicator
+  magenta: '#FF004D',      // Openstaande rekening, activiteit indicators
   streepsRed: '#FF0085',   // Nav pill, send button (= streepsMagenta)
   cyan: '#00BEAE',         // Opslaan knop, admin acties, join buttons
   green: '#00FE96',        // Actief indicator (groene bolletje)

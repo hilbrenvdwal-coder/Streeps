@@ -931,7 +931,7 @@ export default function HomeScreen() {
 
       {/* ── Toast ── */}
       {toast && (
-        <Animated.View style={[s.toast, { bottom: 90 + insets.bottom, opacity: toastOpacity, backgroundColor: toast.type === 'error' ? '#EB5466' : '#00BEAE' }]}>
+        <Animated.View style={[s.toast, { bottom: 90 + insets.bottom, opacity: toastOpacity, backgroundColor: toast.type === 'error' ? '#FF0085' : '#00BEAE' }]}>
           <Ionicons name={toast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} size={20} color="#0F0F1E" />
           <Text style={s.toastText}>{toast.message}</Text>
         </Animated.View>
@@ -1410,9 +1410,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(235, 84, 102, 0.12)',
+    backgroundColor: 'rgba(255, 0, 133, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(235, 84, 102, 0.3)',
+    borderColor: 'rgba(255, 0, 133, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1420,7 +1420,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Unbounded',
     fontSize: 16,
     fontWeight: '400',
-    color: '#EB5466',
+    color: '#FF0085',
   },
 
   // ── Welcome ──
@@ -1549,8 +1549,8 @@ function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: 
           <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FFFFFF' }}>Instellingen</Text>
         </Pressable>
       )}
-      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(235,84,102,0.12)', borderWidth: 1, borderColor: 'rgba(235,84,102,0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
-        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#EB5466' }}>Uitstappen</Text>
+      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,133,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,133,0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
+        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF0085' }}>Uitstappen</Text>
       </Pressable>
     </Animated.View>
   );

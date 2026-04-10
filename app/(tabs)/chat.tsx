@@ -1416,7 +1416,7 @@ const po = StyleSheet.create({
 
   // Logout
   logoutBtn: { marginTop: 32, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' },
-  logoutText: { fontFamily: 'Unbounded', fontSize: 16, color: '#EB5466' },
+  logoutText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FF0085' },
 });
 
 // ── User profile overlay (view other people's profiles) ──
