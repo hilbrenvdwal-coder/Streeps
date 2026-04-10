@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -209,7 +209,7 @@ export default function GroupScreen() {
       {/* Header */}
       <View style={s.groupHeader}>
         {(group as any)?.avatar_url ? (
-          <Image source={{ uri: (group as any).avatar_url }} style={s.headerAvatar} cachePolicy="memory-disk" transition={200} />
+          <Image source={{ uri: (group as any).avatar_url }} style={s.headerAvatar} />
         ) : (
           <View style={[s.headerAvatar, { backgroundColor: t.colors.surface.overlay }]}>
             <Text style={{ color: t.colors.text.secondary, ...t.typography.bodyMedium }}>
@@ -360,7 +360,7 @@ export default function GroupScreen() {
                   >
                     <View style={s.avatarContainer}>
                       {avatarUrl ? (
-                        <Image source={{ uri: avatarUrl }} style={s.memberAvatar} cachePolicy="memory-disk" transition={200} />
+                        <Image source={{ uri: avatarUrl }} style={s.memberAvatar} />
                       ) : (
                         <View style={[s.memberAvatar, { backgroundColor: t.colors.surface.overlay }]}>
                           <Text style={{ color: t.colors.text.secondary, ...t.typography.bodySm, fontWeight: t.fontWeights.semibold }}>
@@ -903,7 +903,7 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
       width: 10,
       height: 10,
       borderRadius: 5,
-      backgroundColor: t.brand.cyan,
+      backgroundColor: t.brand.green,
     },
     catDot: {
       width: 10,

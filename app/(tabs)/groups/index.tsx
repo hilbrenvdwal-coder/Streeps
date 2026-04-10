@@ -9,10 +9,10 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Image,
   Animated,
   Platform,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -77,7 +77,7 @@ export default function GroupsScreen() {
     >
       <View style={s.avatarWrap}>
         {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={s.avatar} cachePolicy="memory-disk" transition={200} />
+          <Image source={{ uri: item.avatar_url }} style={s.avatar} />
         ) : (
           <View style={[s.avatar, s.avatarFallback]}>
             <Text style={s.avatarLetter}>{item.name[0]?.toUpperCase()}</Text>
@@ -125,10 +125,6 @@ export default function GroupsScreen() {
         contentContainerStyle={s.list}
         onRefresh={refresh}
         refreshing={loading}
-        maxToRenderPerBatch={10}
-        updateCellsBatchingPeriod={50}
-        initialNumToRender={10}
-        removeClippedSubviews={true}
         ListHeaderComponent={groups.length > 0 ? <View style={s.cardTop} /> : null}
         ListFooterComponent={groups.length > 0 ? <View style={s.cardBottom} /> : null}
         ListEmptyComponent={
@@ -269,7 +265,7 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: t.brand.cyan },
+    statusDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: t.brand.green },
     groupInfo: { flex: 1 },
     groupName: { ...t.typography.bodyMedium, color: t.colors.text.primary },
     groupMeta: { ...t.typography.caption, color: t.colors.text.tertiary, marginTop: 2 },

@@ -16,7 +16,7 @@ import { Platform } from 'react-native';
 // |-----------------|---------|-----------------------------------------------------|
 // | streepsGreen    | #00FE96 | Actief/online indicator dot, active status text     |
 // | streepsCyan     | #00BEAE | Opslaan knoppen, accenten, admin shield, toast ok   |
-// | streepsMagenta  | #FF0085 | Navbar pill, primaire actie knoppen, send button    |
+// | streepsMagenta  | #FF0085 | Openstaande rekening, activiteit indicator           |
 // | streepsRed      | #EB5466 | Openstaande rekening, danger/destructive acties     |
 //
 export const streepsGreen   = '#00FE96';
@@ -27,10 +27,10 @@ export const streepsRed     = '#EB5466';
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
-  magenta: '#FF004D',
-  streepsRed: '#FF0085',   // Figma --streepsred: buttons, nav pill
-  cyan: '#00BEAE',
-  green: '#00FE96',        // Figma --streepsgreen: confirmation
+  magenta: '#FF004D',      // Nav pill, send button
+  streepsRed: '#FF0085',   // Openstaande rekening, activiteit indicator
+  cyan: '#00BEAE',         // Opslaan knop, admin acties, join buttons
+  green: '#00FE96',        // Actief indicator (groene bolletje)
   blue: '#4A6CF7',
   purple: '#8B5CF6',
   streepsWhite: '#F1F1F1', // Figma --streepswhite: input bg, text on dark
