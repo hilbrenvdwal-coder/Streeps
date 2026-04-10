@@ -296,12 +296,11 @@ export default function StreepjesVerificatieModal({
 
               {/* Right: stacked info */}
               <View style={s.infoRight}>
-                <Text
-                  style={[s.categoryNameText, { color: categoryColor }]}
-                  numberOfLines={1}
-                >
-                  {categoryName}
-                </Text>
+                <View style={[s.catBadge, { backgroundColor: categoryColor + '20' }]}>
+                  <Text style={[s.catBadgeText, { color: categoryColor }]} numberOfLines={1}>
+                    {categoryName}
+                  </Text>
+                </View>
                 {hasPrice && (
                   <>
                     <Text style={s.pricePerUnit}>
@@ -441,10 +440,16 @@ const s = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  categoryNameText: {
-    fontFamily: 'Unbounded-SemiBold',
-    fontSize: 18,
+  catBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
     marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  catBadgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 12,
   },
   pricePerUnit: {
     fontFamily: 'Unbounded',
