@@ -691,13 +691,13 @@ function createStyles(t: Theme) {
     },
     historyCatBadge: {
       alignSelf: 'flex-start' as const,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 7,
     },
     historyCatBadgeText: {
       fontFamily: 'Unbounded',
-      fontSize: 15,
+      fontSize: 11,
       fontWeight: '500' as const,
     },
     historyMeta: {
