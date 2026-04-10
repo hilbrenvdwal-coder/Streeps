@@ -78,7 +78,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
 
   useEffect(() => {
     return () => { minusRepeat.stop(); plusRepeat.stop(); };
-  }, [minusRepeat, plusRepeat]);
+  }, []);
 
   // ── Number transition: overlapping layer stack ──
   // Each value gets its own layer that fades in/out independently — no interrupts needed
