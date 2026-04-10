@@ -50,10 +50,10 @@ export const aurora = {
 // ─── Category Colors ────────────────────────────────────────────────────────
 
 export const categoryColors = [
-  brand.cyan,
+  brand.green,
   brand.magenta,
-  brand.blue,
-  brand.purple,
+  brand.cyan,
+  brand.streepsRed,
 ] as const;
 
 // ─── Semantic Colors (theme-independent) ────────────────────────────────────
