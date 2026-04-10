@@ -1268,11 +1268,16 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
     setUploadingAvatar(false);
   };
 
+  const poScrimOpacity = Animated.multiply(
+    anim,
+    poSwipeX.interpolate({ inputRange: [0, SCREEN_W], outputRange: [1, 0], extrapolate: 'clamp' })
+  );
+
   if (!show) return null;
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: poScrimOpacity }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={po.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
@@ -2445,11 +2450,16 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
     onFriendshipChange();
   };
 
+  const apScrimOpacity = Animated.multiply(
+    anim,
+    apSwipeX.interpolate({ inputRange: [0, SCREEN_W], outputRange: [1, 0], extrapolate: 'clamp' })
+  );
+
   if (!show) return null;
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: apScrimOpacity }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={ap.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
