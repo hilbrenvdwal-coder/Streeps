@@ -352,14 +352,21 @@ export default function ActiviteitScreen() {
               <>
                 <Text style={styles.sectionHeader}>OPENSTAAND</Text>
                 {pendingSettlements.map((settlement) => (
-                  <View key={settlement.id} style={styles.pendingCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pendingTitle}>{settlement.group_name}</Text>
-                      <Text style={styles.pendingSubtitle}>
-                        {settlement.admin_name} wil afrekenen
-                      </Text>
-                      <Text style={styles.pendingAmount}>
+                  <View key={settlement.id} style={styles.rekItem}>
+                    <View style={styles.rekCountBox}>
+                      <Text style={[styles.rekCountText, { color: '#FF004D' }]}>
                         {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
+                      </Text>
+                    </View>
+                    <View style={styles.rekRight}>
+                      <View style={[styles.rekBadge, { backgroundColor: 'rgba(255, 0, 77, 0.12)' }]}>
+                        <Text style={[styles.rekBadgeText, { color: '#FF004D' }]}>Openstaand</Text>
+                      </View>
+                      <Text style={styles.rekMeta}>
+                        {settlement.group_name} · {settlement.admin_name}
+                      </Text>
+                      <Text style={styles.rekMeta}>
+                        {formatTimeAgo(settlement.created_at)}
                       </Text>
                     </View>
                     <Pressable
@@ -377,55 +384,56 @@ export default function ActiviteitScreen() {
               <Text style={styles.emptyText}>Geen openstaande rekeningen</Text>
             )}
 
-            {bills.map((bill) => (
-              <View key={bill.group_id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle}>{bill.group_name}</Text>
-                  <Text style={styles.cardAmount}>
-                    {'\u20AC'}{(bill.total / 100).toFixed(2).replace('.', ',')}
-                  </Text>
-                </View>
-                {[1, 2, 3, 4].map((cat) => {
-                  const count = bill.counts[cat] || 0;
-                  if (count === 0) return null;
-                  const price = bill.category_prices[cat - 1] || 0;
-                  const subtotal = count * price;
-                  return (
-                    <View key={cat} style={styles.catRow}>
-                      <View style={[styles.catDot, { backgroundColor: t.categoryColors[(cat - 1) % 4] }]} />
-                      <Text style={styles.catName}>{bill.category_names[cat - 1]}</Text>
-                      <Text style={styles.catCalc}>
-                        {count}{'\u00D7'}{'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
-                      </Text>
-                      <Text style={styles.catTotal}>
-                        {'\u20AC'}{(subtotal / 100).toFixed(2).replace('.', ',')}
+            {/* Current bills per group */}
+            {bills.length > 0 && (
+              <>
+                {pendingSettlements.length > 0 && <Text style={styles.sectionHeader}>LOPEND</Text>}
+                {bills.map((bill) => (
+                  <View key={bill.group_id} style={styles.rekItem}>
+                    <View style={styles.rekCountBox}>
+                      <Text style={[styles.rekCountText, { color: '#FF004D' }]}>
+                        {'\u20AC'}{(bill.total / 100).toFixed(2).replace('.', ',')}
                       </Text>
                     </View>
-                  );
-                })}
-              </View>
-            ))}
+                    <View style={styles.rekRight}>
+                      <Text style={styles.rekGroupName}>{bill.group_name}</Text>
+                      {[1, 2, 3, 4].map((cat) => {
+                        const count = bill.counts[cat] || 0;
+                        if (count === 0) return null;
+                        const price = bill.category_prices[cat - 1] || 0;
+                        return (
+                          <Text key={cat} style={styles.rekMeta}>
+                            {bill.category_names[cat - 1]}: {count}{'\u00D7'}{'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
+                          </Text>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
 
             {/* Past settlements */}
             {pastSettlements.length > 0 && (
               <>
                 <Text style={styles.sectionHeader}>AFGEREKEND</Text>
-                <View style={styles.card}>
-                  {pastSettlements.map((settlement, i) => (
-                    <React.Fragment key={settlement.id}>
-                      {i > 0 && <View style={styles.cardDivider} />}
-                      <View style={styles.settlementRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.settlementName}>{settlement.group_name}</Text>
-                          <Text style={styles.settlementTime}>{formatTimeAgo(settlement.created_at)}</Text>
-                        </View>
-                        <Text style={[styles.settlementAmount, { color: settlement.paid ? '#00BEAE' : '#FF004D' }]}>
-                          {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
-                        </Text>
+                {pastSettlements.map((settlement) => (
+                  <View key={settlement.id} style={styles.rekItem}>
+                    <View style={styles.rekCountBox}>
+                      <Text style={[styles.rekCountText, { color: '#00BEAE' }]}>
+                        {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
+                      </Text>
+                    </View>
+                    <View style={styles.rekRight}>
+                      <View style={[styles.rekBadge, { backgroundColor: 'rgba(0, 190, 174, 0.12)' }]}>
+                        <Text style={[styles.rekBadgeText, { color: '#00BEAE' }]}>Betaald</Text>
                       </View>
-                    </React.Fragment>
-                  ))}
-                </View>
+                      <Text style={styles.rekMeta}>
+                        {settlement.group_name} · {formatTimeAgo(settlement.created_at)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </>
             )}
           </ScrollView>
@@ -521,68 +529,6 @@ function createStyles(t: Theme) {
       marginTop: 4,
     },
 
-    // ── Card ──
-    card: {
-      borderRadius: 25,
-      backgroundColor: 'rgba(78, 78, 78, 0.2)',
-      overflow: 'hidden',
-      padding: s(16),
-      marginBottom: s(12),
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: s(12),
-    },
-    cardTitle: {
-      fontFamily: 'Unbounded',
-      fontSize: 18,
-      fontWeight: '400',
-      color: '#FFFFFF',
-    },
-    cardAmount: {
-      fontFamily: 'Unbounded',
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#FF004D',
-    },
-    cardDivider: {
-      height: 1,
-      backgroundColor: 'rgba(78, 78, 78, 0.3)',
-    },
-
-    // ── Category rows ──
-    catRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 6,
-    },
-    catDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      marginRight: 10,
-    },
-    catName: {
-      fontFamily: 'Unbounded',
-      fontSize: 14,
-      color: '#FFFFFF',
-      flex: 1,
-    },
-    catCalc: {
-      fontFamily: 'Unbounded',
-      color: '#848484',
-      fontSize: 12,
-      marginRight: 12,
-    },
-    catTotal: {
-      fontFamily: 'Unbounded',
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '500',
-    },
-
     // ── Section header ──
     sectionHeader: {
       fontFamily: 'Unbounded',
@@ -593,72 +539,71 @@ function createStyles(t: Theme) {
       marginBottom: s(8),
     },
 
-    // ── Pending settlement card ──
-    pendingCard: {
-      borderRadius: 25,
-      backgroundColor: 'rgba(255, 0, 77, 0.08)',
-      borderWidth: 1,
-      borderColor: 'rgba(255, 0, 77, 0.3)',
-      padding: s(16),
-      marginBottom: s(12),
+    // ── Rekening items (transparent rows with dividers) ──
+    rekItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255, 255, 255, 0.06)',
     },
-    pendingTitle: {
+    rekCountBox: {
+      minWidth: 80,
+      alignItems: 'flex-start',
+      marginRight: 14,
+    },
+    rekCountText: {
+      fontFamily: 'Unbounded-SemiBold',
+      fontSize: 22,
+      fontWeight: '600',
+    },
+    rekRight: {
+      flex: 1,
+      justifyContent: 'space-evenly',
+    },
+    rekGroupName: {
       fontFamily: 'Unbounded',
-      fontSize: 16,
+      fontSize: 13,
       fontWeight: '500',
       color: '#FFFFFF',
+      marginBottom: 2,
     },
-    pendingSubtitle: {
+    rekBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+      marginBottom: 4,
+    },
+    rekBadgeText: {
       fontFamily: 'Unbounded',
-      fontSize: 12,
+      fontSize: 11,
+      fontWeight: '500',
+    },
+    rekMeta: {
+      fontFamily: 'Unbounded',
+      fontSize: 11,
       color: '#848484',
-      marginTop: 2,
-    },
-    pendingAmount: {
-      fontFamily: 'Unbounded',
-      fontSize: 20,
-      fontWeight: '600',
-      color: '#FF004D',
-      marginTop: 6,
+      marginTop: 1,
     },
     payButton: {
       backgroundColor: '#00BEAE',
-      borderRadius: 20,
-      paddingHorizontal: s(20),
-      paddingVertical: s(12),
+      borderRadius: 16,
+      paddingHorizontal: s(16),
+      paddingVertical: s(10),
       marginLeft: s(12),
     },
     payButtonText: {
       fontFamily: 'Unbounded',
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#FFFFFF',
-    },
-
-    // ── Settlement rows ──
-    settlementRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-    },
-    settlementName: {
-      fontFamily: 'Unbounded',
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '500',
-    },
-    settlementTime: {
-      fontFamily: 'Unbounded',
-      color: '#848484',
       fontSize: 12,
-      marginTop: 2,
-    },
-    settlementAmount: {
-      fontFamily: 'Unbounded',
-      fontSize: 18,
       fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    catDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: 10,
     },
 
     // ── History card (matches confirmatie modal info card) ──
