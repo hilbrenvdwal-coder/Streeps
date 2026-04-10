@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, streepsMagenta } from '@/src/theme';
+import { getTheme, streepsMagenta, brand } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
@@ -3023,7 +3023,7 @@ export default function ChatScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
 
       {/* ── Conversation list (always mounted) ── */}
       <Animated.View style={{ flex: 1, paddingTop: insets.top, transform: [{ translateX: overviewTranslateX }] }}>
@@ -3171,7 +3171,7 @@ export default function ChatScreen() {
           }]}
           {...chatPan.panHandlers}
         >
-          <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
+          <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
           <View style={{ height: insets.top }} />
           <ChatDetail
             conversationId={currentConv.id}

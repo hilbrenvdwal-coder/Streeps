@@ -36,7 +36,7 @@ export const brand = {
   streepsWhite: '#F1F1F1', // Figma --streepswhite: input bg, text on dark
   inactive: '#848484',     // Figma --inactivewords: placeholder, inactive
   gradient: ['#E91E8C', '#8B5CF6', '#4A6CF7', '#00BEAE'] as const,
-  bg: { from: '#0E0D1C', to: '#3D3D3D' } as const, // Screen background gradient
+  bg: { from: '#0E0D1C', to: '#141414' } as const, // Screen background gradient
 } as const;
 
 // ─── Aurora Background Stops ─────────────────────────────────────────────────
@@ -51,9 +51,9 @@ export const aurora = {
 
 export const categoryColors = [
   brand.cyan,
-  brand.streepsRed,
-  brand.green,
   brand.magenta,
+  brand.blue,
+  brand.purple,
 ] as const;
 
 // ─── Semantic Colors (theme-independent) ────────────────────────────────────
