@@ -14,11 +14,6 @@ import {
   TouchableWithoutFeedback,
   Platform,
 } from 'react-native';
-import ReanimatedModule, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -381,50 +376,6 @@ const cbs = StyleSheet.create({
   hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
 
-const ReanimatedView = ReanimatedModule.View;
-
-/**
- * AnimatedCollapse: smoothly animates height + opacity for expand/collapse.
- * Uses onLayout to measure content height, then animates between 0 and measured height.
- */
-function AnimatedCollapse({ expanded, children }: { expanded: boolean; children: React.ReactNode }) {
-  const measuredHeight = useSharedValue(0);
-  const animProgress = useSharedValue(expanded ? 1 : 0);
-  const hasRendered = useRef(false);
-
-  // When expanded changes, animate
-  useEffect(() => {
-    if (!hasRendered.current) {
-      // First render: set instantly without animation
-      hasRendered.current = true;
-      animProgress.value = expanded ? 1 : 0;
-      return;
-    }
-    animProgress.value = withTiming(expanded ? 1 : 0, { duration: 280 });
-  }, [expanded]);
-
-  const containerStyle = useAnimatedStyle(() => ({
-    height: animProgress.value * measuredHeight.value,
-    opacity: animProgress.value,
-    overflow: 'hidden' as const,
-  }));
-
-  const onLayout = useCallback((e: any) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0) {
-      measuredHeight.value = h;
-    }
-  }, []);
-
-  return (
-    <ReanimatedView style={containerStyle}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }} onLayout={onLayout}>
-        {children}
-      </View>
-    </ReanimatedView>
-  );
-}
-
 function FadeMask({ children }: { children: React.ReactNode }) {
   return (
     <MaskedView
@@ -493,13 +444,6 @@ export default function SettingsOverlay({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [tallyAdj, setTallyAdj] = useState<Record<string, Record<number, number>>>({});
-  const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(new Set());
-  const [pendingDeletes, setPendingDeletes] = useState<
-    { tallyId: string; userId: string; category: number }[]
-  >([]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const pendingDeletesRef = useRef(pendingDeletes);
-  useEffect(() => { pendingDeletesRef.current = pendingDeletes; }, [pendingDeletes]);
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -519,16 +463,8 @@ export default function SettingsOverlay({
     enabledCats: Set<number>;
   } | null>(null);
 
-  // Reset optimistic adjustments when real data arrives (preserve pending deletes)
-  useEffect(() => {
-    const adj: Record<string, Record<number, number>> = {};
-    pendingDeletesRef.current.forEach(({ userId, category }) => {
-      if (!adj[userId]) adj[userId] = {};
-      adj[userId][category] = (adj[userId][category] || 0) - 1;
-    });
-    setTallyAdj(adj);
-    setPendingRemoveIds(new Set());
-  }, [recentTallies]);
+  // Reset optimistic adjustments when real data arrives
+  useEffect(() => { setTallyAdj({}); }, [tallyCounts]);
 
   // Reset newDrinkCat when selected category is no longer enabled
   useEffect(() => {
@@ -546,8 +482,6 @@ export default function SettingsOverlay({
   // Init form when opened
   useEffect(() => {
     if (visible && group) {
-      setPendingDeletes([]);
-      setShowDeleteConfirm(false);
       setGroupName(group.name);
       setGroupAvatarUrl(group.avatar_url ?? null);
       setPrice1(centsToEuroStr(group.price_category_1));
@@ -601,7 +535,6 @@ export default function SettingsOverlay({
   }, [visible]);
 
   const isDirty = (): boolean => {
-    if (pendingDeletes.length > 0) return true;
     const iv = initialValues.current;
     if (!iv) return false;
     const setsEqual = (a: Set<number>, b: Set<number>) =>
@@ -663,7 +596,10 @@ export default function SettingsOverlay({
     }
   };
 
-  const validatePrices = (): { p1: number | null; p2: number | null; p3: number | null; p4: number | null } | null => {
+  const handleSave = async () => {
+    if (isSaving) return;
+
+    // Validate prices
     const p1 = euroStrToCents(price1);
     const p2 = euroStrToCents(price2);
     const p3 = price3.trim() ? euroStrToCents(price3) : null;
@@ -677,26 +613,17 @@ export default function SettingsOverlay({
 
     if (Object.values(errors).some(Boolean)) {
       setPriceErrors(errors);
-      return null;
+      return;
     }
-    return { p1, p2, p3, p4 };
-  };
 
-  const executeSave = async (prices: { p1: number | null; p2: number | null; p3: number | null; p4: number | null }) => {
     setIsSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    if (pendingDeletes.length > 0 && removeTally) {
-      await Promise.all(pendingDeletes.map(d => removeTally(d.tallyId)));
-      setPendingDeletes([]);
-    }
-
     await updateGroupPrices({
       ...(groupName.trim() ? { name: groupName.trim() } : {}),
-      price_category_1: enabledCats.has(1) ? (prices.p1 ?? 150) : null,
-      price_category_2: enabledCats.has(2) ? (prices.p2 ?? 300) : null,
-      price_category_3: enabledCats.has(3) ? (prices.p3 ?? 150) : null,
-      price_category_4: enabledCats.has(4) ? (prices.p4 ?? 150) : null,
+      price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
+      price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
+      price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
+      price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
       name_category_1: catName1.trim() || 'Categorie 1',
       name_category_2: catName2.trim() || 'Categorie 2',
       name_category_3: catName3.trim() || 'Categorie 3',
@@ -708,26 +635,6 @@ export default function SettingsOverlay({
       setSavedOk(false);
       performClose();
     }, 600);
-  };
-
-  const handleConfirmDeletes = async () => {
-    setShowDeleteConfirm(false);
-    const prices = validatePrices();
-    if (!prices) return;
-    await executeSave(prices);
-  };
-
-  const handleSave = async () => {
-    if (isSaving) return;
-    const prices = validatePrices();
-    if (!prices) return;
-
-    if (pendingDeletes.length > 0) {
-      setShowDeleteConfirm(true);
-      return;
-    }
-
-    await executeSave(prices);
   };
 
   const toggleCategory = (cat: number) => {
@@ -1019,7 +926,7 @@ export default function SettingsOverlay({
               </Pressable>
             </View>
             {/* Category badge selector: hold to expand, drag to pick */}
-            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8, alignItems: 'center', flexDirection: 'column', gap: 6 }]}>
+            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8, flexDirection: 'column', gap: 6 }]}>
               <CategoryBadgeSelector
                 value={parseInt(newDrinkCat) || 1}
                 onChange={(v) => setNewDrinkCat(String(v))}
@@ -1028,7 +935,6 @@ export default function SettingsOverlay({
                 getCategoryName={getCategoryName}
                 onScrollEnable={setScrollEnabled}
               />
-              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Unbounded' }}>Houd ingedrukt</Text>
             </View>
           </View>
 
@@ -1057,8 +963,8 @@ export default function SettingsOverlay({
                     </View>
                     <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#848484" />
                   </Pressable>
-                  {/* Expanded: tally counts + admin actions (animated) */}
-                  <AnimatedCollapse expanded={isExpanded}>
+                  {/* Expanded: tally counts + admin actions */}
+                  {isExpanded && (
                     <View style={s.memberExpanded}>
                       {/* Tally counts per category */}
                       {activeCategories.map((cat) => {
@@ -1091,24 +997,20 @@ export default function SettingsOverlay({
                             {removeTally && count > 0 && (
                               <Pressable
                                 onPress={() => {
-                                  const alreadyPendingIds = new Set(pendingDeletes.map(d => d.tallyId));
                                   const memberRecentTallies = (recentTallies || []).filter(
-                                    (t: any) =>
-                                      t.user_id === member.user_id &&
-                                      t.category === cat &&
-                                      !t.removed &&
-                                      !alreadyPendingIds.has(t.id)
+                                    (t: any) => t.user_id === member.user_id && t.category === cat && !t.removed
                                   );
                                   if (memberRecentTallies.length > 0) {
-                                    setTallyAdj((prev) => ({
-                                      ...prev,
-                                      [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
-                                    }));
-                                    setPendingDeletes((prev) => [
-                                      ...prev,
-                                      { tallyId: memberRecentTallies[0].id, userId: member.user_id, category: cat },
+                                    Alert.alert('Streepje verwijderen', `1x ${catName} van ${name}?`, [
+                                      { text: 'Annuleren', style: 'cancel' },
+                                      { text: 'Verwijderen', style: 'destructive', onPress: () => {
+                                        setTallyAdj((prev) => ({
+                                          ...prev,
+                                          [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
+                                        }));
+                                        removeTally(memberRecentTallies[0].id);
+                                      } },
                                     ]);
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                   }
                                 }}
                                 style={({ pressed }) => [s.tallyBtn, pressed && { opacity: 0.7 }]}
@@ -1136,7 +1038,7 @@ export default function SettingsOverlay({
                         </View>
                       )}
                     </View>
-                  </AnimatedCollapse>
+                  )}
                 </React.Fragment>
               );
             })}
@@ -1180,51 +1082,6 @@ export default function SettingsOverlay({
         </FadeMask>
       </Animated.View>
 
-      {/* Delete confirmation modal */}
-      <Modal visible={showDeleteConfirm} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setShowDeleteConfirm(false)}>
-        <View style={s.confirmOverlay}>
-          <View style={s.confirmCard}>
-            <Text style={s.confirmTitle}>Streepjes verwijderen</Text>
-            <Text style={s.confirmSubtitle}>De volgende streepjes worden verwijderd:</Text>
-            {(() => {
-              const grouped: Record<string, Record<number, number>> = {};
-              pendingDeletes.forEach(({ userId, category }) => {
-                if (!grouped[userId]) grouped[userId] = {};
-                grouped[userId][category] = (grouped[userId][category] || 0) + 1;
-              });
-              return Object.entries(grouped).map(([userId, cats]) => {
-                const member = members.find(m => m.user_id === userId);
-                const memberName = userId === currentUserId ? 'Jij' : (member?.profile?.full_name || 'Onbekend');
-                return (
-                  <View key={userId} style={s.confirmMemberRow}>
-                    <Text style={s.confirmMemberName}>{memberName}</Text>
-                    {Object.entries(cats).map(([catStr, count]) => {
-                      const cat = Number(catStr);
-                      const catColor = categoryColors[(cat - 1) % 4];
-                      const catName = getCategoryName?.(cat) ?? `Cat ${cat}`;
-                      return (
-                        <View key={cat} style={s.confirmCatRow}>
-                          <View style={[s.tallyDot, { backgroundColor: catColor }]} />
-                          <Text style={s.confirmCatText}>-{count} {catName}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              });
-            })()}
-            <View style={s.confirmButtons}>
-              <Pressable onPress={() => setShowDeleteConfirm(false)} style={({ pressed }) => [s.confirmBtnCancel, pressed && { opacity: 0.7 }]}>
-                <Text style={s.confirmBtnCancelText}>Annuleren</Text>
-              </Pressable>
-              <Pressable onPress={handleConfirmDeletes} style={({ pressed }) => [s.confirmBtnConfirm, pressed && { opacity: 0.7 }]}>
-                <Text style={s.confirmBtnConfirmText}>Bevestigen</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       <CameraModal
         visible={cameraVisible}
         onClose={() => setCameraVisible(false)}
@@ -1259,7 +1116,7 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
 
   // Inputs
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 25, marginHorizontal: 12, marginVertical: 8 },
   inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
 
   // Categories
@@ -1347,19 +1204,4 @@ const s = StyleSheet.create({
   // Danger
   dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
   dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
-
-  // Delete confirmation modal
-  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  confirmCard: { backgroundColor: '#1A1A1A', borderRadius: 16, padding: 20, width: '85%', maxWidth: 360 },
-  confirmTitle: { fontFamily: 'Unbounded', fontSize: 18, color: '#FFFFFF', marginBottom: 8 },
-  confirmSubtitle: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginBottom: 16 },
-  confirmMemberRow: { marginBottom: 12 },
-  confirmMemberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', marginBottom: 4 },
-  confirmCatRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2, paddingLeft: 8 },
-  confirmCatText: { fontFamily: 'Unbounded', fontSize: 12, color: '#FFFFFF', marginLeft: 8 },
-  confirmButtons: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  confirmBtnCancel: { flex: 1, height: 44, borderRadius: 22, backgroundColor: '#3A3A3A', alignItems: 'center', justifyContent: 'center' },
-  confirmBtnConfirm: { flex: 1, height: 44, borderRadius: 22, backgroundColor: '#EB5466', alignItems: 'center', justifyContent: 'center' },
-  confirmBtnCancelText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  confirmBtnConfirmText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', fontWeight: '600' },
 });

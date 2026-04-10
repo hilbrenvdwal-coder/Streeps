@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,7 +6,7 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  Alert,
+  Modal,
   Animated,
   Easing,
   Platform,
@@ -75,6 +75,21 @@ export default function GroupSelector({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const actionRowRef = useRef<View>(null);
+
+  // Error modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const splashTexts = [
+    'Misschien een typfoutje?',
+    'Check de code en probeer het opnieuw',
+    'Vraag de groepsbeheerder voor de juiste code',
+    'Hmm, die kennen we niet...',
+  ];
+  const splashText = useMemo(
+    () => splashTexts[Math.floor(Math.random() * splashTexts.length)],
+    [showErrorModal],
+  );
 
   // Auto-scroll to input when keyboard opens
   useEffect(() => {
@@ -159,7 +174,7 @@ export default function GroupSelector({
     const result = await onCreate(newName.trim());
     setSubmitting(false);
     spinAnim.setValue(0);
-    if (result && 'error' in result && result.error) { Alert.alert('Fout', result.error as string); return; }
+    if (result && 'error' in result && result.error) { setErrorMessage(result.error as string); setShowErrorModal(true); return; }
     setNewName('');
     setInlineMode('none');
     if (result && 'data' in result && result.data) {
@@ -177,7 +192,7 @@ export default function GroupSelector({
     const result = await onJoin(joinCode.trim());
     setSubmitting(false);
     spinAnim.setValue(0);
-    if (result.error) { Alert.alert('Fout', result.error); return; }
+    if (result.error) { setErrorMessage(result.error || 'Code niet gevonden'); setShowErrorModal(true); return; }
     setJoinCode('');
     setInlineMode('none');
     handleClose();
@@ -328,6 +343,20 @@ export default function GroupSelector({
           </View>
         </View>
       )}
+
+      {/* Error modal for invalid code */}
+      <Modal visible={showErrorModal} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setShowErrorModal(false)}>
+        <Pressable style={errorStyles.overlay} onPress={() => setShowErrorModal(false)}>
+          <View style={errorStyles.card}>
+            <Text style={errorStyles.sadFace}>:(</Text>
+            <Text style={errorStyles.title}>Code niet gevonden</Text>
+            <Text style={errorStyles.splash}>{splashText}</Text>
+            <Pressable style={errorStyles.okBtn} onPress={() => setShowErrorModal(false)}>
+              <Text style={errorStyles.okBtnText}>Oke</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </>
   );
 }
@@ -396,4 +425,14 @@ const st = StyleSheet.create({
     paddingHorizontal: 20,
     height: 48,
   },
+});
+
+const errorStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
+  card: { backgroundColor: 'rgba(20,20,20,0.95)', borderRadius: 24, padding: 32, width: '80%', maxWidth: 320, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  sadFace: { fontFamily: 'Unbounded', fontSize: 48, color: '#FFFFFF', marginBottom: 16 },
+  title: { fontFamily: 'Unbounded', fontSize: 18, color: '#FFFFFF', marginBottom: 8, textAlign: 'center' },
+  splash: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginBottom: 24, textAlign: 'center' },
+  okBtn: { height: 48, borderRadius: 24, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
+  okBtnText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', fontWeight: '600' },
 });

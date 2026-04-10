@@ -169,8 +169,8 @@ export default function GroupSetupWizard({
     goToStep(step + 1);
   }, [step, catName1, catName2, catName3, catName4, price1, price2, price3, price4, cat2Enabled, cat3Enabled, cat4Enabled, groupId, goToStep]);
 
-  const handleSkip = useCallback(() => {
-    goToStep(step + 1);
+  const handleBack = useCallback(() => {
+    goToStep(step - 1);
   }, [step, goToStep]);
 
   const handleFinish = useCallback(() => {
@@ -446,12 +446,13 @@ export default function GroupSetupWizard({
       );
     }
 
-    const showSkip = step === 1 || step === 4;
+    const showBack = step >= 2;
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {showSkip ? (
-          <Pressable style={ws.skipBtn} onPress={handleSkip}>
-            <Text style={ws.skipBtnText}>Overslaan</Text>
+        {showBack ? (
+          <Pressable style={ws.backBtn} onPress={handleBack}>
+            <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.5)" />
+            <Text style={ws.backBtnText}>Terug</Text>
           </Pressable>
         ) : (
           <View style={{ flex: 1 }} />
@@ -791,18 +792,19 @@ const ws = StyleSheet.create({
     gap: 12,
     paddingTop: 16,
   },
-  skipBtn: {
+  backBtn: {
     flex: 1,
     height: 52,
     borderRadius: 26,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    gap: 4,
   },
-  skipBtnText: {
+  backBtnText: {
     fontFamily: 'Unbounded',
     fontSize: 14,
-    color: '#848484',
+    color: 'rgba(255,255,255,0.5)',
     fontWeight: '600',
   },
   nextBtn: {
