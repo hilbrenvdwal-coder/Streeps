@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   Animated,
   Easing,
@@ -16,6 +16,20 @@ import * as Haptics from 'expo-haptics';
 import { AuroraPresetView } from './AuroraBackground';
 
 const FLASH_AURORA_COLORS = ['#00FE96', '#F1F1F1', '#00BEAE', '#FFFFFF'];
+
+const SPLASH_MESSAGES: Record<string, string[]> = {
+  '1': ['Eentje kan geen kwaad', 'Proostje!', 'Een goede keuze'],
+  '2': ['Twee is altijd beter', 'Lekker bezig!', 'Dubbel genieten'],
+  '3': ['Drie is een feestje', 'Het gaat lekker!', 'Hattrick!'],
+  '4': ['Vier?! Toe maar!', 'Jij gaat lekker', 'Gezellig hoor'],
+  '5': ['Vijf stuks, respect!', 'Jij houdt van gezelligheid', 'Dat wordt een avond'],
+};
+const SPLASH_MESSAGES_6PLUS = ['Jij meent het!', 'Gaat lekker vanavond!', 'Ik tel niet meer mee', 'Legendestatus'];
+
+function getSplashMessage(count: number): string {
+  const pool = count >= 6 ? SPLASH_MESSAGES_6PLUS : (SPLASH_MESSAGES[String(count)] ?? SPLASH_MESSAGES_6PLUS);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 interface Props {
   visible: boolean;
@@ -57,6 +71,9 @@ export default function StreepjesVerificatieModal({
   const hasPrice = categoryPrice != null && categoryPrice > 0;
   const pricePerUnit = hasPrice ? (categoryPrice / 100).toFixed(2).replace('.', ',') : null;
   const totalPrice = hasPrice ? ((categoryPrice * count) / 100).toFixed(2).replace('.', ',') : null;
+
+  // Splash message — stable per count value, changes when count changes
+  const splashMessage = useMemo(() => getSplashMessage(count), [count]);
 
   useEffect(() => {
     if (visible) {
@@ -129,6 +146,9 @@ export default function StreepjesVerificatieModal({
   const handleConfirm = useCallback(() => {
     setConfirming(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Fire onConfirm immediately — don't wait for animation
+    onConfirm();
 
     flashScale.setValue(0);
     flashOpacity.setValue(0);
@@ -205,7 +225,6 @@ export default function StreepjesVerificatieModal({
     ]).start(() => {
       setShow(false);
       setConfirming(false);
-      onConfirm();
     });
   }, [onConfirm]);
 
@@ -309,6 +328,9 @@ export default function StreepjesVerificatieModal({
                 )}
               </View>
             </Animated.View>
+
+            {/* Splash message */}
+            <Text style={s.splashText}>{splashMessage}</Text>
 
             {/* Zone 3: Actions */}
             <Animated.View
@@ -457,6 +479,16 @@ const s = StyleSheet.create({
     fontFamily: 'Unbounded-Medium',
     fontSize: 16,
     color: '#00BEAE',
+  },
+
+  // Splash message
+  splashText: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.4)',
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
 
   // Actions
