@@ -352,10 +352,6 @@ function CategoryBadgeSelector({
             })}
           </View>
 
-          {/* Hint text */}
-          <View style={cbs.hintContainer}>
-            <Text style={cbs.hintText}>Houd ingedrukt</Text>
-          </View>
         </View>
       </Modal>
     </>
@@ -372,8 +368,6 @@ const cbs = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
   chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '500' },
-  hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
-  hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
 
 function FadeMask({ children }: { children: React.ReactNode }) {
@@ -464,7 +458,7 @@ export default function SettingsOverlay({
   } | null>(null);
 
   // Reset optimistic adjustments when real data arrives
-  useEffect(() => { setTallyAdj({}); }, [tallyCounts]);
+  useEffect(() => { setTallyAdj({}); }, [recentTallies]);
 
   // Reset newDrinkCat when selected category is no longer enabled
   useEffect(() => {
@@ -926,7 +920,7 @@ export default function SettingsOverlay({
               </Pressable>
             </View>
             {/* Category badge selector: hold to expand, drag to pick */}
-            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8, flexDirection: 'column', gap: 6 }]}>
+            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
               <CategoryBadgeSelector
                 value={parseInt(newDrinkCat) || 1}
                 onChange={(v) => setNewDrinkCat(String(v))}
@@ -936,6 +930,9 @@ export default function SettingsOverlay({
                 onScrollEnable={setScrollEnabled}
               />
             </View>
+            <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Unbounded', textAlign: 'center', marginTop: 2, marginBottom: 4 }}>
+              Houd ingedrukt om te wisselen
+            </Text>
           </View>
 
           {/* Members */}
@@ -1116,7 +1113,7 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
 
   // Inputs
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 25, marginHorizontal: 12, marginVertical: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
   inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
 
   // Categories
