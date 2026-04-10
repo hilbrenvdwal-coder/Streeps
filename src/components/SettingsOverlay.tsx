@@ -13,6 +13,8 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Platform,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,10 @@ import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 
 interface Member {
   id: string;
@@ -450,6 +456,15 @@ export default function SettingsOverlay({
     new Animated.Value(1),
   ]).current;
 
+  const chevronAnims = useRef<Record<string, Animated.Value>>({}).current;
+
+  const getChevronAnim = (userId: string) => {
+    if (!chevronAnims[userId]) {
+      chevronAnims[userId] = new Animated.Value(0);
+    }
+    return chevronAnims[userId];
+  };
+
   const initialValues = useRef<{
     groupName: string;
     price1: string; price2: string; price3: string; price4: string;
@@ -470,7 +485,27 @@ export default function SettingsOverlay({
   }, [enabledCats, newDrinkCat]);
 
   const toggleExpandMember = useCallback((userId: string) => {
-    setExpandedMember((prev) => (prev === userId ? null : userId));
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
+    );
+    setExpandedMember((prev) => {
+      const willExpand = prev !== userId;
+      Animated.timing(getChevronAnim(userId), {
+        toValue: willExpand ? 1 : 0,
+        duration: 220,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+      if (prev && prev !== userId) {
+        Animated.timing(getChevronAnim(prev), {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }
+      return willExpand ? userId : null;
+    });
   }, []);
 
   // Init form when opened
@@ -958,7 +993,12 @@ export default function SettingsOverlay({
                       <Text style={s.memberName}>{name}</Text>
                       {member.is_admin && <Text style={s.adminBadge}>Admin</Text>}
                     </View>
-                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#848484" />
+                    <Animated.View style={{ transform: [{ rotate: getChevronAnim(member.user_id).interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '180deg'],
+                    }) }] }}>
+                      <Ionicons name="chevron-down" size={18} color="#848484" />
+                    </Animated.View>
                   </Pressable>
                   {/* Expanded: tally counts + admin actions */}
                   {isExpanded && (
