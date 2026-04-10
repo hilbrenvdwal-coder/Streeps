@@ -2898,7 +2898,6 @@ export default function ChatScreen() {
     InteractionManager.runAfterInteractions(() => markAsRead(conv.id));
     setActiveConv(conv);
     activeConvRef.current = conv;
-    setShowingChat(true);
     slideAnim.setValue(0);
     swipeX.setValue(0);
     Animated.parallel([
@@ -2909,6 +2908,10 @@ export default function ChatScreen() {
         toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
       }),
     ]).start();
+    // Mount ChatDetail after first frame to avoid jank during slide animation
+    requestAnimationFrame(() => {
+      setShowingChat(true);
+    });
     // Prefetch profile/group data
     if (conv.type === 'dm' && conv.other_user_id) {
       prefetchProfile(conv.other_user_id);

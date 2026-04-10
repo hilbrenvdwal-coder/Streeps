@@ -1,38 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { InteractionManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/contexts/AuthContext';
-import * as db from '@/src/lib/db';
-import { chatSyncManager } from '@/src/lib/syncManager';
+import { getPreloadedMessages } from './useMessagePreloadCache';
 
 const PAGE_SIZE = 30;
 const MAX_MESSAGES_IN_MEMORY = 200;
+const CACHE_KEY_PREFIX = 'chat_msgs_';
+const CACHE_VERSION = 1;
 
-// ── Profile enrichment (fetches from Supabase + caches in SQLite) ──
-async function enrichWithProfiles(msgs: any[], profileCache: Record<string, any>) {
-  const unknownIds = [...new Set(msgs.map((m) => m.user_id).filter((id) => !profileCache[id]))];
+// ── Cache helpers ──
+async function loadCache(convId: string) {
+  try {
+    const raw = await AsyncStorage.getItem(`${CACHE_KEY_PREFIX}${convId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.version !== CACHE_VERSION) return null;
+    return parsed as { version: number; messages: any[]; oldestCursor: string | null; hasMore: boolean };
+  } catch { return null; }
+}
 
-  // First try to fill from SQLite
-  const stillUnknown: string[] = [];
-  for (const id of unknownIds) {
-    const local = db.getProfile(id);
-    if (local) {
-      profileCache[id] = local;
-    } else {
-      stillUnknown.push(id);
-    }
+async function saveCache(convId: string, msgs: any[], oldestCursor: string | null, hasMore: boolean) {
+  try {
+    const toCache = msgs.slice(0, PAGE_SIZE);
+    await AsyncStorage.setItem(`${CACHE_KEY_PREFIX}${convId}`, JSON.stringify({
+      version: CACHE_VERSION,
+      messages: toCache,
+      oldestCursor: toCache.length > 0 ? toCache[toCache.length - 1].created_at : null,
+      hasMore,
+    }));
+  } catch {}
+}
+
+// ── Profile enrichment (caches across pages) ──
+async function enrichWithProfiles(msgs: any[], cache: Record<string, any>) {
+  const unknownIds = [...new Set(msgs.map((m) => m.user_id).filter((id) => !cache[id]))];
+  if (unknownIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', unknownIds);
+    (profiles || []).forEach((p) => { cache[p.id] = p; });
   }
-
-  // Fetch remaining from Supabase
-  if (stillUnknown.length > 0) {
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', stillUnknown);
-    if (profiles && profiles.length > 0) {
-      db.upsertProfiles(profiles);
-      profiles.forEach((p) => { profileCache[p.id] = p; });
-    }
-  }
-
-  return msgs.map((m) => ({ ...m, profile: profileCache[m.user_id] || null }));
+  return msgs.map((m) => ({ ...m, profile: cache[m.user_id] || null }));
 }
 
 let groupChatsEnsured = false;
@@ -58,31 +66,7 @@ export function useConversations() {
 
   const fetchConversations = useCallback(async () => {
     if (!user) return;
-
-    // Step 1: Show cached conversations from SQLite instantly
-    if (!hasLoadedRef.current) {
-      const cached = db.getConversations();
-      if (cached.length > 0) {
-        const previews: ConversationPreview[] = cached.map((c) => ({
-          id: c.id,
-          type: c.type as 'dm' | 'group',
-          group_id: c.group_id,
-          other_user_id: c.other_user_id,
-          name: c.name,
-          avatar_url: c.avatar_url,
-          last_message: c.last_message_text,
-          last_message_at: c.last_message_at,
-          last_message_by: c.last_message_sender,
-          unread: c.unread_count,
-        }));
-        setConversations(previews);
-        setLoading(false);
-      } else {
-        setLoading(true);
-      }
-    }
-
-    // Step 2: Full Supabase fetch in background (existing logic)
+    if (!hasLoadedRef.current) setLoading(true);
 
     // Ensure all user's groups have a group chat (runs once per session)
     if (!groupChatsEnsured) {
@@ -137,11 +121,6 @@ export function useConversations() {
       .in('id', memberIds);
     const profileMap: Record<string, any> = {};
     (profiles || []).forEach((p) => { profileMap[p.id] = p; });
-
-    // Cache profiles in SQLite
-    if (profiles && profiles.length > 0) {
-      db.upsertProfiles(profiles);
-    }
 
     // Get group names for group conversations, but only groups the user is still a member of
     const groupIds = convs.filter((c) => c.group_id).map((c) => c.group_id);
@@ -243,12 +222,6 @@ export function useConversations() {
       return tb.localeCompare(ta);
     });
 
-    // Step 3: Upsert results into SQLite for next instant load
-    db.upsertConversations(previews);
-
-    // Start realtime via SyncManager for these conversations
-    chatSyncManager.startRealtime(validConvIds);
-
     setConversations(previews);
     setLoading(false);
     hasLoadedRef.current = true;
@@ -266,13 +239,6 @@ export function useConversations() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  // Initialize sync manager when user is available
-  useEffect(() => {
-    if (!user) return;
-    chatSyncManager.initialize(user.id);
-    return () => { /* cleanup handled elsewhere (logout) */ };
   }, [user]);
 
   const markAsRead = useCallback(async (conversationId: string) => {
@@ -318,56 +284,57 @@ export function useChatMessages(conversationId: string | null) {
     return () => handle.cancel();
   }, [conversationId, user]);
 
-  // ── Initial load: SQLite first, then delta sync from server ──
+  // ── Initial load: cache first, then server ──
   const fetchInitial = useCallback(async () => {
     if (!conversationId) return;
     convIdRef.current = conversationId;
     profileCacheRef.current = {};
 
-    // Step 1: Read messages from SQLite (instant)
-    const localMessages = db.getMessages(conversationId, PAGE_SIZE);
-    if (localMessages.length > 0) {
-      setMessages(localMessages);
-      oldestCursorRef.current = localMessages[localMessages.length - 1].created_at;
+    // Step 0: Check in-memory preload cache (instant, no async)
+    const preloaded = getPreloadedMessages(conversationId);
+    if (preloaded) {
+      setMessages(preloaded.messages);
+      oldestCursorRef.current = preloaded.oldestCursor;
+      hasMoreRef.current = preloaded.hasMore;
+      setHasMore(preloaded.hasMore);
       setLoading(false);
-      // Populate profile cache from local data
-      localMessages.forEach((m: any) => {
-        if (m.profile) profileCacheRef.current[m.user_id] = m.profile;
-      });
+      Object.assign(profileCacheRef.current, preloaded.profileCache);
+      // Skip AsyncStorage fallback — preload cache already populated
+    } else {
+      // Step 1: Show cached messages instantly (AsyncStorage fallback, only if no preload hit)
+      const cached = await loadCache(conversationId);
+      if (cached && cached.messages.length > 0) {
+        setMessages(cached.messages);
+        oldestCursorRef.current = cached.oldestCursor;
+        hasMoreRef.current = cached.hasMore;
+        setHasMore(cached.hasMore);
+        setLoading(false);
+        cached.messages.forEach((m: any) => { if (m.profile) profileCacheRef.current[m.user_id] = m.profile; });
+      }
     }
 
-    // Step 2: Delta sync from server — fetch only messages newer than our latest local
-    const latestLocal = localMessages.length > 0 ? localMessages[0].created_at : null;
-
-    const query = supabase
+    // Step 2: Fetch fresh first page from server
+    const { data: freshMsgs } = await supabase
       .from('messages')
       .select('*')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE);
 
-    // If we have local data, still fetch the full first page to check for gaps
-    const { data: freshMsgs } = await query;
-
     if (convIdRef.current !== conversationId) return;
 
     if (!freshMsgs || freshMsgs.length === 0) {
-      if (localMessages.length === 0) {
-        setMessages([]);
-        setHasMore(false);
-        hasMoreRef.current = false;
-        oldestCursorRef.current = null;
-        setLoading(false);
-      }
+      setMessages([]);
+      setHasMore(false);
+      hasMoreRef.current = false;
+      oldestCursorRef.current = null;
+      setLoading(false);
+      saveCache(conversationId, [], null, false);
       return;
     }
 
-    // Enrich with profiles (SQLite first, then Supabase)
     const enriched = await enrichWithProfiles(freshMsgs, profileCacheRef.current);
     if (convIdRef.current !== conversationId) return;
-
-    // Store fresh messages in SQLite for next time
-    db.insertMessages(freshMsgs);
 
     const serverHasMore = freshMsgs.length === PAGE_SIZE;
     const oldestTs = enriched[enriched.length - 1].created_at;
@@ -377,9 +344,10 @@ export function useChatMessages(conversationId: string | null) {
     hasMoreRef.current = serverHasMore;
     setHasMore(serverHasMore);
     setLoading(false);
+    saveCache(conversationId, enriched, oldestTs, serverHasMore);
   }, [conversationId]);
 
-  // ── Load older messages: try SQLite first, then Supabase ──
+  // ── Load older messages (cursor pagination) ──
   const loadMore = useCallback(async () => {
     if (!conversationId || !hasMoreRef.current || loadingMoreRef.current) return;
     if (!oldestCursorRef.current) return;
@@ -387,30 +355,6 @@ export function useChatMessages(conversationId: string | null) {
     loadingMoreRef.current = true;
     setLoadingMore(true);
 
-    // Step 1: Try loading from SQLite first
-    const localOlder = db.getMessages(conversationId, PAGE_SIZE, oldestCursorRef.current);
-
-    if (localOlder.length >= PAGE_SIZE) {
-      // We have enough locally — use SQLite data
-      const newOldest = localOlder[localOlder.length - 1].created_at;
-
-      setMessages((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id));
-        const newOnes = localOlder.filter((m) => !existingIds.has(m.id));
-        const merged = [...prev, ...newOnes];
-        return merged.length > MAX_MESSAGES_IN_MEMORY ? merged.slice(0, MAX_MESSAGES_IN_MEMORY) : merged;
-      });
-
-      oldestCursorRef.current = newOldest;
-      // There might be more — can't know for sure from local count alone
-      hasMoreRef.current = true;
-      setHasMore(true);
-      loadingMoreRef.current = false;
-      setLoadingMore(false);
-      return;
-    }
-
-    // Step 2: Not enough locally — fetch from Supabase
     const { data: olderMsgs } = await supabase
       .from('messages')
       .select('*')
@@ -432,9 +376,6 @@ export function useChatMessages(conversationId: string | null) {
       setLoadingMore(false);
       return;
     }
-
-    // Store in SQLite for future use
-    db.insertMessages(olderMsgs);
 
     const enriched = await enrichWithProfiles(olderMsgs, profileCacheRef.current);
     if (convIdRef.current !== conversationId) {
@@ -461,13 +402,11 @@ export function useChatMessages(conversationId: string | null) {
   }, [conversationId]);
 
   // ── Reset & fetch on conversation change ──
-  // Check if we have local data to show instantly, otherwise show loading
+  // Defer data loading until after slide-in animation completes to prevent jitter
   useEffect(() => {
-    const hasLocal = conversationId ? db.getMessageCount(conversationId) > 0 : false;
-    if (!hasLocal) setLoading(true);
+    setLoading(true);
     setLoadingMore(false);
     setHasMore(true);
-    setReactions({});
     oldestCursorRef.current = null;
     hasMoreRef.current = true;
     loadingMoreRef.current = false;
@@ -497,10 +436,6 @@ export function useChatMessages(conversationId: string | null) {
             .single()
             .then(({ data: msg }) => {
               if (!msg) return;
-
-              // Store in SQLite
-              db.insertMessages([msg]);
-
               // Mark as read if message is from someone else
               if (msg.user_id !== user?.id) {
                 supabase.from('conversation_members')
@@ -514,33 +449,17 @@ export function useChatMessages(conversationId: string | null) {
                 .eq('id', msg.user_id)
                 .single()
                 .then(({ data: profile }) => {
-                  // Cache profile in SQLite
-                  if (profile) {
-                    db.upsertProfiles([profile]);
-                  }
-
                   setMessages((prev) => {
                     const exists = prev.some((m) => m.id === newId);
                     if (exists) return prev;
                     const tempIdx = prev.findIndex((m) => m.id.startsWith('temp-') && m.user_id === msg.user_id && m.content === msg.content);
                     if (tempIdx >= 0) {
-                      // Confirm optimistic message: replace temp with real
-                      const tempId = prev[tempIdx].id;
-                      db.confirmMessage(tempId, msg);
                       const updated = [...prev];
                       updated[tempIdx] = { ...msg, profile: profile || null };
                       return updated;
                     }
                     return [{ ...msg, profile: profile || null }, ...prev];
                   });
-
-                  // Update conversation preview in SQLite
-                  db.updateConversationPreview(
-                    conversationId,
-                    msg.content,
-                    msg.created_at,
-                    profile?.full_name ?? null,
-                  );
                 });
             });
         })
@@ -603,12 +522,9 @@ export function useChatMessages(conversationId: string | null) {
   }, [conversationId]);
 
   // ── Toggle like (optimistic) ──
-  // Use ref to avoid re-creating callback on every reaction change (prevents ChatBubble re-renders)
-  const reactionsRef = useRef(reactions);
-  reactionsRef.current = reactions;
   const toggleLike = useCallback(async (messageId: string) => {
     if (!user || !messageId || messageId.startsWith('temp-')) return;
-    const current = reactionsRef.current[messageId] || [];
+    const current = reactions[messageId] || [];
     const alreadyLiked = current.includes(user.id);
 
     // Optimistic update
@@ -629,30 +545,19 @@ export function useChatMessages(conversationId: string | null) {
       await supabase.from('message_reactions')
         .insert({ message_id: messageId, user_id: user.id });
     }
-  }, [user]);
+  }, [user, reactions]);
 
-  // ── Send message (optimistic + SQLite) ──
+  // ── Send message (optimistic) ──
   const sendMessage = useCallback(async (content: string) => {
     if (!user || !conversationId || !content.trim()) return;
     const trimmed = content.trim();
-    const tempId = `temp-${Date.now()}`;
-    const now = new Date().toISOString();
 
-    const optimisticMsg = {
-      id: tempId,
+    setMessages((prev) => [{
+      id: `temp-${Date.now()}`,
       conversation_id: conversationId,
       user_id: user.id,
       content: trimmed,
-      message_type: null,
-      metadata: null,
-      created_at: now,
-    };
-
-    // Insert optimistic message in SQLite (synced=0)
-    db.insertOptimisticMessage(optimisticMsg);
-
-    setMessages((prev) => [{
-      ...optimisticMsg,
+      created_at: new Date().toISOString(),
       profile: { full_name: user.user_metadata?.full_name || '', avatar_url: null },
     }, ...prev]);
 
@@ -663,7 +568,7 @@ export function useChatMessages(conversationId: string | null) {
     });
   }, [user, conversationId]);
 
-  // ── Send gift (optimistic + SQLite) ──
+  // ── Send gift (optimistic) ──
   const sendGift = useCallback(async (
     recipientId: string, recipientName: string, groupId: string,
     category: number, quantity: number, categoryName: string,
@@ -672,24 +577,15 @@ export function useChatMessages(conversationId: string | null) {
 
     const giverName = user.user_metadata?.full_name || 'Iemand';
     const content = `${giverName} heeft ${quantity} ${categoryName} gegeven aan ${recipientName}!`;
-    const tempId = `temp-gift-${Date.now()}`;
-    const now = new Date().toISOString();
-    const metadata = { recipient_id: recipientId, category, quantity, category_name: categoryName };
 
-    const optimisticMsg = {
-      id: tempId,
+    setMessages((prev) => [{
+      id: `temp-gift-${Date.now()}`,
       conversation_id: conversationId,
       user_id: user.id,
       content,
       message_type: 'gift',
-      metadata,
-      created_at: now,
-    };
-
-    db.insertOptimisticMessage(optimisticMsg);
-
-    setMessages((prev) => [{
-      ...optimisticMsg,
+      metadata: { recipient_id: recipientId, category, quantity, category_name: categoryName },
+      created_at: new Date().toISOString(),
       profile: { full_name: giverName, avatar_url: null },
     }, ...prev]);
 
@@ -715,7 +611,7 @@ export function useChatMessages(conversationId: string | null) {
       user_id: user.id,
       content,
       message_type: 'gift',
-      metadata,
+      metadata: { recipient_id: recipientId, category, quantity, category_name: categoryName },
     });
   }, [user, conversationId]);
 
@@ -723,25 +619,16 @@ export function useChatMessages(conversationId: string | null) {
     if (!user || !conversationId) return;
 
     const fileName = `${user.id}/${Date.now()}.jpg`;
-    const tempId = `temp-img-${Date.now()}`;
-    const now = new Date().toISOString();
-    const metadata = { image_url: uri };
 
-    const optimisticMsg = {
-      id: tempId,
+    // Optimistic: show local image immediately
+    setMessages((prev) => [{
+      id: `temp-img-${Date.now()}`,
       conversation_id: conversationId,
       user_id: user.id,
       content: '',
       message_type: 'image',
-      metadata,
-      created_at: now,
-    };
-
-    db.insertOptimisticMessage(optimisticMsg);
-
-    // Optimistic: show local image immediately
-    setMessages((prev) => [{
-      ...optimisticMsg,
+      metadata: { image_url: uri },
+      created_at: new Date().toISOString(),
       profile: { full_name: user.user_metadata?.full_name || '', avatar_url: null },
     }, ...prev]);
 
