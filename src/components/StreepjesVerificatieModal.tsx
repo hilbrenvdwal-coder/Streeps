@@ -231,8 +231,16 @@ export default function StreepjesVerificatieModal({
   return (
     <Modal visible transparent animationType="none">
       <Pressable style={{ flex: 1 }} onPress={handleCancel}>
-        {/* Scrim */}
-        <Animated.View style={[s.scrim, { opacity: scrimOpacity }]} />
+        {/* Blurred backdrop */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]}>
+          <BlurView
+            intensity={30}
+            tint="dark"
+            style={StyleSheet.absoluteFillObject}
+            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+          />
+          <View style={s.scrim} />
+        </Animated.View>
 
         {/* Aurora flash -- real aurora preset, scaled to fill screen */}
         <Animated.View
@@ -275,16 +283,9 @@ export default function StreepjesVerificatieModal({
                 },
               ]}
             >
-              {/* Left: count with glow */}
+              {/* Left: count */}
               <View style={s.infoLeft}>
                 <View style={s.countContainer}>
-                  {/* Glow behind count */}
-                  <View
-                    style={[
-                      s.countGlow,
-                      { backgroundColor: categoryColor },
-                    ]}
-                  />
                   <Text style={s.countText}>{count}</Text>
                 </View>
                 {credit > 0 && (
@@ -302,14 +303,9 @@ export default function StreepjesVerificatieModal({
                   </Text>
                 </View>
                 {hasPrice && (
-                  <>
-                    <Text style={s.pricePerUnit}>
-                      {'\u20AC'}{pricePerUnit} per stuk
-                    </Text>
-                    <Text style={s.totalPrice}>
-                      Totaal: {'\u20AC'}{totalPrice}
-                    </Text>
-                  </>
+                  <Text style={s.pricePerUnit}>
+                    {'\u20AC'}{pricePerUnit} per stuk
+                  </Text>
                 )}
               </View>
             </Animated.View>
