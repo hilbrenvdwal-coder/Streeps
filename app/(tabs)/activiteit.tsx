@@ -330,7 +330,7 @@ export default function ActiviteitScreen() {
             }
           >
           <ScrollView
-            refreshControl={<RefreshControl refreshing={billLoading} onRefresh={fetchBills} tintColor="#FF004D" />}
+            refreshControl={<RefreshControl refreshing={billLoading} onRefresh={fetchBills} tintColor="#FF0085" />}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
@@ -417,7 +417,7 @@ export default function ActiviteitScreen() {
                           <Text style={styles.settlementName}>{settlement.group_name}</Text>
                           <Text style={styles.settlementTime}>{formatTimeAgo(settlement.created_at)}</Text>
                         </View>
-                        <Text style={[styles.settlementAmount, { color: settlement.paid ? '#00BEAE' : '#FF004D' }]}>
+                        <Text style={[styles.settlementAmount, { color: settlement.paid ? '#00BEAE' : '#FF0085' }]}>
                           {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
                         </Text>
                       </View>
@@ -488,7 +488,7 @@ function createStyles(t: Theme) {
       color: '#848484',
     },
     tabTextActive: {
-      color: '#FF004D',
+      color: '#FF0085',
     },
 
     // ── Scroll content ──
@@ -539,7 +539,7 @@ function createStyles(t: Theme) {
       fontFamily: 'Unbounded',
       fontSize: 18,
       fontWeight: '600',
-      color: '#FF004D',
+      color: '#FF0085',
     },
     cardDivider: {
       height: 1,
@@ -614,7 +614,7 @@ function createStyles(t: Theme) {
       fontFamily: 'Unbounded',
       fontSize: 20,
       fontWeight: '600',
-      color: '#FF004D',
+      color: '#FF0085',
       marginTop: 6,
     },
     payButton: {
