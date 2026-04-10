@@ -27,8 +27,8 @@ export const streepsRed     = '#EB5466';
 // ─── Brand ──────────────────────────────────────────────────────────────────
 
 export const brand = {
-  magenta: '#FF004D',      // Nav pill, send button
-  streepsRed: '#FF0085',   // Openstaande rekening, activiteit indicator
+  magenta: '#FF004D',      // Openstaande rekening, activiteit indicator
+  streepsRed: '#FF0085',   // Nav pill, send button (= streepsMagenta)
   cyan: '#00BEAE',         // Opslaan knop, admin acties, join buttons
   green: '#00FE96',        // Actief indicator (groene bolletje)
   blue: '#4A6CF7',

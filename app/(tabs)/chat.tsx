@@ -1004,7 +1004,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
                 </Pressable>
               </Animated.View>
               {/* Send button (fades in when typing, overlays camera position) */}
-              <Animated.View style={[dt.actionBtn, { backgroundColor: '#FF004D', position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
+              <Animated.View style={[dt.actionBtn, { backgroundColor: '#FF0085', position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
                 <Pressable style={dt.actionBtnInner} onPress={handleSend} onPressIn={sendPress.onPressIn} onPressOut={sendPress.onPressOut}>
                   <Ionicons name="send" size={20} color="#FFFFFF" />
                 </Pressable>
@@ -1012,7 +1012,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
             </>
           ) : (
             /* DM: send button appears inside input when typing */
-            <Animated.View style={[dt.actionBtn, { backgroundColor: '#FF004D', position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendDmPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
+            <Animated.View style={[dt.actionBtn, { backgroundColor: '#FF0085', position: 'absolute', right: 0, bottom: 0, opacity: sendOpacity, transform: [{ scale: Animated.multiply(sendScale, sendDmPress.scale) }] }]} pointerEvents={hasText ? 'auto' : 'none'}>
               <Pressable style={dt.actionBtnInner} onPress={handleSend} onPressIn={sendDmPress.onPressIn} onPressOut={sendDmPress.onPressOut}>
                 <Ionicons name="send" size={20} color="#FFFFFF" />
               </Pressable>
@@ -1129,7 +1129,7 @@ const dt = StyleSheet.create({
   inputGlowWrap: { flex: 1, borderRadius: 27, shadowColor: '#00FE96', shadowOffset: { width: 0, height: 0 }, shadowRadius: 6.5, elevation: 8 },
   inputBlurWrap: { flex: 1, borderRadius: 25, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' },
   input: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 16, minHeight: 50, maxHeight: 120 },
-  sendBtn: { width: 52, height: 52, borderRadius: 25, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 52, height: 52, borderRadius: 25, backgroundColor: '#FF0085', alignItems: 'center', justifyContent: 'center' },
   actionBtn: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', margin: 6 },
   actionBtnInner: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   giftWrap: { alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginVertical: 20, width: 390, height: 165 },
