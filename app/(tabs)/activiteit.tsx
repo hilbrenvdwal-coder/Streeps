@@ -330,14 +330,14 @@ export default function ActiviteitScreen() {
             }
           >
           <ScrollView
-            refreshControl={<RefreshControl refreshing={billLoading} onRefresh={fetchBills} tintColor="#FF0085" />}
+            refreshControl={<RefreshControl refreshing={billLoading} onRefresh={fetchBills} tintColor="#EB5466" />}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
           >
             {/* Grand total */}
             <View style={styles.totalSection}>
-              <Text style={[styles.totalAmount, grandTotal > 0 ? { color: t.brand.streepsRed } : { color: t.brand.cyan }]}>
+              <Text style={[styles.totalAmount, grandTotal > 0 ? { color: '#EB5466' } : { color: t.brand.cyan }]}>
                 {'\u20AC'}{(grandTotal / 100).toFixed(2).replace('.', ',')}
               </Text>
               <Text style={styles.totalLabel}>
@@ -417,7 +417,7 @@ export default function ActiviteitScreen() {
                           <Text style={styles.settlementName}>{settlement.group_name}</Text>
                           <Text style={styles.settlementTime}>{formatTimeAgo(settlement.created_at)}</Text>
                         </View>
-                        <Text style={[styles.settlementAmount, { color: settlement.paid ? '#00BEAE' : '#FF0085' }]}>
+                        <Text style={[styles.settlementAmount, { color: settlement.paid ? '#00BEAE' : '#EB5466' }]}>
                           {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
                         </Text>
                       </View>
@@ -472,7 +472,7 @@ function createStyles(t: Theme) {
       top: s(5),
       bottom: s(5),
       borderRadius: 20,
-      backgroundColor: 'rgba(255, 0, 133, 0.19)',
+      backgroundColor: 'rgba(235, 84, 102, 0.19)',
     },
     tabBtn: {
       flex: 1,
@@ -488,7 +488,7 @@ function createStyles(t: Theme) {
       color: '#848484',
     },
     tabTextActive: {
-      color: '#FF0085',
+      color: '#EB5466',
     },
 
     // ── Scroll content ──
@@ -539,7 +539,7 @@ function createStyles(t: Theme) {
       fontFamily: 'Unbounded',
       fontSize: 18,
       fontWeight: '600',
-      color: '#FF0085',
+      color: '#EB5466',
     },
     cardDivider: {
       height: 1,
@@ -590,9 +590,9 @@ function createStyles(t: Theme) {
     // ── Pending settlement card ──
     pendingCard: {
       borderRadius: 25,
-      backgroundColor: 'rgba(255, 0, 133, 0.08)',
+      backgroundColor: 'rgba(235, 84, 102, 0.08)',
       borderWidth: 1,
-      borderColor: 'rgba(255, 0, 133, 0.3)',
+      borderColor: 'rgba(235, 84, 102, 0.3)',
       padding: s(16),
       marginBottom: s(12),
       flexDirection: 'row',
@@ -614,7 +614,7 @@ function createStyles(t: Theme) {
       fontFamily: 'Unbounded',
       fontSize: 20,
       fontWeight: '600',
-      color: '#FF0085',
+      color: '#EB5466',
       marginTop: 6,
     },
     payButton: {
