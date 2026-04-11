@@ -269,7 +269,7 @@ export default function GroupScreen() {
               <Pressable
                 onPress={async (e) => {
                   e.stopPropagation();
-                  await Share.share({ message: `Join mijn groep "${group.name}" op Streeps! Code: ${group.invite_code}` });
+                  await Share.share({ message: `Join ${group.name} op Streeps!\nhttps://streeps.app/join/${group.invite_code}` });
                 }}
               >
                 <Text style={{ color: t.colors.tint, ...t.typography.overline }}>delen</Text>
@@ -903,7 +903,7 @@ function createStyles(t: Theme, mode: 'light' | 'dark') {
       width: 10,
       height: 10,
       borderRadius: 5,
-      backgroundColor: t.brand.green,
+      backgroundColor: t.brand.cyan,
     },
     catDot: {
       width: 10,

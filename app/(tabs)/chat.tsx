@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, streepsMagenta, brand } from '@/src/theme';
+import { getTheme, streepsMagenta } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
@@ -107,13 +107,6 @@ function usePressScale() {
 // ── Swipe-to-dismiss hook for overlays ──
 function useSwipeDismiss(onDismiss: () => void, overlayAnim?: Animated.Value) {
   const swipeX = useRef(new Animated.Value(0)).current;
-  const scrimOpacity = useMemo(() => {
-    if (!overlayAnim) return swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.3, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' });
-    return Animated.multiply(
-      overlayAnim,
-      swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.3, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' })
-    );
-  }, [overlayAnim, swipeX]);
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) => gs.dx > 10 && gs.moveX < 80 && Math.abs(gs.dy) < 25,
@@ -139,7 +132,7 @@ function useSwipeDismiss(onDismiss: () => void, overlayAnim?: Animated.Value) {
       },
     })
   ).current;
-  return { swipeX, scrimOpacity, panHandlers: pan.panHandlers };
+  return { swipeX, panHandlers: pan.panHandlers };
 }
 
 // ── Top fade mask wrapper ──
@@ -269,7 +262,7 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const anim = useRef(new Animated.Value(0)).current;
-  const { swipeX: goSwipeX, scrimOpacity: goScrimOpacity, panHandlers: goPan } = useSwipeDismiss(onClose, anim);
+  const { swipeX: goSwipeX, panHandlers: goPan } = useSwipeDismiss(onClose, anim);
 
   const [members, setMembers] = useState<any[]>([]);
   const [activeCategories, setActiveCategories] = useState<{ category: number; name: string }[]>([]);
@@ -414,7 +407,7 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: goScrimOpacity }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={go.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} />
@@ -1155,7 +1148,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
   const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-  const { swipeX: poSwipeX, scrimOpacity: poScrimOpacity, panHandlers: poPan } = useSwipeDismiss(onClose, anim);
+  const { swipeX: poSwipeX, panHandlers: poPan } = useSwipeDismiss(onClose, anim);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -1269,7 +1262,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
     const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (error) { Alert.alert('Upload mislukt', error.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
     setAvatarUrl(publicUrl);
     setUploadingAvatar(false);
@@ -1279,7 +1272,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: poScrimOpacity }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={po.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
@@ -1423,7 +1416,7 @@ const po = StyleSheet.create({
 
   // Logout
   logoutBtn: { marginTop: 32, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' },
-  logoutText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FF0085' },
+  logoutText: { fontFamily: 'Unbounded', fontSize: 16, color: '#EB5466' },
 });
 
 // ── User profile overlay (view other people's profiles) ──
@@ -1436,7 +1429,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
   const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-  const { swipeX: upSwipeX, scrimOpacity: upScrimOpacity, panHandlers: upPan } = useSwipeDismiss(onClose, anim);
+  const { swipeX: upSwipeX, panHandlers: upPan } = useSwipeDismiss(onClose, anim);
 
   const [profile, setProfile] = useState<any>(null);
   const [sharedGroups, setSharedGroups] = useState<any[]>([]);
@@ -1550,7 +1543,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: upScrimOpacity }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={up.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
@@ -1784,7 +1777,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-  const { swipeX: gpSwipeX, scrimOpacity: gpScrimOpacity, panHandlers: gpPan } = useSwipeDismiss(onClose, anim);
+  const { swipeX: gpSwipeX, panHandlers: gpPan } = useSwipeDismiss(onClose, anim);
 
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
@@ -1843,7 +1836,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const handleShare = async () => {
     if (!group) return;
     try {
-      await Share.share({ message: `Join ${group.name} op Streeps! Code: ${group.invite_code}` });
+      await Share.share({ message: `Join ${group.name} op Streeps!\nhttps://streeps.app/join/${group.invite_code}` });
     } catch {}
   };
 
@@ -1855,7 +1848,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: gpScrimOpacity }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={gp.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
@@ -2197,7 +2190,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
   const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-  const { swipeX: apSwipeX, scrimOpacity: apScrimOpacity, panHandlers: apPan } = useSwipeDismiss(onClose, anim);
+  const { swipeX: apSwipeX, panHandlers: apPan } = useSwipeDismiss(onClose, anim);
   const [tab, setTab] = useState<'suggest' | 'requests'>('suggest');
 
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -2456,7 +2449,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: apScrimOpacity }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]} pointerEvents="auto">
         <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
         <View style={ap.scrim} />
         <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
@@ -2872,24 +2865,6 @@ export default function ChatScreen() {
   const searchAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const swipeX = useRef(new Animated.Value(0)).current;
-
-  const OVERVIEW_PARALLAX = -SCREEN_W * 0.3;
-
-  const overviewTranslateX = useMemo(() => {
-    const baseSlide = slideAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, OVERVIEW_PARALLAX],
-    });
-
-    const swipeCorrection = swipeX.interpolate({
-      inputRange: [0, SCREEN_W],
-      outputRange: [0, -OVERVIEW_PARALLAX],
-      extrapolate: 'clamp',
-    });
-
-    return Animated.add(baseSlide, swipeCorrection);
-  }, [slideAnim, swipeX]);
-
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const navBarHeight = 77 + (insets.bottom || 12) / 2;
@@ -2905,6 +2880,7 @@ export default function ChatScreen() {
     InteractionManager.runAfterInteractions(() => markAsRead(conv.id));
     setActiveConv(conv);
     activeConvRef.current = conv;
+    setShowingChat(true);
     slideAnim.setValue(0);
     swipeX.setValue(0);
     Animated.parallel([
@@ -2915,10 +2891,6 @@ export default function ChatScreen() {
         toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: true,
       }),
     ]).start();
-    // Mount ChatDetail after first frame to avoid jank during slide animation
-    requestAnimationFrame(() => {
-      setShowingChat(true);
-    });
     // Prefetch profile/group data
     if (conv.type === 'dm' && conv.other_user_id) {
       prefetchProfile(conv.other_user_id);
@@ -3033,10 +3005,10 @@ export default function ChatScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
       {/* ── Conversation list (always mounted) ── */}
-      <Animated.View style={{ flex: 1, paddingTop: insets.top, transform: [{ translateX: overviewTranslateX }] }}>
+      <View style={{ flex: 1, paddingTop: insets.top }}>
         {/* Aurora */}
         <View style={cs.auroraWrap} pointerEvents="none">
           <AuroraPresetView preset="header" colors={CHAT_AURORA_COLORS} animated gentle />
@@ -3166,7 +3138,7 @@ export default function ChatScreen() {
             )}
           />
         </FadeMask>
-      </Animated.View>
+      </View>
 
       {/* ── Chat detail overlay (slides in from right) ── */}
       {showingChat && currentConv && (
@@ -3181,7 +3153,7 @@ export default function ChatScreen() {
           }]}
           {...chatPan.panHandlers}
         >
-          <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
+          <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
           <View style={{ height: insets.top }} />
           <ChatDetail
             conversationId={currentConv.id}

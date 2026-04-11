@@ -189,7 +189,7 @@ export default function GroupSetupWizard({
     const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (error) { Alert.alert('Upload mislukt', error.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
     await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', groupId);
     setGroupAvatarUrl(publicUrl);
     setUploadingAvatar(false);
@@ -226,7 +226,7 @@ export default function GroupSetupWizard({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Join ${groupName} op Streeps! Gebruik code: ${inviteCode}`,
+        message: `Join ${groupName} op Streeps!\nhttps://streeps.app/join/${inviteCode}`,
       });
     } catch {}
   };
@@ -356,7 +356,7 @@ export default function GroupSetupWizard({
               <Text style={ws.drinkName}>{drink.name}</Text>
               <View style={[ws.drinkCatDot, { backgroundColor: categoryColors[(drink.category - 1) % 4] }]} />
               <Pressable onPress={() => handleRemoveDrink(drink.id)} hitSlop={8}>
-                <Ionicons name="close-circle" size={20} color="#FF0085" />
+                <Ionicons name="close-circle" size={20} color="#EB5466" />
               </Pressable>
             </View>
           </React.Fragment>

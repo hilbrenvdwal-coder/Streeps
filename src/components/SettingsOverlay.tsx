@@ -13,8 +13,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Platform,
-  LayoutAnimation,
-  UIManager,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,10 +25,6 @@ import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
-
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental?.(true);
-}
 
 interface Member {
   id: string;
@@ -358,6 +353,10 @@ function CategoryBadgeSelector({
             })}
           </View>
 
+          {/* Hint text */}
+          <View style={cbs.hintContainer}>
+            <Text style={cbs.hintText}>Houd ingedrukt</Text>
+          </View>
         </View>
       </Modal>
     </>
@@ -374,6 +373,8 @@ const cbs = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
   chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
   chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '500' },
+  hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
+  hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
 
 function FadeMask({ children }: { children: React.ReactNode }) {
@@ -456,15 +457,6 @@ export default function SettingsOverlay({
     new Animated.Value(1),
   ]).current;
 
-  const chevronAnims = useRef<Record<string, Animated.Value>>({}).current;
-
-  const getChevronAnim = (userId: string) => {
-    if (!chevronAnims[userId]) {
-      chevronAnims[userId] = new Animated.Value(0);
-    }
-    return chevronAnims[userId];
-  };
-
   const initialValues = useRef<{
     groupName: string;
     price1: string; price2: string; price3: string; price4: string;
@@ -485,27 +477,7 @@ export default function SettingsOverlay({
   }, [enabledCats, newDrinkCat]);
 
   const toggleExpandMember = useCallback((userId: string) => {
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity)
-    );
-    setExpandedMember((prev) => {
-      const willExpand = prev !== userId;
-      Animated.timing(getChevronAnim(userId), {
-        toValue: willExpand ? 1 : 0,
-        duration: 220,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }).start();
-      if (prev && prev !== userId) {
-        Animated.timing(getChevronAnim(prev), {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-      }
-      return willExpand ? userId : null;
-    });
+    setExpandedMember((prev) => (prev === userId ? null : userId));
   }, []);
 
   // Init form when opened
@@ -770,7 +742,7 @@ export default function SettingsOverlay({
     const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (error) { Alert.alert('Upload mislukt', error.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
     await supabase.from('groups').update({ avatar_url: publicUrl }).eq('id', groupId);
     setGroupAvatarUrl(publicUrl);
     setUploadingAvatar(false);
@@ -939,7 +911,7 @@ export default function SettingsOverlay({
                       <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
                     </View>
                     <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.7 }} accessibilityLabel={`${drink.name} verwijderen`} accessibilityRole="button">
-                      <Ionicons name="close-circle" size={20} color="#FF0085" />
+                      <Ionicons name="close-circle" size={20} color="#EB5466" />
                     </Pressable>
                   </View>
                 </React.Fragment>
@@ -965,9 +937,6 @@ export default function SettingsOverlay({
                 onScrollEnable={setScrollEnabled}
               />
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'Unbounded', textAlign: 'center', marginTop: 2, marginBottom: 4 }}>
-              Houd ingedrukt om te wisselen
-            </Text>
           </View>
 
           {/* Members */}
@@ -993,12 +962,7 @@ export default function SettingsOverlay({
                       <Text style={s.memberName}>{name}</Text>
                       {member.is_admin && <Text style={s.adminBadge}>Admin</Text>}
                     </View>
-                    <Animated.View style={{ transform: [{ rotate: getChevronAnim(member.user_id).interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '180deg'],
-                    }) }] }}>
-                      <Ionicons name="chevron-down" size={18} color="#848484" />
-                    </Animated.View>
+                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#848484" />
                   </Pressable>
                   {/* Expanded: tally counts + admin actions */}
                   {isExpanded && (
@@ -1055,7 +1019,7 @@ export default function SettingsOverlay({
                                 accessibilityLabel="Streepje verwijderen"
                                 accessibilityRole="button"
                               >
-                                <Ionicons name="remove" size={16} color="#FF0085" />
+                                <Ionicons name="remove" size={16} color="#EB5466" />
                               </Pressable>
                             )}
                           </View>
@@ -1069,7 +1033,7 @@ export default function SettingsOverlay({
                             <Text style={s.memberActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
                           </Pressable>
                           <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={({ pressed }) => [s.memberActionBtnDanger, pressed && { opacity: 0.7 }]}>
-                            <Ionicons name="person-remove-outline" size={18} color="#FF0085" />
+                            <Ionicons name="person-remove-outline" size={18} color="#EB5466" />
                             <Text style={s.memberActionTextDanger}>Verwijderen</Text>
                           </Pressable>
                         </View>
@@ -1090,26 +1054,40 @@ export default function SettingsOverlay({
                 <Text style={s.refreshText}>Vernieuwen</Text>
               </Pressable>
             </View>
+            <View style={s.divider} />
+            <Pressable
+              style={({ pressed }) => [s.shareInviteRow, pressed && { opacity: 0.7 }]}
+              onPress={async () => {
+                try {
+                  await Share.share({
+                    message: `Join ${group?.name} op Streeps!\nhttps://streeps.app/join/${group?.invite_code}`,
+                  });
+                } catch {}
+              }}
+            >
+              <Ionicons name="share-outline" size={18} color="#00BEAE" />
+              <Text style={s.shareInviteText}>Deel uitnodiging</Text>
+            </Pressable>
           </View>
 
           {/* Danger zone */}
           <View style={[s.card, { marginTop: 24 }]}>
             {isAdmin && (
               <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleRemoveAdmin}>
-                <Ionicons name="shield-outline" size={20} color="#FF0085" style={{ marginRight: 12 }} />
+                <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
                 <Text style={s.dangerRowText}>Admin afstaan</Text>
               </Pressable>
             )}
             {isAdmin && <View style={s.divider} />}
             <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleLeaveGroup}>
-              <Ionicons name="exit-outline" size={20} color="#FF0085" style={{ marginRight: 12 }} />
+              <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
               <Text style={s.dangerRowText}>Groep verlaten</Text>
             </Pressable>
             {isAdmin && (
               <>
                 <View style={s.divider} />
                 <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
-                  <Ionicons name="trash-outline" size={20} color="#FF0085" style={{ marginRight: 12 }} />
+                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
                   <Text style={s.dangerRowText}>Groep verwijderen</Text>
                 </Pressable>
               </>
@@ -1153,8 +1131,8 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
 
   // Inputs
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 25, marginHorizontal: 12, marginVertical: 8 },
-  inputText: { flex: 1, fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
+  inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
 
   // Categories
   catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
@@ -1188,12 +1166,12 @@ const s = StyleSheet.create({
     fontVariant: ['tabular-nums'] as any,
   },
   catPriceInputError: {
-    color: '#FF0085',
+    color: '#EB5466',
   },
   priceError: {
     fontFamily: 'Unbounded',
     fontSize: 10,
-    color: '#FF0085',
+    color: '#EB5466',
     textAlign: 'right' as const,
     paddingRight: 16,
     paddingBottom: 4,
@@ -1230,15 +1208,17 @@ const s = StyleSheet.create({
   memberActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(0,217,163,0.1)' },
   memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', flexShrink: 1 },
-  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(255,0,133,0.1)' },
-  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#FF0085', flexShrink: 1 },
+  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(235,84,102,0.1)' },
+  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466', flexShrink: 1 },
 
   // Invite
   inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, minHeight: 52 },
   inviteCode: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', flex: 1, letterSpacing: 2 },
   refreshText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE' },
+  shareInviteRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 20, minHeight: 48, gap: 10 },
+  shareInviteText: { fontFamily: 'Unbounded', fontSize: 13, color: '#00BEAE' },
 
   // Danger
   dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
-  dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#FF0085', flex: 1 },
+  dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
 });

@@ -3,6 +3,7 @@ import { useFonts } from 'expo-font';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -113,10 +114,19 @@ function RootLayoutNav() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
-    if (!session && !inAuthGroup) {
+    const inJoinRoute = segments[0] === 'join';
+    if (!session && !inAuthGroup && !inJoinRoute) {
       router.replace('/(auth)/login' as any);
     } else if (session && inAuthGroup) {
-      router.replace('/(tabs)/home' as any);
+      // Check for pending invite code from deep link before login
+      AsyncStorage.getItem('streeps_pending_invite_code').then((pendingCode) => {
+        if (pendingCode) {
+          AsyncStorage.removeItem('streeps_pending_invite_code');
+          router.replace(`/join/${pendingCode}` as any);
+        } else {
+          router.replace('/(tabs)/home' as any);
+        }
+      });
     }
   }, [session, loading, isRecovery]);
 
