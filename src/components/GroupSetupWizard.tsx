@@ -589,6 +589,7 @@ const ws = StyleSheet.create({
     width: '100%',
     paddingVertical: 14,
     paddingHorizontal: 4,
+    minHeight: 72,
   },
   catRowDisabled: {
     opacity: 0.4,
