@@ -12,7 +12,6 @@ import {
   Animated,
   Easing,
   Alert,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -276,43 +275,41 @@ export default function ActiviteitScreen() {
             keyExtractor={(item) => item.id}
             onRefresh={refreshHistory}
             refreshing={historyLoading}
-            contentContainerStyle={styles.historyScrollContent}
+            contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <Text style={styles.emptyText}>Nog geen streepjes gezet</Text>
             }
             renderItem={({ item, index }) => {
-              const catColor = t.categoryColors[(item.category - 1) % 4];
-              const catLabel = item.type === 'gift_sent'
-                ? `Gedoneerd · Cat ${item.category}`
-                : `Categorie ${item.category}`;
-              const displayCount = item.type === 'gift_sent'
-                ? (item.gift_quantity ?? 1)
-                : (item.count ?? 1);
+              const catColor = item.type === 'gift_sent' ? '#00BEAE'
+                : t.categoryColors[(item.category - 1) % 4];
+              const title = item.type === 'gift_sent'
+                ? `Gedoneerd aan ${item.gift_other_name}`
+                : `Categorie ${item.category}${item.removed ? ' (verwijderd)' : ''}`;
               return (
                 <AnimatedCard index={index} enabled={index < 15}>
                 <View style={[
-                  styles.historyCard,
+                  styles.historyItem,
+                  index === 0 && { borderTopLeftRadius: 25, borderTopRightRadius: 25 },
+                  index === history.length - 1 && { borderBottomLeftRadius: 25, borderBottomRightRadius: 25 },
                   item.removed && { opacity: 0.4 },
                 ]}>
-                  {/* Left: count container */}
-                  <View style={styles.historyCountBox}>
-                    <Text style={styles.historyCountText}>{displayCount}</Text>
-                    {item.type === 'gift_sent' && (
-                      <View style={styles.giftIconOverlay}>
-                        <Ionicons name="gift" size={14} color="#00BEAE" />
-                      </View>
+                  <View style={{ width: 30, alignItems: 'center', marginRight: 10 }}>
+                    {item.type === 'gift_sent' ? (
+                      <Ionicons name="gift" size={18} color="#00BEAE" />
+                    ) : (
+                      <View style={[styles.catDot, { backgroundColor: catColor }]} />
                     )}
                   </View>
-                  {/* Right: badge + meta */}
-                  <View style={styles.historyRight}>
-                    <View style={[styles.historyCatBadge, { backgroundColor: catColor + '20' }]}>
-                      <Text style={[styles.historyCatBadgeText, { color: catColor }]}>{catLabel}</Text>
-                    </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyTitle}>{title}</Text>
                     <Text style={styles.historyMeta}>
                       {item.group_name} · {formatTimeAgo(item.created_at)}
                     </Text>
                   </View>
+                  {((item.count ?? 1) > 1 || (item.gift_quantity ?? 0) > 0) && (
+                    <Text style={styles.historyCount}>{item.count ?? item.gift_quantity}</Text>
+                  )}
                 </View>
                 </AnimatedCard>
               );
@@ -340,7 +337,7 @@ export default function ActiviteitScreen() {
           >
             {/* Grand total */}
             <View style={styles.totalSection}>
-              <Text style={[styles.totalAmount, grandTotal > 0 ? { color: '#FF004D' } : { color: t.brand.cyan }]}>
+              <Text style={[styles.totalAmount, grandTotal > 0 ? { color: '#FF004D' } : { color: '#00BEAE' }]}>
                 {'\u20AC'}{(grandTotal / 100).toFixed(2).replace('.', ',')}
               </Text>
               <Text style={styles.totalLabel}>
@@ -353,21 +350,16 @@ export default function ActiviteitScreen() {
               <>
                 <Text style={styles.sectionHeader}>OPENSTAAND</Text>
                 {pendingSettlements.map((settlement) => (
-                  <View key={settlement.id} style={styles.rekItem}>
-                    <View style={styles.rekCountBox}>
-                      <Text style={[styles.rekCountText, { color: '#FF004D' }]}>
-                        {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
+                  <View key={settlement.id} style={styles.pendingCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pendingTitle}>{settlement.group_name}</Text>
+                      <Text style={styles.pendingSubtitle}>
+                        {settlement.admin_name} wil afrekenen
                       </Text>
                     </View>
-                    <View style={styles.rekRight}>
-                      <View style={[styles.rekBadge, { backgroundColor: 'rgba(255, 0, 77, 0.12)' }]}>
-                        <Text style={[styles.rekBadgeText, { color: '#FF004D' }]}>Openstaand</Text>
-                      </View>
-                      <Text style={styles.rekMeta}>
-                        {settlement.group_name} · {settlement.admin_name}
-                      </Text>
-                      <Text style={styles.rekMeta}>
-                        {formatTimeAgo(settlement.created_at)}
+                    <View style={styles.pendingAmountBox}>
+                      <Text style={styles.pendingAmount}>
+                        {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
                       </Text>
                     </View>
                     <Pressable
@@ -385,56 +377,55 @@ export default function ActiviteitScreen() {
               <Text style={styles.emptyText}>Geen openstaande rekeningen</Text>
             )}
 
-            {/* Current bills per group */}
-            {bills.length > 0 && (
-              <>
-                {pendingSettlements.length > 0 && <Text style={styles.sectionHeader}>LOPEND</Text>}
-                {bills.map((bill) => (
-                  <View key={bill.group_id} style={styles.rekItem}>
-                    <View style={styles.rekCountBox}>
-                      <Text style={[styles.rekCountText, { color: '#FF004D' }]}>
-                        {'\u20AC'}{(bill.total / 100).toFixed(2).replace('.', ',')}
+            {bills.map((bill) => (
+              <View key={bill.group_id} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>{bill.group_name}</Text>
+                  <Text style={styles.cardAmount}>
+                    {'\u20AC'}{(bill.total / 100).toFixed(2).replace('.', ',')}
+                  </Text>
+                </View>
+                {[1, 2, 3, 4].map((cat) => {
+                  const count = bill.counts[cat] || 0;
+                  if (count === 0) return null;
+                  const price = bill.category_prices[cat - 1] || 0;
+                  const subtotal = count * price;
+                  return (
+                    <View key={cat} style={styles.catRow}>
+                      <View style={[styles.catDot, { backgroundColor: t.categoryColors[(cat - 1) % 4] }]} />
+                      <Text style={styles.catName}>{bill.category_names[cat - 1]}</Text>
+                      <Text style={styles.catCalc}>
+                        {count}{'\u00D7'}{'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
+                      </Text>
+                      <Text style={styles.catTotal}>
+                        {'\u20AC'}{(subtotal / 100).toFixed(2).replace('.', ',')}
                       </Text>
                     </View>
-                    <View style={styles.rekRight}>
-                      <Text style={styles.rekGroupName}>{bill.group_name}</Text>
-                      {[1, 2, 3, 4].map((cat) => {
-                        const count = bill.counts[cat] || 0;
-                        if (count === 0) return null;
-                        const price = bill.category_prices[cat - 1] || 0;
-                        return (
-                          <Text key={cat} style={styles.rekMeta}>
-                            {bill.category_names[cat - 1]}: {count}{'\u00D7'}{'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
-                          </Text>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-              </>
-            )}
+                  );
+                })}
+              </View>
+            ))}
 
             {/* Past settlements */}
             {pastSettlements.length > 0 && (
               <>
                 <Text style={styles.sectionHeader}>AFGEREKEND</Text>
-                {pastSettlements.map((settlement) => (
-                  <View key={settlement.id} style={styles.rekItem}>
-                    <View style={styles.rekCountBox}>
-                      <Text style={[styles.rekCountText, { color: '#00BEAE' }]}>
-                        {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
-                      </Text>
-                    </View>
-                    <View style={styles.rekRight}>
-                      <View style={[styles.rekBadge, { backgroundColor: 'rgba(0, 190, 174, 0.12)' }]}>
-                        <Text style={[styles.rekBadgeText, { color: '#00BEAE' }]}>Betaald</Text>
+                <View style={styles.card}>
+                  {pastSettlements.map((settlement, i) => (
+                    <React.Fragment key={settlement.id}>
+                      {i > 0 && <View style={styles.cardDivider} />}
+                      <View style={styles.settlementRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.settlementName}>{settlement.group_name}</Text>
+                          <Text style={styles.settlementTime}>{formatTimeAgo(settlement.created_at)}</Text>
+                        </View>
+                        <Text style={[styles.settlementAmount, { color: settlement.paid ? '#00BEAE' : '#FF004D' }]}>
+                          {'\u20AC'}{(settlement.amount / 100).toFixed(2).replace('.', ',')}
+                        </Text>
                       </View>
-                      <Text style={styles.rekMeta}>
-                        {settlement.group_name} · {formatTimeAgo(settlement.created_at)}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                    </React.Fragment>
+                  ))}
+                </View>
               </>
             )}
           </ScrollView>
@@ -508,10 +499,6 @@ function createStyles(t: Theme) {
       paddingTop: s(16),
       paddingBottom: 120,
     },
-    historyScrollContent: {
-      paddingTop: s(16),
-      paddingBottom: 120,
-    },
 
     // ── Total ──
     totalSection: {
@@ -530,6 +517,68 @@ function createStyles(t: Theme) {
       marginTop: 4,
     },
 
+    // ── Card ──
+    card: {
+      borderRadius: 25,
+      backgroundColor: 'rgba(78, 78, 78, 0.2)',
+      overflow: 'hidden',
+      padding: s(16),
+      marginBottom: s(12),
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: s(12),
+    },
+    cardTitle: {
+      fontFamily: 'Unbounded',
+      fontSize: 18,
+      fontWeight: '400',
+      color: '#FFFFFF',
+    },
+    cardAmount: {
+      fontFamily: 'Unbounded',
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#FF004D',
+    },
+    cardDivider: {
+      height: 1,
+      backgroundColor: 'rgba(78, 78, 78, 0.3)',
+    },
+
+    // ── Category rows ──
+    catRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    catDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: 10,
+    },
+    catName: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      color: '#FFFFFF',
+      flex: 1,
+    },
+    catCalc: {
+      fontFamily: 'Unbounded',
+      color: '#848484',
+      fontSize: 12,
+      marginRight: 12,
+    },
+    catTotal: {
+      fontFamily: 'Unbounded',
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '500',
+    },
+
     // ── Section header ──
     sectionHeader: {
       fontFamily: 'Unbounded',
@@ -540,123 +589,102 @@ function createStyles(t: Theme) {
       marginBottom: s(8),
     },
 
-    // ── Rekening items (transparent rows with dividers) ──
-    rekItem: {
+    // ── Pending settlement card ──
+    pendingCard: {
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 0, 77, 0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 0, 77, 0.3)',
+      padding: s(16),
+      marginBottom: s(12),
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(255, 255, 255, 0.06)',
     },
-    rekCountBox: {
-      minWidth: 80,
-      alignItems: 'flex-start',
-      marginRight: 14,
-    },
-    rekCountText: {
-      fontFamily: 'Unbounded-SemiBold',
-      fontSize: 22,
-      fontWeight: '600',
-    },
-    rekRight: {
-      flex: 1,
-      justifyContent: 'space-evenly',
-    },
-    rekGroupName: {
+    pendingTitle: {
       fontFamily: 'Unbounded',
-      fontSize: 13,
+      fontSize: 16,
       fontWeight: '500',
       color: '#FFFFFF',
-      marginBottom: 2,
     },
-    rekBadge: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      marginBottom: 4,
-    },
-    rekBadgeText: {
+    pendingSubtitle: {
       fontFamily: 'Unbounded',
-      fontSize: 11,
-      fontWeight: '500',
-    },
-    rekMeta: {
-      fontFamily: 'Unbounded',
-      fontSize: 11,
+      fontSize: 12,
       color: '#848484',
-      marginTop: 1,
+      marginTop: 2,
+    },
+    pendingAmountBox: {
+      alignItems: 'flex-end',
+      marginLeft: 14,
+    },
+    pendingAmount: {
+      fontFamily: 'Unbounded',
+      fontSize: 20,
+      fontWeight: '600',
+      color: '#FF004D',
     },
     payButton: {
       backgroundColor: '#00BEAE',
-      borderRadius: 16,
-      paddingHorizontal: s(16),
-      paddingVertical: s(10),
+      borderRadius: 20,
+      paddingHorizontal: s(20),
+      paddingVertical: s(12),
       marginLeft: s(12),
     },
     payButtonText: {
       fontFamily: 'Unbounded',
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: '600',
       color: '#FFFFFF',
     },
-    catDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      marginRight: 10,
+
+    // ── Settlement rows ──
+    settlementRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    settlementName: {
+      fontFamily: 'Unbounded',
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    settlementTime: {
+      fontFamily: 'Unbounded',
+      color: '#848484',
+      fontSize: 12,
+      marginTop: 2,
+    },
+    settlementAmount: {
+      fontFamily: 'Unbounded',
+      fontSize: 18,
+      fontWeight: '600',
     },
 
-    // ── History card (matches confirmatie modal info card) ──
-    historyCard: {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      backgroundColor: 'transparent',
-      padding: 16,
-      marginBottom: 0,
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(255,255,255,0.06)',
+    // ── History list ──
+    historyItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: s(20),
+      paddingVertical: s(18),
+      backgroundColor: 'rgba(78, 78, 78, 0.2)',
     },
-    historyCountBox: {
-      width: 64,
-      height: 64,
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-    },
-    giftIconOverlay: {
-      position: 'absolute' as const,
-      top: 2,
-      right: 2,
-      backgroundColor: 'rgba(0, 190, 174, 0.15)',
-      borderRadius: 10,
-      padding: 3,
-    },
-    historyCountText: {
-      fontFamily: 'Unbounded-SemiBold',
-      fontSize: 36,
-      color: '#FFFFFF',
-    },
-    historyRight: {
-      flex: 1,
-      marginLeft: 16,
-      justifyContent: 'space-evenly' as const,
-      height: 64,
-    },
-    historyCatBadge: {
-      alignSelf: 'flex-start' as const,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 7,
-    },
-    historyCatBadgeText: {
+    historyTitle: {
       fontFamily: 'Unbounded',
-      fontSize: 11,
-      fontWeight: '500' as const,
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '500',
     },
     historyMeta: {
       fontFamily: 'Unbounded',
       color: '#848484',
-      fontSize: 11,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    historyCount: {
+      fontFamily: 'Unbounded',
+      fontSize: 18,
+      color: '#FFFFFF',
+      marginLeft: 12,
     },
 
     // ── Empty state ──
