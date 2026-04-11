@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Linking from 'expo-linking';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -51,7 +52,7 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const mode = useColorScheme();
   const t = getTheme(mode);
-  const { session, loading } = useAuth();
+  const { session, loading, isRecovery } = useAuth();
   const segments = useSegments();
 
   useHeartbeat(session?.user?.id);
@@ -81,15 +82,43 @@ function RootLayoutNav() {
         },
       };
 
+  // Deep link handling for password recovery URLs
+  useEffect(() => {
+    const handleUrl = (url: string) => {
+      if (url && url.includes('reset-password')) {
+        router.replace('/(auth)/reset-password' as any);
+      }
+    };
+
+    // Check cold start URL
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl(url);
+    });
+
+    // Listen for incoming URLs while app is open
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleUrl(event.url);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
     if (loading) return;
+
+    // If in recovery mode, redirect to reset-password screen
+    if (isRecovery) {
+      router.replace('/(auth)/reset-password' as any);
+      return;
+    }
+
     const inAuthGroup = segments[0] === '(auth)';
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login' as any);
     } else if (session && inAuthGroup) {
       router.replace('/(tabs)/home' as any);
     }
-  }, [session, loading]);
+  }, [session, loading, isRecovery]);
 
   if (loading) {
     return (

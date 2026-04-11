@@ -135,6 +135,11 @@ export default function LoginScreen() {
               </Pressable>
             </View>
 
+            {/* ── Wachtwoord vergeten? link ── */}
+            <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
+              <Text style={s.forgotLink}>Wachtwoord vergeten?</Text>
+            </Pressable>
+
             {/* ── "Log in." button ──
               Figma: 144×25, bg #FF0085, border-radius 25,
               box-shadow 0 0 6.8px #FF0085
@@ -288,6 +293,17 @@ const s = StyleSheet.create({
   },
   eyeBtn: {
     marginLeft: 8,
+  },
+
+  /* ── Forgot password link ── */
+  forgotLink: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    fontWeight: '400',
+    color: '#848484',
+    textAlign: 'right',
+    marginTop: -12,
+    marginBottom: 12,
   },
 
   /* ── Buttons ── 144×25, #FF0085, radius 25, glow 0 0 6.8px #FF0085 */

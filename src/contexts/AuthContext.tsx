@@ -6,9 +6,11 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  resetRecovery: () => void;
 }
 
 const noop = async () => ({ error: null });
@@ -16,9 +18,11 @@ const defaultContext: AuthContextType = {
   session: null,
   user: null,
   loading: true,
+  isRecovery: false,
   signIn: noop as any,
   signUp: noop as any,
   signOut: async () => {},
+  resetRecovery: () => {},
 };
 
 const AuthContext = createContext<AuthContextType>(defaultContext);
@@ -26,6 +30,7 @@ const AuthContext = createContext<AuthContextType>(defaultContext);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -33,8 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -61,14 +69,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const resetRecovery = () => setIsRecovery(false);
+
   return (
     <AuthContext.Provider value={{
       session,
       user: session?.user ?? null,
       loading,
+      isRecovery,
       signIn,
       signUp,
       signOut,
+      resetRecovery,
     }}>
       {children}
     </AuthContext.Provider>
