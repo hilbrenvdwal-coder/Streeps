@@ -7,8 +7,10 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -175,11 +177,13 @@ export default function CameraModal({
     <Modal visible={showModal} transparent animationType="none" statusBarTranslucent>
       {/* Scrim */}
       <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimAnim }]}>
-        <Pressable
-          style={styles.scrim}
-          onPress={animateClose}
-          accessibilityLabel="Sluiten"
+        <BlurView
+          intensity={30}
+          tint="dark"
+          style={StyleSheet.absoluteFillObject}
+          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
         />
+        <Pressable style={styles.scrim} onPress={animateClose} accessibilityLabel="Sluiten" />
       </Animated.View>
 
       {/* Bottom sheet */}
@@ -192,6 +196,12 @@ export default function CameraModal({
           },
         ]}
       >
+        <BlurView
+          intensity={40}
+          tint="dark"
+          style={StyleSheet.absoluteFillObject}
+          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+        />
         {/* Drag handle */}
         <View style={styles.handle} />
 
@@ -251,7 +261,7 @@ export default function CameraModal({
 const styles = StyleSheet.create({
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: SCRIM_COLOR,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
 
   sheet: {
@@ -259,20 +269,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: SHEET_BG,
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
+    backgroundColor: 'rgba(10, 10, 12, 0.65)',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    overflow: 'hidden',
     paddingHorizontal: space[5],
     paddingTop: space[3],
   },
 
   handle: {
-    width: HANDLE_WIDTH,
+    width: 142,
     height: HANDLE_HEIGHT,
-    borderRadius: HANDLE_HEIGHT / 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    backgroundColor: 'rgba(217, 217, 217, 0.46)',
     alignSelf: 'center',
-    marginBottom: space[4],
+    marginTop: 8,
+    marginBottom: 24,
   },
 
   title: {
@@ -324,7 +336,7 @@ const styles = StyleSheet.create({
 
   cancelBtn: {
     height: 48,
-    borderRadius: 9999,
+    borderRadius: 25,
     backgroundColor: '#2C2C2E',
     alignItems: 'center',
     justifyContent: 'center',
