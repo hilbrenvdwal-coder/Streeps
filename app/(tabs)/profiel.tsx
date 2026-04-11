@@ -128,7 +128,7 @@ export default function ProfielScreen() {
     const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: mimeType ?? 'image/jpeg', upsert: true });
     if (uploadError) { Alert.alert('Upload mislukt', uploadError.message); setUploadingAvatar(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now();
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
     setAvatarUrl(publicUrl);
     setUploadingAvatar(false);
@@ -139,6 +139,61 @@ export default function ProfielScreen() {
       { text: 'Annuleren', style: 'cancel' },
       { text: 'Uitloggen', style: 'destructive', onPress: async () => { await signOut(); router.replace('/(auth)/login'); } },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Account verwijderen',
+      'Weet je het zeker? Al je gegevens worden permanent verwijderd. Dit kan niet ongedaan worden gemaakt.',
+      [
+        { text: 'Annuleren', style: 'cancel' },
+        {
+          text: 'Verwijderen',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Definitief verwijderen?',
+              'Dit is je laatste kans.',
+              [
+                { text: 'Annuleren', style: 'cancel' },
+                {
+                  text: 'Definitief verwijderen',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      const { data: { session: currentSession } } = await supabase.auth.getSession();
+                      if (!currentSession?.access_token) {
+                        Alert.alert('Fout', 'Je bent niet ingelogd.');
+                        return;
+                      }
+                      const res = await fetch(
+                        'https://ozyfedcosrgukiyscvsd.supabase.co/functions/v1/delete-account',
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${currentSession.access_token}`,
+                            'Content-Type': 'application/json',
+                          },
+                        }
+                      );
+                      const body = await res.json();
+                      if (!res.ok) {
+                        Alert.alert('Fout', body.error || 'Er ging iets mis.');
+                        return;
+                      }
+                      await signOut();
+                      router.replace('/(auth)/login');
+                    } catch (e: any) {
+                      Alert.alert('Fout', e.message || 'Er ging iets mis.');
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const themeOptions = [
@@ -292,6 +347,13 @@ export default function ProfielScreen() {
         <Pressable style={styles.logoutBtn} onPress={handleSignOut}>
           <Text style={styles.logoutText}>Uitloggen</Text>
         </Pressable>
+        </AnimatedCard>
+
+        {/* ── Account verwijderen ── */}
+        <AnimatedCard index={3}>
+          <Pressable style={styles.deleteBtn} onPress={handleDeleteAccount}>
+            <Text style={styles.deleteText}>Account verwijderen</Text>
+          </Pressable>
         </AnimatedCard>
       </ScrollView>
       </FadeMask>
@@ -493,7 +555,24 @@ function createStyles(t: Theme) {
       fontFamily: 'Unbounded',
       fontSize: 16,
       fontWeight: '400',
-      color: '#FF0085',
+      color: '#EB5466',
+    },
+
+    // Delete account
+    deleteBtn: {
+      marginHorizontal: s(24),
+      marginTop: s(12),
+      height: s(50),
+      borderRadius: 25,
+      backgroundColor: 'rgba(78, 78, 78, 0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteText: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      fontWeight: '400',
+      color: '#EB5466',
     },
   });
 }
