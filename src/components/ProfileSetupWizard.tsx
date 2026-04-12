@@ -236,7 +236,6 @@ export default function ProfileSetupWizard({
         placeholderTextColor="#848484"
         autoFocus
         returnKeyType="done"
-        onSubmitEditing={handleNextStep1}
       />
     </View>
   );
