@@ -4,7 +4,6 @@ import CategoryRow from '@/src/components/CategoryRow';
 import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
 import GroupSetupWizard from '@/src/components/GroupSetupWizard';
-import ProfileSetupWizard from '@/src/components/ProfileSetupWizard';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
@@ -26,6 +25,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Dimensions,
   Easing,
   Modal,
@@ -197,6 +197,13 @@ export default function HomeScreen() {
     if (!selectedGroupId && groups.length > 0) setSelectedGroupId(groups[0].id);
   }, [groups, selectedGroupId]);
 
+  useEffect(() => {
+    AsyncStorage.getItem('streeps_confirm_count').then((val) => {
+      const parsed = val ? parseInt(val, 10) : 0;
+      setConfirmCount(isNaN(parsed) ? 0 : parsed);
+    });
+  }, []);
+
   const {
     group, members, drinks, tallyCounts, tallyCategoryCounts, recentTallies, credits,
     loading: detailLoading, isAdmin, addTally, addTallyForMember, addTallyForMemberByCategory, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
@@ -218,6 +225,8 @@ export default function HomeScreen() {
   const [showVerification, setShowVerification] = useState(false);
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmCount, setConfirmCount] = useState<number>(999); // default 999 voorkomt FOUC bij mount
+  const hintProgress = useRef(new Animated.Value(0)).current;
 
   // Toast feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -247,6 +256,18 @@ export default function HomeScreen() {
       setContentReady(false);
     }
   }, [group?.id, selectedGroupId]);
+
+  // Animate "Tik om te bevestigen" hint — only shown until user has confirmed 5+ times
+  useEffect(() => {
+    const shouldShow = tallyCount >= 1 && confirmCount < 5;
+    Animated.timing(hintProgress, {
+      toValue: shouldShow ? 1 : 0,
+      duration: shouldShow ? 200 : 150,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,  // layout props → non-native
+    }).start();
+  }, [tallyCount, confirmCount]);
+
 
   // Expand/collapse animations
   const membersExpandAnim = useRef(new Animated.Value(1)).current;
@@ -307,11 +328,6 @@ export default function HomeScreen() {
       toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true,
     }).start();
   }, [navBarAnim]);
-
-  // TIJDELIJK: verberg navbar voor ProfileSetupWizard preview (visible={true})
-  useEffect(() => {
-    Animated.timing(navBarAnim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Avatar preview
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
@@ -381,6 +397,60 @@ export default function HomeScreen() {
     return ([1, 2, 3, 4] as const).filter((cat) => catsWithDrinks.has(cat));
   }, [drinks]);
 
+  // ── Live badge: auto-expires at the exact moment the 10-min window closes ──
+  const [isLive, setIsLive] = useState(false);
+
+  useEffect(() => {
+    const WINDOW_MS = 10 * 60 * 1000;
+
+    const evaluate = () => {
+      if (!recentTallies || recentTallies.length === 0) {
+        setIsLive(false);
+        return null;
+      }
+      const newest = Math.max(
+        ...recentTallies.map((t: { created_at: string }) => new Date(t.created_at).getTime())
+      );
+      const age = Date.now() - newest;
+      if (age >= WINDOW_MS) {
+        setIsLive(false);
+        return null;
+      }
+      setIsLive(true);
+      return setTimeout(() => setIsLive(false), WINDOW_MS - age);
+    };
+
+    let timer = evaluate();
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        if (timer) clearTimeout(timer);
+        timer = evaluate();
+      }
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.remove();
+    };
+  }, [recentTallies]);
+
+  const livePulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isLive) {
+      livePulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(livePulse, { toValue: 0.4, duration: 750, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(livePulse, { toValue: 1, duration: 750, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => { loop.stop(); };
+  }, [isLive]);
+
   // Auto-select first active category when categories load or selected one disappears
   useEffect(() => {
     if (activeCategories.length > 0 && (selectedCategory === null || !activeCategories.includes(selectedCategory as any))) {
@@ -411,6 +481,7 @@ export default function HomeScreen() {
   };
 
   const handleCategoryTap = (cat: number) => {
+    if (adding) return; // debounce: block while tally is being saved
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(cat);
   };
@@ -424,7 +495,9 @@ export default function HomeScreen() {
     try {
       await addTally(selectedCategory as 1 | 2 | 3 | 4, count);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(`${count}× ${catName} toegevoegd`);
+      const newCount = confirmCount + 1;
+      setConfirmCount(newCount);
+      AsyncStorage.setItem('streeps_confirm_count', String(newCount));
       setTallyCount(0);
     } catch {
       showToast('Kon streepje niet opslaan, probeer opnieuw', 'error');
@@ -565,9 +638,9 @@ export default function HomeScreen() {
         {selectedGroupId && group ? (
           <Animated.View style={{ opacity: contentOpacity }}>
             {/* ── Group Header ── SVG: Groepheader + Group 13 (expand icon) */}
-            <View style={s.groupHeader}>
-              <Pressable style={s.groupTopRow} onPress={() => setShowGroupSelector(true)}>
-                <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined}>
+            <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)}>
+              <View style={s.groupTopRow}>
+                <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined} hitSlop={6}>
                   <View ref={avatarRef} collapsable={false}>
                     {(group as any)?.avatar_url ? (
                       <Image source={{ uri: (group as any).avatar_url }} style={s.avatar} transition={200} cachePolicy="memory-disk" />
@@ -578,38 +651,71 @@ export default function HomeScreen() {
                     )}
                   </View>
                 </Pressable>
-                <Text style={s.groupName} numberOfLines={1}>{group.name}</Text>
-              </Pressable>
-              {/* SVG Group 13: radial glow + up/down arrows — positioned right */}
-              <Pressable onPress={() => setShowGroupSelector(true)} hitSlop={12} style={s.expandBtn}>
-                <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
-                  <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
-                  <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
-                </Svg>
-              </Pressable>
-              <Text style={s.activeCount}>
-                {members.filter((m) => m.is_active).length} actief
-              </Text>
-            </View>
+                <Text
+                  style={s.groupName}
+                  numberOfLines={1}
+                >
+                  {group.name}
+                </Text>
+                {/* SVG Group 13: radial glow + up/down arrows */}
+                <View style={s.chevronWrap} pointerEvents="none">
+                  <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
+                    <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
+                    <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
+                  </Svg>
+                </View>
+              </View>
+              <View style={s.groupLabelRow}>
+                {isLive && (
+                  <Animated.View style={[s.liveBadge, { opacity: livePulse }]}>
+                    <View style={s.liveDot} />
+                    <Text style={s.liveBadgeText}>LIVE</Text>
+                  </Animated.View>
+                )}
+                <View style={s.activePill}>
+                  <Text style={s.activePillText}>
+                    {members.filter((m) => m.is_active).length} actief
+                  </Text>
+                </View>
+              </View>
+            </Pressable>
 
             {/* ── Counter ── SVG node Counter: minus(19,190) display(158,190) plus(245,190) */}
             <View style={s.counterWrap}>
               <CounterControl
                 value={tallyCount}
-                onIncrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
-                onDecrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
-                onSubmit={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+                onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
+                onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
+                onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+                onSwipeCycle={(direction: 'next' | 'prev') => {
+                  if (adding) return;
+                  const list = activeCategories;
+                  if (!list || list.length === 0) return;
+                  const currentIdx = list.findIndex((c) => c === selectedCategory);
+                  if (currentIdx === -1) return;
+                  const nextIdx = direction === 'next'
+                    ? (currentIdx + 1) % list.length
+                    : (currentIdx - 1 + list.length) % list.length;
+                  setSelectedCategory(list[nextIdx]);
+                  Haptics.selectionAsync();
+                }}
                 auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
-                activeColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined}
               />
               {selectedCategory && credits[selectedCategory] > 0 && (
                 <View style={s.creditBadge}>
                   <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
                 </View>
               )}
-              {tallyCount >= 1 && (
+              <Animated.View
+                style={{
+                  height: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
+                  marginTop: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
+                  opacity: hintProgress,
+                  overflow: 'hidden',
+                }}
+              >
                 <Text style={s.submitHint}>Tik om te bevestigen</Text>
-              )}
+              </Animated.View>
             </View>
 
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
@@ -902,16 +1008,6 @@ export default function HomeScreen() {
         inviteCode={wizardGroup?.invite_code ?? ''}
       />
 
-      {/* ── TIJDELIJK: ProfileSetupWizard preview ── */}
-      <ProfileSetupWizard
-        visible={true}
-        onComplete={() => {
-          Animated.timing(navBarAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }).start();
-          console.log('[Preview] ProfileSetupWizard onComplete');
-        }}
-        userId={user?.id ?? ''}
-      />
-
       {/* ── Settings overlay ── */}
       {selectedGroupId && group && (
         <SettingsOverlay
@@ -1171,6 +1267,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  groupLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingLeft: 78, // avatar width (66) + gap (12)
+  },
+  chevronWrap: {
+    marginLeft: 'auto',
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,190,174,0.18)',
+  },
+  activePillText: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#00BEAE',
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,254,150,0.15)',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00FE96',
+  },
+  liveBadgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    color: '#00FE96',
   },
   avatar: {
     width: 66,
@@ -1485,7 +1629,7 @@ const styles = StyleSheet.create({
   emptyStateText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', textAlign: 'center' },
 
   // ── Submit hint ──
-  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 4, textAlign: 'center' },
+  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center' },
 
   // ── Meer opties toggle ──
   moreOptionsToggle: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 24 },
@@ -1566,8 +1710,8 @@ function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: 
           <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FFFFFF' }}>Instellingen</Text>
         </Pressable>
       )}
-      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,133,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,133,0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
-        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF0085' }}>Uitstappen</Text>
+      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,77,0.5)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
+        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF004D' }}>Uitstappen</Text>
       </Pressable>
     </Animated.View>
   );
