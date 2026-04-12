@@ -24,6 +24,7 @@ import Svg, { Path, G } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
+import ImageLightbox, { type ImageLayout } from '@/src/components/ImageLightbox';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
 
@@ -605,12 +606,15 @@ function ShimmerText({ text, style }: { text: string; style: any }) {
 }
 
 // ── Memoized chat bubble (prevents re-render when messages array changes) ──
-const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversationId, isNew, likedBy, onDoubleTap }: {
+const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversationId, isNew, likedBy, onDoubleTap, onImagePress }: {
   item: any; nextCreatedAt: string | null; isMine: boolean;
   type: 'dm' | 'group'; conversationId: string; isNew: boolean;
   likedBy: string[]; onDoubleTap: () => void;
+  onImagePress?: (uri: string, origin: { x: number; y: number; width: number; height: number }) => void;
 }) => {
   const lastTapRef = useRef(0);
+  const imageRef = useRef<View>(null);
+  const [imageAspect, setImageAspect] = useState<number>(4 / 3);
   const handlePress = useCallback(() => {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
@@ -621,6 +625,30 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
       lastTapRef.current = now;
     }
   }, [onDoubleTap]);
+
+  // Image-only tap handler: single tap opens lightbox, double tap still likes.
+  const handleImageTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap → like
+      onDoubleTap();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      lastTapRef.current = 0;
+      return;
+    }
+    lastTapRef.current = now;
+    const tapAt = now;
+    setTimeout(() => {
+      if (lastTapRef.current === tapAt) {
+        lastTapRef.current = 0;
+        const uri = item?.metadata?.image_url;
+        if (!uri || !onImagePress) return;
+        imageRef.current?.measureInWindow((x, y, w, h) => {
+          onImagePress(uri, { x, y, width: w, height: h });
+        });
+      }
+    }, 300);
+  }, [onDoubleTap, onImagePress, item]);
 
   const showTime = !nextCreatedAt || (
     Math.abs(new Date(item.created_at).getTime() - new Date(nextCreatedAt).getTime()) > 5 * 60 * 1000
@@ -643,6 +671,19 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
 
   // ── Image message ──
   if (item.message_type === 'image' && item.metadata?.image_url) {
+    const IMG_MAX_W = 240;
+    const IMG_MAX_H = 320;
+    let imgW: number;
+    let imgH: number;
+    if (imageAspect >= IMG_MAX_W / IMG_MAX_H) {
+      // Landscape/square → width-bound
+      imgW = IMG_MAX_W;
+      imgH = IMG_MAX_W / imageAspect;
+    } else {
+      // Portrait → height-bound
+      imgH = IMG_MAX_H;
+      imgW = IMG_MAX_H * imageAspect;
+    }
     const imgEl = (
       <View>
         {showTime && <Text style={dt.timeSeparator}>{formatMessageTime(item.created_at)}</Text>}
@@ -661,10 +702,23 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               </View>
             )
           )}
-          <Pressable onPress={handlePress}>
-            <View style={[{ marginBottom: 8, maxWidth: 240, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }]}>
-              <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-                <Image source={{ uri: item.metadata.image_url }} style={{ width: 240, height: 180 }} contentFit="cover" transition={200} cachePolicy="memory-disk" />
+          <Pressable onPress={handleImageTap}>
+            <View style={[{ marginBottom: 8, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }]}>
+              <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
+                <Image
+                  source={{ uri: item.metadata.image_url }}
+                  onLoad={(e: any) => {
+                    const src = e?.source;
+                    if (src && src.width && src.height) {
+                      const next = src.width / src.height;
+                      if (Math.abs(next - imageAspect) > 0.01) setImageAspect(next);
+                    }
+                  }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
               </View>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
             </View>
@@ -891,6 +945,10 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   const aiPress = usePressScale();
   const cameraPress = usePressScale();
   const [showCamera, setShowCamera] = useState(false);
+  const [lightbox, setLightbox] = useState<{ uri: string; origin: ImageLayout } | null>(null);
+  const handleImagePress = useCallback((uri: string, origin: ImageLayout) => {
+    setLightbox({ uri, origin });
+  }, []);
 
   // Keyboard tracking — iOS only (Android uses adjustResize)
   const restBottom = bottomInset || 12;
@@ -1067,6 +1125,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
               isNew={isNew}
               likedBy={reactions[item.id] || []}
               onDoubleTap={() => toggleLike(item.id)}
+              onImagePress={handleImagePress}
             />
           );
         }}
@@ -1109,6 +1168,12 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         {inputBar}
       </Animated.View>
       <CameraOverlay visible={showCamera} onClose={() => setShowCamera(false)} onSend={(uri) => sendImage(uri)} />
+      <ImageLightbox
+        visible={!!lightbox}
+        uri={lightbox?.uri ?? null}
+        origin={lightbox?.origin ?? null}
+        onClose={() => setLightbox(null)}
+      />
     </View>
   );
 }
