@@ -79,6 +79,7 @@ export default function CustomNavBar({ state, navigation }: any) {
     left: leftEdge.value,
     width: rightEdge.value - leftEdge.value,
     height: pillHeight.value,
+    top: 14 + (PILL_H - pillHeight.value) / 2,
     borderRadius: 44,
   }));
 
@@ -171,7 +172,6 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: 'absolute',
-    top: 14,
     backgroundColor: '#FF0085',
     shadowColor: '#FF0085',
     shadowOffset: { width: 0, height: 0 },

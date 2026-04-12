@@ -17,8 +17,12 @@ import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
+  cancelAnimation,
   interpolate,
   Extrapolation,
+  Easing as ReEasing,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -81,7 +85,7 @@ export default function GroupSelector({
   const [joinCode, setJoinCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  const hourglassRotation = useSharedValue(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const actionRowRef = useRef<View>(null);
@@ -94,34 +98,55 @@ export default function GroupSelector({
   const createProgress = useSharedValue(0); // 0→1 when mode = 'create'
   const joinProgress = useSharedValue(0);   // 0→1 when mode = 'join'
 
-  const MORPH_DURATION = 220;
+  const MORPH_DURATION = 340;
+  const MORPH_EASING = ReEasing.out(ReEasing.cubic);
 
   // Pills layer: visible when morphProgress = 0, hidden when morphProgress = 1
+  // Slides ~32px to the left while fading + scaling down
   const pillsStyle = useAnimatedStyle(() => {
     const opacity = interpolate(morphProgress.value, [0, 1], [1, 0], Extrapolation.CLAMP);
-    const scale = interpolate(morphProgress.value, [0, 1], [1, 0.85], Extrapolation.CLAMP);
-    return { opacity, transform: [{ scale }] };
+    const scale = interpolate(morphProgress.value, [0, 1], [1, 0.8], Extrapolation.CLAMP);
+    const translateX = interpolate(morphProgress.value, [0, 1], [0, -32], Extrapolation.CLAMP);
+    return {
+      opacity,
+      transform: [{ translateX }, { scale }],
+      pointerEvents: morphProgress.value > 0.5 ? 'none' : 'auto',
+    };
   });
 
   // Input layer: visible when morphProgress = 1, hidden when morphProgress = 0
+  // Slides in from ~32px to the right while fading + scaling up
   const inputLayerStyle = useAnimatedStyle(() => {
     const opacity = interpolate(morphProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP);
-    const scale = interpolate(morphProgress.value, [0, 1], [0.85, 1], Extrapolation.CLAMP);
-    return { opacity, transform: [{ scale }] };
+    const scale = interpolate(morphProgress.value, [0, 1], [0.9, 1], Extrapolation.CLAMP);
+    const translateX = interpolate(morphProgress.value, [0, 1], [32, 0], Extrapolation.CLAMP);
+    return {
+      opacity,
+      transform: [{ translateX }, { scale }],
+      pointerEvents: morphProgress.value > 0.5 ? 'auto' : 'none',
+    };
   });
 
   // Create circle button
   const createCircleStyle = useAnimatedStyle(() => {
     const opacity = interpolate(createProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP);
-    const scale = interpolate(createProgress.value, [0, 1], [0.7, 1], Extrapolation.CLAMP);
-    return { opacity, transform: [{ scale }] };
+    const scale = interpolate(createProgress.value, [0, 1], [0.6, 1], Extrapolation.CLAMP);
+    return {
+      opacity,
+      transform: [{ scale }],
+      pointerEvents: createProgress.value > 0.5 ? 'auto' : 'none',
+    };
   });
 
   // Join circle button
   const joinCircleStyle = useAnimatedStyle(() => {
     const opacity = interpolate(joinProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP);
-    const scale = interpolate(joinProgress.value, [0, 1], [0.7, 1], Extrapolation.CLAMP);
-    return { opacity, transform: [{ scale }] };
+    const scale = interpolate(joinProgress.value, [0, 1], [0.6, 1], Extrapolation.CLAMP);
+    return {
+      opacity,
+      transform: [{ scale }],
+      pointerEvents: joinProgress.value > 0.5 ? 'auto' : 'none',
+    };
   });
 
   // Auto-scroll to input when keyboard opens
@@ -155,7 +180,29 @@ export default function GroupSelector({
     };
   }, []);
 
-  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
+  // Hourglass flip animation — rotates 180° in bursts with pauses, while submitting
+  const hourglassStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${hourglassRotation.value}deg` }],
+  }));
+
+  useEffect(() => {
+    if (submitting) {
+      hourglassRotation.value = 0;
+      hourglassRotation.value = withRepeat(
+        withSequence(
+          withTiming(180, { duration: 150, easing: ReEasing.out(ReEasing.cubic) }),
+          withTiming(180, { duration: 350 }),
+          withTiming(360, { duration: 150, easing: ReEasing.out(ReEasing.cubic) }),
+          withTiming(360, { duration: 350 }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      cancelAnimation(hourglassRotation);
+      hourglassRotation.value = withTiming(0, { duration: 200 });
+    }
+  }, [submitting]);
 
   // Open overlay
   useEffect(() => {
@@ -178,21 +225,22 @@ export default function GroupSelector({
   const switchInlineMode = useCallback((mode: 'none' | 'create' | 'join') => {
     setInlineMode(mode);
 
+    const timingCfg = { duration: MORPH_DURATION, easing: MORPH_EASING };
     if (mode === 'create') {
-      morphProgress.value = withTiming(1, { duration: MORPH_DURATION });
-      createProgress.value = withTiming(1, { duration: MORPH_DURATION });
-      joinProgress.value = withTiming(0, { duration: MORPH_DURATION });
-      setTimeout(() => inputRef.current?.focus(), 100);
+      morphProgress.value = withTiming(1, timingCfg);
+      createProgress.value = withTiming(1, timingCfg);
+      joinProgress.value = withTiming(0, timingCfg);
+      setTimeout(() => inputRef.current?.focus(), 180);
     } else if (mode === 'join') {
-      morphProgress.value = withTiming(1, { duration: MORPH_DURATION });
-      createProgress.value = withTiming(0, { duration: MORPH_DURATION });
-      joinProgress.value = withTiming(1, { duration: MORPH_DURATION });
-      setTimeout(() => inputRef.current?.focus(), 100);
+      morphProgress.value = withTiming(1, timingCfg);
+      createProgress.value = withTiming(0, timingCfg);
+      joinProgress.value = withTiming(1, timingCfg);
+      setTimeout(() => inputRef.current?.focus(), 180);
     } else {
       // Dismiss back to pills
-      morphProgress.value = withTiming(0, { duration: MORPH_DURATION });
-      createProgress.value = withTiming(0, { duration: MORPH_DURATION });
-      joinProgress.value = withTiming(0, { duration: MORPH_DURATION });
+      morphProgress.value = withTiming(0, timingCfg);
+      createProgress.value = withTiming(0, timingCfg);
+      joinProgress.value = withTiming(0, timingCfg);
       setNewName('');
       setJoinCode('');
     }
@@ -219,12 +267,9 @@ export default function GroupSelector({
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    spinAnim.setValue(0);
-    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     setSubmitting(true);
     const result = await onCreate(newName.trim());
     setSubmitting(false);
-    spinAnim.setValue(0);
     if (result && 'error' in result && result.error) { Alert.alert('Fout', result.error as string); return; }
     setNewName('');
     setInlineMode('none');
@@ -237,12 +282,9 @@ export default function GroupSelector({
 
   const handleJoin = async () => {
     if (!joinCode.trim()) return;
-    spinAnim.setValue(0);
-    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     setSubmitting(true);
     const result = await onJoin(joinCode.trim());
     setSubmitting(false);
-    spinAnim.setValue(0);
     if (result.error) { Alert.alert('Fout', result.error); return; }
     setJoinCode('');
     setInlineMode('none');
@@ -343,8 +385,8 @@ export default function GroupSelector({
               */}
               <View ref={actionRowRef} style={st.actionRow}>
 
-                {/* Layer 1: Pills — always mounted, fades out on morph */}
-                <ReAnimated.View style={[st.pillsLayer, pillsStyle]} pointerEvents={isActive ? 'none' : 'auto'}>
+                {/* Layer 1: Pills — always mounted, fades out on morph (pointerEvents via animated style) */}
+                <ReAnimated.View style={[st.pillsLayer, pillsStyle]}>
                   <Pressable
                     style={[st.actionBtn, { backgroundColor: t.brand.magenta }]}
                     onPress={() => switchInlineMode('create')}
@@ -359,8 +401,8 @@ export default function GroupSelector({
                   </Pressable>
                 </ReAnimated.View>
 
-                {/* Layer 2: Input field — absolute, fades in on morph */}
-                <ReAnimated.View style={[st.inputLayer, inputLayerStyle]} pointerEvents={isActive ? 'auto' : 'none'}>
+                {/* Layer 2: Input field — absolute, fades in on morph (pointerEvents via animated style) */}
+                <ReAnimated.View style={[st.inputLayer, inputLayerStyle]}>
                   <View style={st.inlineInputWrap}>
                     <TextInput
                       ref={inputRef}
@@ -380,28 +422,28 @@ export default function GroupSelector({
                 </ReAnimated.View>
 
                 {/* Layer 3: Create circle button — absolute right, fades in when mode=create */}
-                <ReAnimated.View style={[st.circleLayer, createCircleStyle]} pointerEvents={isCreate ? 'auto' : 'none'}>
+                <ReAnimated.View style={[st.circleLayer, createCircleStyle]}>
                   <Pressable
                     style={[st.circleBtn, { backgroundColor: t.brand.magenta }]}
                     onPress={handleCreate}
                     disabled={submitting && isCreate}
                   >
-                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                    <ReAnimated.View style={hourglassStyle}>
                       <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#FFFFFF" />
-                    </Animated.View>
+                    </ReAnimated.View>
                   </Pressable>
                 </ReAnimated.View>
 
                 {/* Layer 4: Join circle button — absolute right, fades in when mode=join */}
-                <ReAnimated.View style={[st.circleLayer, joinCircleStyle]} pointerEvents={isJoin ? 'auto' : 'none'}>
+                <ReAnimated.View style={[st.circleLayer, joinCircleStyle]}>
                   <Pressable
                     style={[st.circleBtn, { backgroundColor: t.brand.cyan }]}
                     onPress={handleJoin}
                     disabled={submitting && isJoin}
                   >
-                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                    <ReAnimated.View style={hourglassStyle}>
                       <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#1A1A2E" />
-                    </Animated.View>
+                    </ReAnimated.View>
                   </Pressable>
                 </ReAnimated.View>
 
