@@ -190,15 +190,15 @@ export default function StreepjesVerificatieModal({
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
-      ]),
-      // Fade out everything
-      Animated.parallel([
         Animated.timing(scrimOpacity, {
           toValue: 0,
-          duration: 400,
+          duration: 900,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
         }),
+      ]),
+      // Fade out everything
+      Animated.parallel([
         Animated.timing(sweepOpacity, {
           toValue: 0,
           duration: 300,
