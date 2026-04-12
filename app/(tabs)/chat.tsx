@@ -1228,6 +1228,22 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
   const [newName, setNewName] = useState('');
   const [nameChangedAt, setNameChangedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [gender, setGender] = useState<string | null>(null);
+  const [genderModalVisible, setGenderModalVisible] = useState(false);
+
+  const GENDER_OPTIONS = [
+    { value: 'man', label: 'Man', icon: 'male-outline' as const },
+    { value: 'vrouw', label: 'Vrouw', icon: 'female-outline' as const },
+    { value: 'anders', label: 'Anders', icon: 'transgender-outline' as const },
+    { value: 'onbekend', label: 'Zeg ik liever niet', icon: 'remove-circle-outline' as const },
+  ];
+  const genderLabel = (v: string | null) => GENDER_OPTIONS.find((o) => o.value === v)?.label || 'Niet ingesteld';
+  const handleSelectGender = async (value: string) => {
+    if (!user) return;
+    setGender(value);
+    setGenderModalVisible(false);
+    await supabase.from('profiles').update({ gender: value }).eq('id', user.id);
+  };
 
   // Animated theme indicator
   const segLayouts = useRef<{ x: number; w: number }[]>([]).current;
@@ -1263,9 +1279,13 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
 
   useEffect(() => {
     if (!user) return;
-    supabase.from('profiles').select('name_changed_at, avatar_url').eq('id', user.id).single()
+    supabase.from('profiles').select('name_changed_at, avatar_url, gender').eq('id', user.id).single()
       .then(({ data }) => {
-        if (data) { setNameChangedAt(data.name_changed_at); setAvatarUrl(data.avatar_url); }
+        if (data) {
+          setNameChangedAt(data.name_changed_at);
+          setAvatarUrl(data.avatar_url);
+          setGender((data as any).gender ?? null);
+        }
       });
   }, [user]);
 
@@ -1401,7 +1421,50 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
               <Text style={po.rowLabel}>E-mail</Text>
               <Text style={po.rowValue} numberOfLines={1}>{user?.email || '-'}</Text>
             </View>
+            <View style={po.divider} />
+            <Pressable style={po.row} onPress={() => setGenderModalVisible(true)}>
+              <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={po.rowIcon} />
+              <Text style={po.rowLabel}>Geslacht</Text>
+              <Text style={[po.rowValue, !gender && { fontStyle: 'italic', color: '#555' }]}>{genderLabel(gender)}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#848484" style={{ marginLeft: 4 }} />
+            </Pressable>
           </View>
+
+          <Modal
+            visible={genderModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setGenderModalVisible(false)}
+          >
+            <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' }} onPress={() => setGenderModalVisible(false)}>
+              <Pressable
+                style={{ backgroundColor: '#1A1A1F', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, paddingBottom: 40, paddingHorizontal: 20 }}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <Text style={{ fontFamily: 'Unbounded', fontSize: 18, color: '#FFFFFF', textAlign: 'center', marginBottom: 16 }}>Geslacht</Text>
+                {GENDER_OPTIONS.map((opt, i) => (
+                  <React.Fragment key={opt.value}>
+                    {i > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.08)' }} />}
+                    <Pressable
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16 }}
+                      onPress={() => handleSelectGender(opt.value)}
+                    >
+                      <Ionicons name={opt.icon} size={20} color={gender === opt.value ? '#00BEAE' : '#FFFFFF'} style={{ marginRight: 12 }} />
+                      <Text style={{ fontFamily: 'Unbounded', fontSize: 15, color: gender === opt.value ? '#00BEAE' : '#FFFFFF', flex: 1 }}>
+                        {opt.label}
+                      </Text>
+                      {gender === opt.value && (
+                        <Ionicons name="checkmark" size={18} color="#00BEAE" />
+                      )}
+                    </Pressable>
+                  </React.Fragment>
+                ))}
+                <Pressable style={{ marginTop: 16, paddingVertical: 12, alignItems: 'center' }} onPress={() => setGenderModalVisible(false)}>
+                  <Text style={{ fontFamily: 'Unbounded', fontSize: 14, color: '#848484' }}>Annuleren</Text>
+                </Pressable>
+              </Pressable>
+            </Pressable>
+          </Modal>
 
           {/* WEERGAVE section */}
           <Text style={po.sectionHeader}>WEERGAVE</Text>
