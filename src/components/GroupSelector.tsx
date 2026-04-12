@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Animated,
+  AppState,
   Easing,
   Platform,
   Keyboard,
@@ -86,7 +87,13 @@ export default function GroupSelector({
   useEffect(() => {
     if (!visible) return;
     const interval = setInterval(() => forceTick(t => t + 1), 30_000);
-    return () => clearInterval(interval);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') forceTick(t => t + 1);
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
   }, [visible]);
 
   // Overlay animation (old Animated API — Fix C would migrate these, we leave them)

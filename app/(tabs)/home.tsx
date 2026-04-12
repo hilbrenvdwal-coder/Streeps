@@ -26,6 +26,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Dimensions,
   Easing,
   Modal,
@@ -402,21 +403,37 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const WINDOW_MS = 10 * 60 * 1000;
-    if (!recentTallies || recentTallies.length === 0) {
-      setIsLive(false);
-      return;
-    }
-    const newest = Math.max(
-      ...recentTallies.map((t: { created_at: string }) => new Date(t.created_at).getTime())
-    );
-    const age = Date.now() - newest;
-    if (age >= WINDOW_MS) {
-      setIsLive(false);
-      return;
-    }
-    setIsLive(true);
-    const timer = setTimeout(() => setIsLive(false), WINDOW_MS - age);
-    return () => clearTimeout(timer);
+
+    const evaluate = () => {
+      if (!recentTallies || recentTallies.length === 0) {
+        setIsLive(false);
+        return null;
+      }
+      const newest = Math.max(
+        ...recentTallies.map((t: { created_at: string }) => new Date(t.created_at).getTime())
+      );
+      const age = Date.now() - newest;
+      if (age >= WINDOW_MS) {
+        setIsLive(false);
+        return null;
+      }
+      setIsLive(true);
+      return setTimeout(() => setIsLive(false), WINDOW_MS - age);
+    };
+
+    let timer = evaluate();
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        if (timer) clearTimeout(timer);
+        timer = evaluate();
+      }
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.remove();
+    };
   }, [recentTallies]);
 
   const livePulse = useRef(new Animated.Value(1)).current;
