@@ -25,6 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
+import TabFadeIn from '@/src/components/TabFadeIn';
 import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -3032,7 +3033,7 @@ export default function ChatScreen() {
   const currentConv = activeConv || closingConv;
 
   return (
-    <View style={{ flex: 1 }}>
+    <TabFadeIn>
       <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
 
       {/* ── Conversation list (always mounted) ── */}
@@ -3224,7 +3225,7 @@ export default function ChatScreen() {
           }}
         />
       )}
-    </View>
+    </TabFadeIn>
   );
 }
 
