@@ -32,6 +32,12 @@ interface CameraModalProps {
   onClose: () => void;
   onImageCaptured: (uri: string, mimeType?: string) => void;
   title?: string;
+  /**
+   * When true (default), the system picker lets the user crop to a 1:1 square.
+   * Set to false for chat message images where the natural aspect ratio
+   * should be preserved.
+   */
+  square?: boolean;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -60,6 +66,7 @@ export default function CameraModal({
   onClose,
   onImageCaptured,
   title = 'Kies een foto',
+  square = true,
 }: CameraModalProps) {
   const insets = useSafeAreaInsets();
 
@@ -140,6 +147,7 @@ export default function CameraModal({
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') return;
     const result = await ImagePicker.launchCameraAsync({
+      ...(square ? { allowsEditing: true, aspect: [1, 1] as [number, number] } : {}),
       quality: 0.5,
     });
     if (!result.canceled && result.assets[0]) {
@@ -151,6 +159,7 @@ export default function CameraModal({
   const handleGallery = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
+      ...(square ? { allowsEditing: true, aspect: [1, 1] as [number, number] } : {}),
       quality: 0.5,
     });
     if (!result.canceled && result.assets[0]) {

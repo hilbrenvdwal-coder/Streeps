@@ -824,6 +824,7 @@ function CameraOverlay({ visible, onClose, onSend }: { visible: boolean; onClose
       visible={visible}
       onClose={onClose}
       onImageCaptured={(uri) => { onSend(uri); onClose(); }}
+      square={false}
     />
   );
 }
