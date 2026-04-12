@@ -20,7 +20,14 @@ import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
+
+const GENDER_OPTIONS: { value: 'man' | 'vrouw' | 'anders' | 'onbekend'; label: string; icon: string }[] = [
+  { value: 'man', label: 'Man', icon: 'male' },
+  { value: 'vrouw', label: 'Vrouw', icon: 'female' },
+  { value: 'anders', label: 'Anders', icon: 'transgender' },
+  { value: 'onbekend', label: 'Zeg ik liever niet', icon: 'remove-circle-outline' },
+];
 
 interface ProfileSetupWizardProps {
   visible: boolean;
@@ -47,7 +54,10 @@ export default function ProfileSetupWizard({
   const [fullName, setFullName] = useState('');
   const [savingName, setSavingName] = useState(false);
 
-  // Step 2: Avatar
+  // Step 2: Gender
+  const [gender, setGender] = useState<'man' | 'vrouw' | 'anders' | 'onbekend' | null>(null);
+
+  // Step 3: Avatar
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
@@ -58,6 +68,7 @@ export default function ProfileSetupWizard({
       setShowOpen(true);
       setStep(1);
       setFullName('');
+      setGender(null);
       setAvatarUrl(null);
 
       scrimOpacity.setValue(0);
@@ -105,7 +116,19 @@ export default function ProfileSetupWizard({
     goToStep(2);
   }, [fullName, userId, goToStep]);
 
-  // Step 2: Image captured
+  // Step 2: Gender
+  const handleNextStep2Gender = useCallback(async () => {
+    if (gender) {
+      await supabase.from('profiles').update({ gender }).eq('id', userId);
+    }
+    goToStep(3);
+  }, [gender, userId, goToStep]);
+
+  const handleSkipStep2Gender = useCallback(() => {
+    goToStep(3);
+  }, [goToStep]);
+
+  // Step 3: Image captured
   const handleImageCaptured = async (uri: string, mimeType?: string) => {
     setUploadingAvatar(true);
     const ext = uri.split('.').pop() ?? 'jpg';
@@ -122,17 +145,17 @@ export default function ProfileSetupWizard({
     setUploadingAvatar(false);
   };
 
-  // Step 2: Next (after optional photo)
-  const handleNextStep2 = useCallback(() => {
-    goToStep(3);
+  // Step 3: Next (after optional photo)
+  const handleNextStep3Avatar = useCallback(() => {
+    goToStep(4);
   }, [goToStep]);
 
-  // Step 2: Skip
-  const handleSkipStep2 = useCallback(() => {
-    goToStep(3);
+  // Step 3: Skip
+  const handleSkipStep3Avatar = useCallback(() => {
+    goToStep(4);
   }, [goToStep]);
 
-  // Step 3: Finish
+  // Step 4: Finish
   const handleFinish = useCallback(async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await supabase.from('profiles').update({ onboarding_complete: true }).eq('id', userId);
@@ -187,8 +210,29 @@ export default function ProfileSetupWizard({
     </View>
   );
 
-  // ── Step 2: Avatar ──
+  // ── Step 2: Gender ──
   const renderStep2 = () => (
+    <View style={ws.stepContent}>
+      <Text style={ws.stepTitle}>Geslacht</Text>
+      <Text style={ws.stepSubtitle}>Hoe wil je aangesproken worden?</Text>
+
+      <View style={ws.genderGrid}>
+        {GENDER_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt.value}
+            style={[ws.genderOption, gender === opt.value && ws.genderOptionSelected]}
+            onPress={() => setGender(opt.value)}
+          >
+            <Ionicons name={opt.icon as any} size={32} color={gender === opt.value ? '#00BEAE' : '#848484'} />
+            <Text style={[ws.genderLabel, gender === opt.value && ws.genderLabelSelected]}>{opt.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  // ── Step 3: Avatar ──
+  const renderStep3 = () => (
     <View style={ws.stepContent}>
       <Text style={ws.stepTitle}>Profielfoto</Text>
       <Text style={ws.stepSubtitle}>Voeg een profielfoto toe</Text>
@@ -212,8 +256,8 @@ export default function ProfileSetupWizard({
     </View>
   );
 
-  // ── Step 3: Done ──
-  const renderStep3 = () => (
+  // ── Step 4: Done ──
+  const renderStep4 = () => (
     <View style={ws.stepContent}>
       <View style={ws.doneIcon}>
         <Ionicons name="checkmark-circle" size={80} color="#00BEAE" />
@@ -225,7 +269,7 @@ export default function ProfileSetupWizard({
 
   // ── Bottom bar ──
   const renderBottomBar = () => {
-    if (step === 3) {
+    if (step === 4) {
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable style={ws.beginBtn} onPress={handleFinish}>
@@ -252,13 +296,27 @@ export default function ProfileSetupWizard({
       );
     }
 
-    // Step 2: avatar (optional)
+    if (step === 2) {
+      // Step 2: gender (optional)
+      return (
+        <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable style={ws.skipBtn} onPress={handleSkipStep2Gender}>
+            <Text style={ws.skipBtnText}>Overslaan</Text>
+          </Pressable>
+          <Pressable style={ws.nextBtn} onPress={handleNextStep2Gender}>
+            <Text style={ws.nextBtnText}>Volgende</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    // Step 3: avatar (optional)
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable style={ws.skipBtn} onPress={handleSkipStep2}>
+        <Pressable style={ws.skipBtn} onPress={handleSkipStep3Avatar}>
           <Text style={ws.skipBtnText}>Overslaan</Text>
         </Pressable>
-        <Pressable style={ws.nextBtn} onPress={handleNextStep2}>
+        <Pressable style={ws.nextBtn} onPress={handleNextStep3Avatar}>
           <Text style={ws.nextBtnText}>Volgende</Text>
         </Pressable>
       </View>
@@ -270,6 +328,7 @@ export default function ProfileSetupWizard({
       case 1: return renderStep1();
       case 2: return renderStep2();
       case 3: return renderStep3();
+      case 4: return renderStep4();
       default: return null;
     }
   };
@@ -359,7 +418,14 @@ const ws = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Step 2: Avatar
+  // Step 2: Gender
+  genderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
+  genderOption: { width: '47%', aspectRatio: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  genderOptionSelected: { borderColor: '#00BEAE', backgroundColor: 'rgba(0, 190, 174, 0.1)' },
+  genderLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', textAlign: 'center' },
+  genderLabelSelected: { color: '#00BEAE' },
+
+  // Step 3: Avatar
   avatarCircle: {
     width: 120,
     height: 120,
@@ -394,7 +460,7 @@ const ws = StyleSheet.create({
     marginTop: 12,
   },
 
-  // Step 3: Done
+  // Step 4: Done
   doneIcon: {
     marginBottom: 16,
     marginTop: 40,
