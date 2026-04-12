@@ -223,7 +223,15 @@ export function useChatMessages(conversationId: string | null) {
     const serverHasMore = freshMsgs.length === PAGE_SIZE;
     const oldestTs = enriched[enriched.length - 1].created_at;
 
-    setMessages(enriched);
+    // Merge: keep any optimistic temp messages that don't yet have a server
+    // equivalent, otherwise the server overwrite would flash them away.
+    setMessages((prev) => {
+      const temps = prev.filter((m) => typeof m.id === 'string' && m.id.startsWith('temp-'));
+      const survivingTemps = temps.filter(
+        (t) => !enriched.some((m: any) => m.user_id === t.user_id && m.content === t.content)
+      );
+      return [...survivingTemps, ...enriched];
+    });
     oldestCursorRef.current = oldestTs;
     hasMoreRef.current = serverHasMore;
     setHasMore(serverHasMore);
