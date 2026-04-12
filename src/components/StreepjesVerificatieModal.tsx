@@ -27,6 +27,7 @@ const SPLASH_MESSAGES: Record<string, string[]> = {
 const SPLASH_MESSAGES_6PLUS = ['Jij meent het!', 'Gaat lekker vanavond!', 'Ik tel niet meer mee', 'Legendestatus'];
 
 function getSplashMessage(count: number): string {
+  if (count === 67) return '67 ahaha, maar je bent niet serieus toch?';
   const pool = count >= 6 ? SPLASH_MESSAGES_6PLUS : (SPLASH_MESSAGES[String(count)] ?? SPLASH_MESSAGES_6PLUS);
   return pool[Math.floor(Math.random() * pool.length)];
 }
