@@ -51,6 +51,7 @@ export default function GroupSetupWizard({
   const contentAnim = useRef(new Animated.Value(0)).current;
   const stepOpacity = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
+  const morphBtnAnim = useRef(new Animated.Value(0)).current;
 
   // Step 1: Group photo
   const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null);
@@ -139,6 +140,16 @@ export default function GroupSetupWizard({
     }).start();
   }, [step]);
 
+  // Morph button animation for step 1 (group photo)
+  useEffect(() => {
+    Animated.timing(morphBtnAnim, {
+      toValue: groupAvatarUrl ? 1 : 0,
+      duration: 250,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [groupAvatarUrl]);
+
   // Fade transition between steps
   const goToStep = useCallback((nextStep: number) => {
     Animated.timing(stepOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }).start(() => {
@@ -171,6 +182,10 @@ export default function GroupSetupWizard({
 
   const handleSkip = useCallback(() => {
     goToStep(step + 1);
+  }, [step, goToStep]);
+
+  const handleBack = useCallback(() => {
+    goToStep(step - 1);
   }, [step, goToStep]);
 
   const handleFinish = useCallback(() => {
@@ -446,17 +461,40 @@ export default function GroupSetupWizard({
       );
     }
 
-    const showSkip = step === 1 || step === 4;
+    if (step === 1) {
+      // Morph button: "Overslaan" (grey) when no photo, "Volgende" (teal) when photo
+      const morphBg = morphBtnAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['rgba(255,255,255,0.08)', '#00BEAE'],
+      });
+      const morphTextColor = morphBtnAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['#848484', '#FFFFFF'],
+      });
+      return (
+        <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={{ width: 52 }} />
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={groupAvatarUrl ? handleNext : handleSkip}
+          >
+            <Animated.View style={[ws.morphBtn, { backgroundColor: morphBg }]}>
+              <Animated.Text style={[ws.morphBtnText, { color: morphTextColor }]}>
+                {groupAvatarUrl ? 'Volgende' : 'Overslaan'}
+              </Animated.Text>
+            </Animated.View>
+          </Pressable>
+        </View>
+      );
+    }
+
+    // Steps 2, 3, 4: Back button + Volgende
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        {showSkip ? (
-          <Pressable style={ws.skipBtn} onPress={handleSkip}>
-            <Text style={ws.skipBtnText}>Overslaan</Text>
-          </Pressable>
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
-        <Pressable style={ws.nextBtn} onPress={handleNext}>
+        <Pressable style={ws.backBtn} onPress={handleBack}>
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+        </Pressable>
+        <Pressable style={[ws.nextBtn, { flex: 1 }]} onPress={handleNext}>
           <Text style={ws.nextBtnText}>Volgende</Text>
         </Pressable>
       </View>
@@ -792,18 +830,24 @@ const ws = StyleSheet.create({
     gap: 12,
     paddingTop: 16,
   },
-  skipBtn: {
-    flex: 1,
+  backBtn: {
+    width: 52,
     height: 52,
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  skipBtnText: {
+  morphBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  morphBtnText: {
     fontFamily: 'Unbounded',
     fontSize: 14,
-    color: '#848484',
     fontWeight: '600',
   },
   nextBtn: {
