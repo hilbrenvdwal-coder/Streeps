@@ -38,7 +38,6 @@ interface CameraModalProps {
 
 const SHEET_BG = '#1C1C1E';
 const SURFACE = '#2C2C2E';
-const BORDER = colors.dark.border.default;
 const TEXT_PRIMARY = colors.dark.text.primary;
 const TEXT_SECONDARY = colors.dark.text.secondary;
 const SCRIM_COLOR = colors.dark.scrim;
@@ -311,8 +310,7 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     backgroundColor: SURFACE,
     borderRadius: CARD_RADIUS,
-    borderWidth: 1,
-    borderColor: BORDER,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space[3],
