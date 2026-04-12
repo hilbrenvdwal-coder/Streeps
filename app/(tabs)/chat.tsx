@@ -1476,6 +1476,11 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
   useEffect(() => {
     if (visible && userId) {
       upSwipeX.setValue(0);
+      // Clear stale state FIRST — prevents flash of old profile when switching users
+      setProfile(null);
+      setSharedGroups([]);
+      setFriendshipStatus(null);
+      setFriendshipId(null);
       // Use cached data immediately if available
       if (cachedData) {
         setProfile(cachedData.profile);
