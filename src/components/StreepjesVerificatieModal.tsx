@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 const CLEARSCREEN_IMG = require('../../assets/clearscreen.png');
-const CLEARSCREEN_ASPECT = 1100 / 500;
+const CLEARSCREEN_ASPECT = 2000 / 400;
 
 const SPLASH_MESSAGES: Record<string, string[]> = {
   '1': ['Eentje kan geen kwaad', 'Proostje!', 'Een goede keuze'],
@@ -67,7 +67,7 @@ export default function StreepjesVerificatieModal({
   const sweepY = useRef(new Animated.Value(0)).current;
   const sweepOpacity = useRef(new Animated.Value(0)).current;
 
-  const SWEEP_W = SCREEN_W * 1.4;
+  const SWEEP_W = SCREEN_W * 2;
   const SWEEP_H = SWEEP_W / CLEARSCREEN_ASPECT;
 
   // Price calculations (prices are in cents)
@@ -241,7 +241,7 @@ export default function StreepjesVerificatieModal({
             {
               width: SWEEP_W,
               height: SWEEP_H,
-              left: -(SCREEN_W * 0.2),
+              left: -(SCREEN_W * 0.5),
               opacity: sweepOpacity,
               transform: [{ translateY: sweepY }],
             },
