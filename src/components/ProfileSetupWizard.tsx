@@ -225,7 +225,7 @@ export default function ProfileSetupWizard({
   const renderStep2 = () => (
     <View style={ws.stepContent}>
       <Text style={ws.stepTitle}>Geslacht</Text>
-      <Text style={ws.stepSubtitle}>Hoe wil je aangesproken worden?</Text>
+      <Text style={ws.stepSubtitleGender}>Hoe wil je aangesproken worden?</Text>
 
       <View style={ws.genderGrid}>
         {GENDER_OPTIONS.map((opt) => (
@@ -431,6 +431,12 @@ const ws = StyleSheet.create({
     fontSize: 14,
     color: '#848484',
     marginBottom: 32,
+  },
+  stepSubtitleGender: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#848484',
+    marginBottom: 50,
   },
 
   // Step 1: Name input
