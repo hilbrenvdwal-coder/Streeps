@@ -442,7 +442,6 @@ export default function HomeScreen() {
       const newCount = confirmCount + 1;
       setConfirmCount(newCount);
       AsyncStorage.setItem('streeps_confirm_count', String(newCount));
-      showToast(`${count}× ${catName} toegevoegd`);
       setTallyCount(0);
     } catch {
       showToast('Kon streepje niet opslaan, probeer opnieuw', 'error');
