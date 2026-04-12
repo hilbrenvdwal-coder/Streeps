@@ -357,7 +357,6 @@ export default function GroupSelector({
                 <Text style={st.headerName} numberOfLines={1}>{currentGroup?.name ?? ''}</Text>
                 <Ionicons name="chevron-up" size={20} color="#848484" style={{ marginLeft: 8 }} />
               </View>
-              <Text style={st.headerActive}>{activeCount} actief</Text>
             </Pressable>
 
             {/* Groups list */}
