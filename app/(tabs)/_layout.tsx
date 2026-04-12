@@ -16,6 +16,7 @@ export default function TabLayout() {
   return (
     <NavBarAnimContext.Provider value={navBarAnim}>
     <Tabs
+      sceneContainerStyle={{ backgroundColor: '#0E0D1C' }}
       tabBar={(props) => (
         <Animated.View
           style={{
