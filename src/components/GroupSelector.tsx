@@ -37,6 +37,7 @@ interface Group {
   name: string;
   avatar_url?: string | null;
   member_count: number;
+  last_tally_at?: string | null;
   [key: string]: any;
 }
 
@@ -57,6 +58,11 @@ interface Props {
 
 // Action row fixed height so absolute-positioned layers can fill it cleanly
 const ACTION_ROW_HEIGHT = 48;
+
+const isGroupLive = (lastTallyAt: string | null | undefined) => {
+  if (!lastTallyAt) return false;
+  return Date.now() - new Date(lastTallyAt).getTime() < 10 * 60 * 1000;
+};
 
 export default function GroupSelector({
   groups,
@@ -363,7 +369,15 @@ export default function GroupSelector({
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={st.groupName}>{group.name}</Text>
-                        <Text style={st.groupMeta}>{group.member_count} leden</Text>
+                        <View style={st.groupMetaRow}>
+                          <Text style={st.groupMeta}>{group.member_count} leden</Text>
+                          {isGroupLive(group.last_tally_at) && (
+                            <View style={st.liveBadge}>
+                              <View style={st.liveDot} />
+                              <Text style={st.liveBadgeText}>LIVE</Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     </Pressable>
                   ))}
@@ -470,13 +484,21 @@ const st = StyleSheet.create({
   headerActive: { fontFamily: 'Unbounded', fontSize: 20, fontWeight: '400', color: '#FFFFFF', marginTop: 12, paddingLeft: 10 },
 
   // Groups list
-  groupsList: { marginTop: 16, backgroundColor: 'rgba(78, 78, 78, 0.4)', borderRadius: 25, padding: 16, overflow: 'hidden' },
+  groupsList: { marginTop: 16, padding: 16, overflow: 'hidden' },
   groupRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
   groupAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   groupAvatarFallback: { backgroundColor: '#F1F1F1' },
   groupAvatarText: { color: '#333', fontSize: 18, fontWeight: '600' },
   groupName: { fontFamily: 'Unbounded', fontSize: 32, fontWeight: '400', color: '#FFFFFF' },
   groupMeta: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 2 },
+  groupMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  liveBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10,
+    backgroundColor: 'rgba(0,254,150,0.15)',
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00FE96' },
+  liveBadgeText: { fontFamily: 'Unbounded', fontSize: 9, fontWeight: '700', color: '#00FE96', letterSpacing: 0.5 },
   emptyText: { fontFamily: 'Unbounded', color: '#848484', textAlign: 'center', paddingVertical: 20, fontSize: 14 },
 
   // Action row — fixed height, relative position for absolute layers

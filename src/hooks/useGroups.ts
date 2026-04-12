@@ -9,6 +9,7 @@ interface GroupWithStats extends Group {
   my_tally_count: number;
   is_active: boolean;
   avatar_url: string | null;
+  last_tally_at: string | null;
 }
 
 export function useGroups() {
@@ -36,7 +37,7 @@ export function useGroups() {
     // For each group, get member count and my tally count
     const groupsWithStats = await Promise.all(
       data.map(async (group: any) => {
-        const [membersRes, talliesRes] = await Promise.all([
+        const [membersRes, talliesRes, lastTallyRes] = await Promise.all([
           supabase
             .from('group_members')
             .select('id', { count: 'exact', head: true })
@@ -47,6 +48,14 @@ export function useGroups() {
             .eq('group_id', group.id)
             .eq('user_id', user.id)
             .eq('removed', false),
+          supabase
+            .from('tallies')
+            .select('created_at')
+            .eq('group_id', group.id)
+            .eq('removed', false)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
         const myMembership = Array.isArray(group.group_members) ? group.group_members[0] : null;
@@ -56,6 +65,7 @@ export function useGroups() {
           member_count: membersRes.count ?? 0,
           my_tally_count: talliesRes.count ?? 0,
           is_active: myMembership?.is_active ?? false,
+          last_tally_at: lastTallyRes.data?.created_at ?? null,
         } as GroupWithStats;
       })
     );

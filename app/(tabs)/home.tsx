@@ -628,11 +628,18 @@ export default function HomeScreen() {
                 <Text
                   style={s.groupName}
                   numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
                 >
                   {group.name}
                 </Text>
+                {/* SVG Group 13: radial glow + up/down arrows */}
+                <View style={s.chevronWrap} pointerEvents="none">
+                  <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
+                    <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
+                    <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
+                  </Svg>
+                </View>
+              </View>
+              <View style={s.groupLabelRow}>
                 {isLive && (
                   <Animated.View style={[s.liveBadge, { opacity: livePulse }]}>
                     <View style={s.liveDot} />
@@ -643,13 +650,6 @@ export default function HomeScreen() {
                   <Text style={s.activePillText}>
                     {members.filter((m) => m.is_active).length} actief
                   </Text>
-                </View>
-                {/* SVG Group 13: radial glow + up/down arrows */}
-                <View style={s.chevronWrap} pointerEvents="none">
-                  <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
-                    <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
-                    <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
-                  </Svg>
                 </View>
               </View>
             </Pressable>
@@ -1242,6 +1242,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  groupLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingLeft: 78, // avatar width (66) + gap (12)
   },
   chevronWrap: {
     marginLeft: 'auto',
