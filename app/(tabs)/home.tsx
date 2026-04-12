@@ -397,6 +397,33 @@ export default function HomeScreen() {
     return ([1, 2, 3, 4] as const).filter((cat) => catsWithDrinks.has(cat));
   }, [drinks]);
 
+  // ── Live badge: any tally in the last 10 minutes = "LIVE" ──
+  const isLive = useMemo(() => {
+    if (!recentTallies || recentTallies.length === 0) return false;
+    const now = Date.now();
+    const WINDOW_MS = 10 * 60 * 1000;
+    return recentTallies.some((tt: any) => {
+      const ts = tt?.created_at ? new Date(tt.created_at).getTime() : 0;
+      return !isNaN(ts) && now - ts < WINDOW_MS;
+    });
+  }, [recentTallies]);
+
+  const livePulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!isLive) {
+      livePulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(livePulse, { toValue: 0.4, duration: 750, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(livePulse, { toValue: 1, duration: 750, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => { loop.stop(); };
+  }, [isLive]);
+
   // Auto-select first active category when categories load or selected one disappears
   useEffect(() => {
     if (activeCategories.length > 0 && (selectedCategory === null || !activeCategories.includes(selectedCategory as any))) {
@@ -427,6 +454,7 @@ export default function HomeScreen() {
   };
 
   const handleCategoryTap = (cat: number) => {
+    if (adding) return; // debounce: block while tally is being saved
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(cat);
   };
@@ -584,9 +612,9 @@ export default function HomeScreen() {
         {selectedGroupId && group ? (
           <Animated.View style={{ opacity: contentOpacity }}>
             {/* ── Group Header ── SVG: Groepheader + Group 13 (expand icon) */}
-            <View style={s.groupHeader}>
-              <Pressable style={s.groupTopRow} onPress={() => setShowGroupSelector(true)}>
-                <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined}>
+            <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)}>
+              <View style={s.groupTopRow}>
+                <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined} hitSlop={6}>
                   <View ref={avatarRef} collapsable={false}>
                     {(group as any)?.avatar_url ? (
                       <Image source={{ uri: (group as any).avatar_url }} style={s.avatar} transition={200} cachePolicy="memory-disk" />
@@ -597,27 +625,54 @@ export default function HomeScreen() {
                     )}
                   </View>
                 </Pressable>
-                <Text style={s.groupName} numberOfLines={1}>{group.name}</Text>
-              </Pressable>
-              {/* SVG Group 13: radial glow + up/down arrows — positioned right */}
-              <Pressable onPress={() => setShowGroupSelector(true)} hitSlop={12} style={s.expandBtn}>
-                <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
-                  <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
-                  <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
-                </Svg>
-              </Pressable>
-              <Text style={s.activeCount}>
-                {members.filter((m) => m.is_active).length} actief
-              </Text>
-            </View>
+                <Text
+                  style={s.groupName}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {group.name}
+                </Text>
+                {isLive && (
+                  <Animated.View style={[s.liveBadge, { opacity: livePulse }]}>
+                    <View style={s.liveDot} />
+                    <Text style={s.liveBadgeText}>LIVE</Text>
+                  </Animated.View>
+                )}
+                <View style={s.activePill}>
+                  <Text style={s.activePillText}>
+                    {members.filter((m) => m.is_active).length} actief
+                  </Text>
+                </View>
+                {/* SVG Group 13: radial glow + up/down arrows */}
+                <View style={s.chevronWrap} pointerEvents="none">
+                  <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
+                    <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
+                    <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
+                  </Svg>
+                </View>
+              </View>
+            </Pressable>
 
             {/* ── Counter ── SVG node Counter: minus(19,190) display(158,190) plus(245,190) */}
             <View style={s.counterWrap}>
               <CounterControl
                 value={tallyCount}
-                onIncrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
-                onDecrement={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
-                onSubmit={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+                onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
+                onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
+                onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+                onSwipeCycle={(direction: 'next' | 'prev') => {
+                  if (adding) return;
+                  const list = activeCategories;
+                  if (!list || list.length === 0) return;
+                  const currentIdx = list.findIndex((c) => c === selectedCategory);
+                  if (currentIdx === -1) return;
+                  const nextIdx = direction === 'next'
+                    ? (currentIdx + 1) % list.length
+                    : (currentIdx - 1 + list.length) % list.length;
+                  setSelectedCategory(list[nextIdx]);
+                  Haptics.selectionAsync();
+                }}
                 auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
               />
               {selectedCategory && credits[selectedCategory] > 0 && (
@@ -1188,6 +1243,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  chevronWrap: {
+    marginLeft: 'auto',
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,190,174,0.18)',
+  },
+  activePillText: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#00BEAE',
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,254,150,0.15)',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00FE96',
+  },
+  liveBadgeText: {
+    fontFamily: 'Unbounded',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    color: '#00FE96',
+  },
   avatar: {
     width: 66,
     height: 66,
@@ -1582,8 +1678,8 @@ function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: 
           <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FFFFFF' }}>Instellingen</Text>
         </Pressable>
       )}
-      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,133,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,133,0.3)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
-        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF0085' }}>Uitstappen</Text>
+      <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,77,0.5)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
+        <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF004D' }}>Uitstappen</Text>
       </Pressable>
     </Animated.View>
   );
