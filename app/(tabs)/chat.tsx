@@ -1528,7 +1528,7 @@ const po = StyleSheet.create({
 
   // Sections
   sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
-  card: { backgroundColor: 'rgba(78,78,78,0.2)', borderRadius: 25, overflow: 'hidden' },
+  card: { overflow: 'hidden' },
   divider: { height: 1, backgroundColor: 'rgba(78,78,78,0.3)', marginLeft: 48 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 55 },
   rowIcon: { marginRight: 12, width: 20 },
