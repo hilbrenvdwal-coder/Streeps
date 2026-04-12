@@ -9,7 +9,7 @@ type Props = {
   duration?: number;
 };
 
-export default function TabFadeIn({ children, style, from = 0.7, duration = 140 }: Props) {
+export default function TabFadeIn({ children, style, from = 0.4, duration = 220 }: Props) {
   const opacity = useRef(new Animated.Value(1)).current;
 
   useFocusEffect(
