@@ -419,11 +419,38 @@ const ws = StyleSheet.create({
   },
 
   // Step 2: Gender
-  genderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%' },
-  genderOption: { width: '47%', aspectRatio: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  genderOptionSelected: { borderColor: '#00BEAE', backgroundColor: 'rgba(0, 190, 174, 0.1)' },
-  genderLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', textAlign: 'center' },
-  genderLabelSelected: { color: '#00BEAE' },
+  genderGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+    width: '100%',
+  },
+  genderOption: {
+    width: '48.5%',
+    aspectRatio: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  genderOptionSelected: {
+    borderColor: '#00BEAE',
+    backgroundColor: 'rgba(0, 190, 174, 0.1)',
+  },
+  genderLabel: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  genderLabelSelected: {
+    color: '#00BEAE',
+  },
 
   // Step 3: Avatar
   avatarCircle: {
