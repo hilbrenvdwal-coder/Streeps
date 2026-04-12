@@ -30,7 +30,7 @@ export default function TabLayout() {
         </Animated.View>
       )}
       screenOptions={{
-        animation: 'fade',
+        animation: 'none',
         sceneStyle: { backgroundColor: '#0E0D1C' },
         headerStyle: {
           backgroundColor: t.colors.background.primary,
