@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Dimensions, Easing, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 
@@ -88,37 +88,45 @@ export default function ImageLightbox({ visible, uri, origin, onClose }: Props) 
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [originCy - targetCy, 0] });
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]}>
-        <BlurView
-          intensity={30}
-          tint="dark"
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFillObject}
-        />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.7)' }]} />
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} />
-      </Animated.View>
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: targetX,
-          top: targetY,
-          width: targetW,
-          height: targetH,
-          borderRadius: 16,
-          overflow: 'hidden',
-          transform: [{ translateX }, { translateY }, { scale }],
-        }}
-      >
-        <Image
-          source={{ uri: shownUri }}
-          style={{ width: '100%', height: '100%' }}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-        />
-      </Animated.View>
-    </View>
+    <Modal
+      visible={!!latched}
+      transparent
+      statusBarTranslucent
+      animationType="none"
+      onRequestClose={handleClose}
+    >
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: anim }]}>
+          <BlurView
+            intensity={30}
+            tint="dark"
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.7)' }]} />
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} />
+        </Animated.View>
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: targetX,
+            top: targetY,
+            width: targetW,
+            height: targetH,
+            borderRadius: 16,
+            overflow: 'hidden',
+            transform: [{ translateX }, { translateY }, { scale }],
+          }}
+        >
+          <Image
+            source={{ uri: shownUri }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+          />
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
