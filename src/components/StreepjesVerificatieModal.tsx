@@ -13,9 +13,9 @@ import {
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { AuroraPresetView } from './AuroraBackground';
 
-const FLASH_AURORA_COLORS = ['#00FE96', '#F1F1F1', '#00BEAE', '#FFFFFF'];
+const CLEARSCREEN_IMG = require('../../assets/clearscreen.png');
+const CLEARSCREEN_ASPECT = 681 / 305;
 
 const SPLASH_MESSAGES: Record<string, string[]> = {
   '1': ['Eentje kan geen kwaad', 'Proostje!', 'Een goede keuze'],
@@ -63,9 +63,11 @@ export default function StreepjesVerificatieModal({
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const confirmScale = useRef(new Animated.Value(1)).current;
 
-  // Aurora flash
-  const flashScale = useRef(new Animated.Value(0)).current;
-  const flashOpacity = useRef(new Animated.Value(0)).current;
+  // Clearscreen sweep
+  const sweepY = useRef(new Animated.Value(0)).current;
+  const sweepOpacity = useRef(new Animated.Value(0)).current;
+
+  const SWEEP_H = SCREEN_W / CLEARSCREEN_ASPECT;
 
   // Price calculations (prices are in cents)
   const hasPrice = categoryPrice != null && categoryPrice > 0;
@@ -84,8 +86,8 @@ export default function StreepjesVerificatieModal({
       cardScale.setValue(0.8);
       cardOpacity.setValue(0);
       confirmScale.setValue(1);
-      flashScale.setValue(0);
-      flashOpacity.setValue(0);
+      sweepY.setValue(SCREEN_H);
+      sweepOpacity.setValue(0);
 
       Animated.parallel([
         // Scrim fade in
@@ -150,12 +152,12 @@ export default function StreepjesVerificatieModal({
     // Fire onConfirm immediately
     onConfirm();
 
-    flashScale.setValue(0);
-    flashOpacity.setValue(0);
+    sweepY.setValue(SCREEN_H);
+    sweepOpacity.setValue(0);
 
     // Skip button pulse — start close animation directly
     Animated.sequence([
-      // Card shrink + sheet slide + aurora
+      // Card shrink + sheet slide + sweep
       Animated.parallel([
         Animated.timing(cardScale, {
           toValue: 0.8,
@@ -175,32 +177,30 @@ export default function StreepjesVerificatieModal({
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.timing(flashOpacity, {
-          toValue: 1,
-          duration: 400,
+        Animated.timing(sweepY, {
+          toValue: -SWEEP_H,
+          duration: 700,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-        Animated.spring(flashScale, {
+        Animated.timing(sweepOpacity, {
           toValue: 1,
-          damping: 14,
-          stiffness: 120,
-          mass: 1,
+          duration: 150,
+          easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
       ]),
-      Animated.delay(250),
       // Fade out everything
       Animated.parallel([
-        Animated.timing(flashOpacity, {
+        Animated.timing(scrimOpacity, {
           toValue: 0,
           duration: 400,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
         }),
-        Animated.timing(scrimOpacity, {
+        Animated.timing(sweepOpacity, {
           toValue: 0,
-          duration: 400,
+          duration: 300,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
         }),
@@ -218,18 +218,6 @@ export default function StreepjesVerificatieModal({
 
   if (!show) return null;
 
-  const flashTransform = {
-    opacity: flashOpacity,
-    transform: [
-      {
-        scale: flashScale.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.3, 2.5],
-        }),
-      },
-    ],
-  };
-
   return (
     <Modal visible transparent animationType="none">
       <Pressable style={{ flex: 1 }} onPress={handleCancel}>
@@ -244,21 +232,21 @@ export default function StreepjesVerificatieModal({
           <View style={s.scrim} />
         </Animated.View>
 
-        {/* Aurora flash -- real aurora preset, scaled to fill screen */}
-        <Animated.View
+        {/* Clearscreen sweep */}
+        <Animated.Image
+          source={CLEARSCREEN_IMG}
           style={[
-            s.flashWrap,
-            { top: SCREEN_H / 2 - 16, left: SCREEN_W / 2 - 180 },
-            flashTransform,
+            s.sweepImage,
+            {
+              width: SCREEN_W,
+              height: SWEEP_H,
+              opacity: sweepOpacity,
+              transform: [{ translateY: sweepY }],
+            },
           ]}
+          resizeMode="stretch"
           pointerEvents="none"
-        >
-          <AuroraPresetView
-            preset="header"
-            colors={FLASH_AURORA_COLORS}
-            animated
-          />
-        </Animated.View>
+        />
 
         <View style={{ flex: 1 }} />
 
@@ -511,11 +499,9 @@ const s = StyleSheet.create({
     color: '#A0A0B8',
   },
 
-  // Aurora flash
-  flashWrap: {
+  // Clearscreen sweep
+  sweepImage: {
     position: 'absolute',
-    width: 490,
-    height: 370,
-    overflow: 'visible',
+    left: 0,
   },
 });
