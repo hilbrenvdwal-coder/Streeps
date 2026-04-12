@@ -700,6 +700,7 @@ export default function HomeScreen() {
                   Haptics.selectionAsync();
                 }}
                 auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
+                activeColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined}
               />
               {selectedCategory && credits[selectedCategory] > 0 && (
                 <View style={s.creditBadge}>

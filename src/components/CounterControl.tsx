@@ -25,6 +25,8 @@ interface CounterControlProps {
   onDecrement: () => void;
   onSubmit?: () => void;
   auroraColors?: string[];
+  /** Active category color — the ring + shadow smoothly tween to this. */
+  activeColor?: string;
   /**
    * Called when the user horizontally swipes past the threshold over the counter.
    * 'next' = swipe left (reveal next category), 'prev' = swipe right (previous).
@@ -34,6 +36,8 @@ interface CounterControlProps {
   /** Disables the swipe gesture entirely when true. */
   disabled?: boolean;
 }
+
+const DEFAULT_RING_COLOR = '#FF0085';
 
 // Swipe tuning constants
 const SWIPE_THRESHOLD = 60;   // px — distance at which a cycle is committed on release
@@ -90,7 +94,30 @@ function useRepeatPress(onAction: () => void) {
   return { start, stop, fired };
 }
 
-export default function CounterControl({ value, onIncrement, onDecrement, onSubmit, auroraColors, onSwipeCycle, disabled }: CounterControlProps) {
+export default function CounterControl({ value, onIncrement, onDecrement, onSubmit, auroraColors, activeColor, onSwipeCycle, disabled }: CounterControlProps) {
+  // Smooth color transition for ring + shadow when activeColor changes
+  const resolvedColor = activeColor ?? auroraColors?.[0] ?? DEFAULT_RING_COLOR;
+  const prevColorRef = useRef(resolvedColor);
+  const currentColorRef = useRef(resolvedColor);
+  const colorProgress = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (currentColorRef.current === resolvedColor) return;
+    prevColorRef.current = currentColorRef.current;
+    currentColorRef.current = resolvedColor;
+    colorProgress.setValue(0);
+    Animated.timing(colorProgress, {
+      toValue: 1,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [resolvedColor, colorProgress]);
+
+  const animatedRingColor = colorProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [prevColorRef.current, currentColorRef.current],
+  });
   const minus = usePressAnim();
   const plus = usePressAnim();
   const minusRepeat = useRepeatPress(onDecrement);
@@ -274,8 +301,8 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
             style={[
               s.ringOuter,
               {
-                borderColor: auroraColors?.[0] ?? '#FF0085',
-                shadowColor: auroraColors?.[0] ?? '#FF0085',
+                borderColor: animatedRingColor,
+                shadowColor: animatedRingColor,
                 opacity: pulseOpacity,
                 transform: [{ scale: pulseScale }],
               },
@@ -287,7 +314,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
             style={[
               s.ringInner,
               {
-                shadowColor: auroraColors?.[0] ?? '#FF0085',
+                shadowColor: animatedRingColor,
                 opacity: pulseOpacity,
                 transform: [{ scale: pulseScale }],
               },
