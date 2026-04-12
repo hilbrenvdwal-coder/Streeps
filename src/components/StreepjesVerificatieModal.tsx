@@ -67,7 +67,7 @@ export default function StreepjesVerificatieModal({
   const sweepY = useRef(new Animated.Value(0)).current;
   const sweepOpacity = useRef(new Animated.Value(0)).current;
 
-  const SWEEP_W = SCREEN_W * 1.3;
+  const SWEEP_W = SCREEN_H * CLEARSCREEN_ASPECT * 1.1;
   const SWEEP_H = SWEEP_W / CLEARSCREEN_ASPECT;
 
   // Price calculations (prices are in cents)
@@ -180,7 +180,7 @@ export default function StreepjesVerificatieModal({
         }),
         Animated.timing(sweepY, {
           toValue: -SWEEP_H,
-          duration: 700,
+          duration: 900,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
@@ -241,9 +241,13 @@ export default function StreepjesVerificatieModal({
             {
               width: SWEEP_W,
               height: SWEEP_H,
-              left: -(SCREEN_W * 0.15),
+              left: 0,
+              top: 0,
               opacity: sweepOpacity,
-              transform: [{ translateY: sweepY }],
+              transform: [
+                { translateX: (SCREEN_W - SWEEP_W) / 2 },
+                { translateY: sweepY },
+              ],
             },
           ]}
           resizeMode="stretch"

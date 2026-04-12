@@ -13,6 +13,15 @@ import {
   Keyboard,
   Dimensions,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withRepeat,
+  Easing as REasing,
+  interpolate,
+  cancelAnimation,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -71,7 +80,8 @@ export default function GroupSelector({
   const [joinCode, setJoinCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  const morphProgress = useSharedValue(0);
+  const hourglassRotation = useSharedValue(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const actionRowRef = useRef<View>(null);
@@ -106,8 +116,6 @@ export default function GroupSelector({
       hideSub.remove();
     };
   }, []);
-  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
-
   // Open overlay
   useEffect(() => {
     if (visible) {
@@ -125,15 +133,41 @@ export default function GroupSelector({
   const switchInlineMode = useCallback((mode: 'none' | 'create' | 'join') => {
     setInlineMode(mode);
     if (mode !== 'none') {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      morphProgress.value = withTiming(1, { duration: 300, easing: REasing.out(REasing.cubic) });
+      setTimeout(() => inputRef.current?.focus(), 150);
     } else {
+      morphProgress.value = withTiming(0, { duration: 250, easing: REasing.in(REasing.cubic) });
       setNewName('');
       setJoinCode('');
     }
   }, []);
 
+  // De knop die NIET gekozen is: fade + shrink weg
+  const hiddenButtonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(morphProgress.value, [0, 0.3], [1, 0]),
+    transform: [{ scale: interpolate(morphProgress.value, [0, 0.4], [1, 0.8]) }],
+    flex: interpolate(morphProgress.value, [0, 0.4], [1, 0]),
+    maxWidth: interpolate(morphProgress.value, [0, 0.4], [200, 0]),
+    marginLeft: interpolate(morphProgress.value, [0, 0.4], [0, -12]),
+    overflow: 'hidden' as const,
+  }));
+
+  // Het input veld: fade + expand in
+  const inputFieldStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(morphProgress.value, [0.15, 0.5], [0, 1]),
+    flex: interpolate(morphProgress.value, [0, 0.4, 1], [0.001, 0.5, 1]),
+    overflow: 'hidden' as const,
+  }));
+
+  // Zandloper rotatie
+  const hourglassStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${hourglassRotation.value}deg` }],
+  }));
+
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
+    morphProgress.value = 0;
+    hourglassRotation.value = 0;
     Animated.parallel([
       Animated.timing(scrimOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(listAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
@@ -153,12 +187,17 @@ export default function GroupSelector({
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    spinAnim.setValue(0);
-    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    hourglassRotation.value = 0;
+    hourglassRotation.value = withRepeat(
+      withTiming(180, { duration: 1000, easing: REasing.linear }),
+      -1,
+      false
+    );
     setSubmitting(true);
     const result = await onCreate(newName.trim());
     setSubmitting(false);
-    spinAnim.setValue(0);
+    cancelAnimation(hourglassRotation);
+    hourglassRotation.value = withTiming(0, { duration: 200 });
     if (result && 'error' in result && result.error) { Alert.alert('Fout', result.error as string); return; }
     setNewName('');
     setInlineMode('none');
@@ -171,12 +210,17 @@ export default function GroupSelector({
 
   const handleJoin = async () => {
     if (!joinCode.trim()) return;
-    spinAnim.setValue(0);
-    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    hourglassRotation.value = 0;
+    hourglassRotation.value = withRepeat(
+      withTiming(180, { duration: 1000, easing: REasing.linear }),
+      -1,
+      false
+    );
     setSubmitting(true);
     const result = await onJoin(joinCode.trim());
     setSubmitting(false);
-    spinAnim.setValue(0);
+    cancelAnimation(hourglassRotation);
+    hourglassRotation.value = withTiming(0, { duration: 200 });
     if (result.error) { Alert.alert('Fout', result.error); return; }
     setJoinCode('');
     setInlineMode('none');
@@ -267,9 +311,9 @@ export default function GroupSelector({
 
               {/* ── Action row ── */}
               <View ref={actionRowRef} style={st.actionRow}>
-                {/* Input field — always mounted, flex 0 or 1 */}
+                {/* Input field — geanimeerd */}
                 {isActive && (
-                  <View style={st.inlineInputWrap}>
+                  <ReAnimated.View style={[st.inlineInputWrap, inputFieldStyle]}>
                     <TextInput
                       ref={inputRef}
                       style={st.inlineInput}
@@ -281,47 +325,57 @@ export default function GroupSelector({
                       returnKeyType="done"
                       onSubmitEditing={isCreate ? handleCreate : handleJoin}
                     />
-                  </View>
+                  </ReAnimated.View>
                 )}
 
-                {/* "Nieuwe groep" button — pill or circle */}
-                {(!isJoin) && (
+                {/* Active circle button — altijd direct naast input */}
+                {isCreate && (
                   <Pressable
-                    style={isCreate
-                      ? [st.circleBtn, { backgroundColor: t.brand.magenta }]
-                      : [st.actionBtn, { backgroundColor: t.brand.magenta }]
-                    }
-                    onPress={isCreate ? handleCreate : () => switchInlineMode('create')}
-                    disabled={submitting && isCreate}
+                    style={[st.circleBtn, { backgroundColor: t.brand.magenta }]}
+                    onPress={handleCreate}
+                    disabled={submitting}
                   >
-                    {isCreate ? (
-                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                        <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#FFFFFF" />
-                      </Animated.View>
+                    {submitting ? (
+                      <ReAnimated.View style={hourglassStyle}>
+                        <Ionicons name="hourglass" size={20} color="#FFFFFF" />
+                      </ReAnimated.View>
                     ) : (
+                      <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                    )}
+                  </Pressable>
+                )}
+                {isJoin && (
+                  <Pressable
+                    style={[st.circleBtn, { backgroundColor: t.brand.cyan }]}
+                    onPress={handleJoin}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <ReAnimated.View style={hourglassStyle}>
+                        <Ionicons name="hourglass" size={20} color="#1A1A2E" />
+                      </ReAnimated.View>
+                    ) : (
+                      <Ionicons name="arrow-forward" size={20} color="#1A1A2E" />
+                    )}
+                  </Pressable>
+                )}
+
+                {/* Default: beide pill-knoppen */}
+                {!isActive && (
+                  <>
+                    <Pressable
+                      style={[st.actionBtn, { backgroundColor: t.brand.magenta }]}
+                      onPress={() => switchInlineMode('create')}
+                    >
                       <Text style={st.actionText}>+ Nieuw</Text>
-                    )}
-                  </Pressable>
-                )}
-
-                {/* "Deelnemen" button — pill or circle */}
-                {(!isCreate) && (
-                  <Pressable
-                    style={isJoin
-                      ? [st.circleBtn, { backgroundColor: t.brand.cyan }]
-                      : [st.actionBtn, { backgroundColor: t.brand.cyan }]
-                    }
-                    onPress={isJoin ? handleJoin : () => switchInlineMode('join')}
-                    disabled={submitting && isJoin}
-                  >
-                    {isJoin ? (
-                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                        <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#1A1A2E" />
-                      </Animated.View>
-                    ) : (
+                    </Pressable>
+                    <Pressable
+                      style={[st.actionBtn, { backgroundColor: t.brand.cyan }]}
+                      onPress={() => switchInlineMode('join')}
+                    >
                       <Text style={[st.actionText, { color: '#1A1A2E' }]}>Deelnemen</Text>
-                    )}
-                  </Pressable>
+                    </Pressable>
+                  </>
                 )}
               </View>
             </Animated.View>

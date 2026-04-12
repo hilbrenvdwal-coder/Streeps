@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View, Pressable, Animated, Dimensions, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, View, Pressable, Dimensions, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,10 +32,8 @@ const PILL_W = 80;
 const ICON_X = [48 + 16, 179 + 16, 310 + 16];
 
 const PILL_LEFTS = PILL_POSITIONS.map((x) => scale(x));
-const PILL_RIGHTS = PILL_POSITIONS.map((x) => scale(x + PILL_W));
 
 const PILL_W_SCALED = scale(PILL_W);
-const BASE_CENTER = PILL_LEFTS[1] + PILL_W_SCALED / 2;
 
 const PILL_H = 50;
 const PILL_H_THIN = 38;
@@ -49,46 +48,39 @@ export default function CustomNavBar({ state, navigation }: any) {
   const activeTab = visibleIndex >= 0 ? visibleIndex : 1;
 
   const prevTab = useRef(activeTab);
-  const leftEdge = useRef(new Animated.Value(PILL_LEFTS[activeTab])).current;
-  const rightEdge = useRef(new Animated.Value(PILL_RIGHTS[activeTab])).current;
-  const scaleY = useRef(new Animated.Value(1)).current;
+  const leftEdge = useSharedValue(PILL_LEFTS[activeTab]);
+  const rightEdge = useSharedValue(PILL_LEFTS[activeTab] + PILL_W_SCALED);
+  const pillHeight = useSharedValue(PILL_H);
 
   useEffect(() => {
     const goingRight = activeTab > prevTab.current;
     const changed = activeTab !== prevTab.current;
-    const spring = (v: Animated.Value, to: number) =>
-      Animated.spring(v, { toValue: to, ...SPRING_CONF, useNativeDriver: true });
+
+    const targetLeft = PILL_LEFTS[activeTab];
+    const targetRight = targetLeft + PILL_W_SCALED;
 
     if (changed) {
-      // Instantly squeeze, then spring back alongside the move
-      scaleY.setValue(PILL_H_THIN / PILL_H);
-      Animated.spring(scaleY, { toValue: 1, ...SPRING_CONF, useNativeDriver: true }).start();
+      pillHeight.value = PILL_H_THIN;
+      pillHeight.value = withSpring(PILL_H, SPRING_CONF);
     }
 
     if (goingRight) {
-      spring(rightEdge, PILL_RIGHTS[activeTab]).start();
-      Animated.sequence([
-        Animated.delay(100),
-        spring(leftEdge, PILL_LEFTS[activeTab]),
-      ]).start();
+      rightEdge.value = withSpring(targetRight, SPRING_CONF);
+      leftEdge.value = withDelay(100, withSpring(targetLeft, SPRING_CONF));
     } else {
-      spring(leftEdge, PILL_LEFTS[activeTab]).start();
-      Animated.sequence([
-        Animated.delay(100),
-        spring(rightEdge, PILL_RIGHTS[activeTab]),
-      ]).start();
+      leftEdge.value = withSpring(targetLeft, SPRING_CONF);
+      rightEdge.value = withDelay(100, withSpring(targetRight, SPRING_CONF));
     }
 
     prevTab.current = activeTab;
   }, [activeTab]);
 
-  const { translateX, scaleXAnim } = useMemo(() => {
-    const pillWidthAnim = Animated.subtract(rightEdge, leftEdge);
-    const pillCenterAnim = Animated.add(leftEdge, Animated.divide(pillWidthAnim, new Animated.Value(2)));
-    const tx = Animated.subtract(pillCenterAnim, new Animated.Value(BASE_CENTER));
-    const sx = Animated.divide(pillWidthAnim, new Animated.Value(PILL_W_SCALED));
-    return { translateX: tx, scaleXAnim: sx };
-  }, []);
+  const pillAnimatedStyle = useAnimatedStyle(() => ({
+    left: leftEdge.value,
+    width: rightEdge.value - leftEdge.value,
+    height: pillHeight.value,
+    borderRadius: 44,
+  }));
 
   const icons: Array<{ name: keyof typeof Ionicons.glyphMap; nameFocused: keyof typeof Ionicons.glyphMap }> = [
     { name: 'people-outline', nameFocused: 'people' },
@@ -122,7 +114,7 @@ export default function CustomNavBar({ state, navigation }: any) {
 
       <View style={styles.bar}>
         {/* Animated pill */}
-        <Animated.View style={[styles.pill, { transform: [{ translateX }, { scaleX: scaleXAnim }, { scaleY }] }]} />
+        <Animated.View style={[styles.pill, pillAnimatedStyle]} />
 
         {/* Icons at exact Figma positions */}
         {TAB_ORDER.map((routeName, index) => {
@@ -179,11 +171,7 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: 'absolute',
-    left: PILL_LEFTS[1],
-    width: PILL_W_SCALED,
-    height: PILL_H,
     top: 14,
-    borderRadius: 44,
     backgroundColor: '#FF0085',
     shadowColor: '#FF0085',
     shadowOffset: { width: 0, height: 0 },

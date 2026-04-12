@@ -371,6 +371,7 @@ export default function ProfileSetupWizard({
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable style={ws.backBtn} onPress={() => goToStep(1)}>
+            <Ionicons name="chevron-back" size={18} color="#848484" />
             <Text style={ws.backBtnText}>Terug</Text>
           </Pressable>
           <Animated.View style={[ws.genderBtn, { backgroundColor: btnBg }]}>
@@ -391,6 +392,7 @@ export default function ProfileSetupWizard({
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={ws.backBtn} onPress={() => goToStep(2)}>
+          <Ionicons name="chevron-back" size={18} color="#848484" />
           <Text style={ws.backBtnText}>Terug</Text>
         </Pressable>
         <Pressable style={ws.nextBtn} onPress={handleNextStep3Avatar}>
@@ -532,8 +534,10 @@ const ws = StyleSheet.create({
     flex: 1,
     height: 52,
     borderRadius: 26,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   backBtnText: {
