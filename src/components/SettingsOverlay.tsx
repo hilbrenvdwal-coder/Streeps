@@ -306,9 +306,8 @@ function CategoryBadgeSelector({
     <>
       <View ref={badgeRef} collapsable={false} {...panResponder.panHandlers}>
         <View
-          style={[cbs.badge, { backgroundColor: color + '20', borderColor: color + '40' }]}
+          style={[cbs.badge, { backgroundColor: color + '20' }]}
         >
-          <View style={[cbs.badgeDot, { backgroundColor: color }]} />
           <Text style={[cbs.badgeLabel, { color }]} numberOfLines={1}>{label}</Text>
         </View>
       </View>
@@ -342,12 +341,11 @@ function CategoryBadgeSelector({
                   style={[
                     cbs.chip,
                     { backgroundColor: catColor + '20' },
-                    highlighted && { borderWidth: 2, borderColor: '#FFFFFF', transform: [{ scale: 1.08 }] },
+                    highlighted && { borderWidth: 2, borderColor: catColor, transform: [{ scale: 1.08 }] },
                     !highlighted && { borderWidth: 2, borderColor: 'transparent' },
                   ]}
                 >
-                  <View style={[cbs.chipDot, { backgroundColor: catColor }]} />
-                  <Text style={[cbs.chipLabel, { color: highlighted ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                  <Text style={[cbs.chipLabel, { color: catColor }]} numberOfLines={1}>{catLabel}</Text>
                 </Pressable>
               );
             })}
@@ -364,15 +362,13 @@ function CategoryBadgeSelector({
 }
 
 const cbs = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, alignSelf: 'flex-start' },
-  badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '500' },
+  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
+  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400' },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
   chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
-  chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
-  chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '500' },
+  chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '400' },
   hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
   hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
