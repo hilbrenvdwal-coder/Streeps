@@ -7,11 +7,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
 import { ThemeProvider as StreepsThemeProvider } from '@/src/contexts/ThemeContext';
 import { getTheme } from '@/src/theme';
 import { useHeartbeat } from '@/src/hooks/useHeartbeat';
+import { queryClient } from '@/src/lib/queryClient';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -40,13 +42,15 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <StreepsThemeProvider>
-        <AuthProvider>
-          <RootLayoutNav />
-        </AuthProvider>
-      </StreepsThemeProvider>
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <StreepsThemeProvider>
+          <AuthProvider>
+            <RootLayoutNav />
+          </AuthProvider>
+        </StreepsThemeProvider>
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
 

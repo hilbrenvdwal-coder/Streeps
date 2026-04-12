@@ -98,3 +98,34 @@ export function updateCacheWithNewMessage(convId: string, message: any): void {
 export function invalidateCache(convId: string): void {
   preloadCache.delete(convId);
 }
+
+/**
+ * Seeds the preload cache with pre-fetched messages from the get_preloaded_chats RPC.
+ * Called by useConversations so that opening a chat is instant.
+ *
+ * Messages from the RPC come newest-first and each item may already include a
+ * `profile` field (the RPC joins with profiles). We normalize into the same
+ * shape used by preloadConversation.
+ */
+export function seedPreloadCache(convId: string, messages: any[]): void {
+  if (!messages || messages.length === 0) return;
+
+  const profileCache: Record<string, any> = {};
+  const normalized = messages.map((m: any) => {
+    const profile = m.profile ?? null;
+    if (profile && m.user_id) profileCache[m.user_id] = profile;
+    return { ...m, profile };
+  });
+
+  const oldestCursor = normalized[normalized.length - 1]?.created_at ?? null;
+  // RPC fetches a full page (default 20) — assume more may exist if we got a full page.
+  const hasMore = messages.length >= PRELOAD_PAGE_SIZE;
+
+  preloadCache.set(convId, {
+    messages: normalized,
+    oldestCursor,
+    hasMore,
+    loadedAt: Date.now(),
+    profileCache,
+  });
+}

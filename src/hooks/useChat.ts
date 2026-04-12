@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { getPreloadedMessages } from './useMessagePreloadCache';
@@ -60,190 +61,68 @@ export interface ConversationPreview {
 
 export function useConversations() {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<ConversationPreview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const hasLoadedRef = useRef(false);
+  const queryClient = useQueryClient();
 
-  const fetchConversations = useCallback(async () => {
-    if (!user) return;
-    if (!hasLoadedRef.current) setLoading(true);
+  const { data: conversations = [], isLoading, refetch } = useQuery<ConversationPreview[]>({
+    queryKey: ['chats', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      if (!user) return [];
 
-    // Ensure all user's groups have a group chat (runs once per session)
-    if (!groupChatsEnsured) {
-      groupChatsEnsured = true;
-      const { data: myGroups } = await supabase
-        .from('group_members')
-        .select('group_id')
-        .eq('user_id', user.id);
-      if (myGroups && myGroups.length > 0) {
-        await Promise.all(
-          myGroups.map((g) =>
-            supabase.rpc('get_or_create_group_chat', { p_group_id: g.group_id }).then(() => {}, () => {})
-          )
-        );
-      }
-    }
-
-    // Get all conversations the user is a member of
-    const { data: memberships } = await supabase
-      .from('conversation_members')
-      .select('conversation_id, last_read_at')
-      .eq('user_id', user.id);
-
-    if (!memberships || memberships.length === 0) {
-      setConversations([]);
-      setLoading(false);
-      hasLoadedRef.current = true;
-      return;
-    }
-
-    const convIds = memberships.map((m) => m.conversation_id);
-
-    // Get conversations with their members
-    const { data: convs } = await supabase
-      .from('conversations')
-      .select('*')
-      .in('id', convIds);
-
-    if (!convs) { setConversations([]); setLoading(false); hasLoadedRef.current = true; return; }
-
-    // Get all members of these conversations with profiles
-    const { data: allMembers } = await supabase
-      .from('conversation_members')
-      .select('conversation_id, user_id')
-      .in('conversation_id', convIds);
-
-    // Get profiles for all member user_ids
-    const memberIds = [...new Set((allMembers || []).map((m) => m.user_id))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .in('id', memberIds);
-    const profileMap: Record<string, any> = {};
-    (profiles || []).forEach((p) => { profileMap[p.id] = p; });
-
-    // Get group names for group conversations, but only groups the user is still a member of
-    const groupIds = convs.filter((c) => c.group_id).map((c) => c.group_id);
-    let groupMap: Record<string, any> = {};
-    if (groupIds.length > 0) {
-      // Check which of these groups the user is still a member of
-      const { data: myActiveMemberships } = await supabase
-        .from('group_members')
-        .select('group_id')
-        .eq('user_id', user.id)
-        .in('group_id', groupIds);
-      const myGroupIds = new Set((myActiveMemberships || []).map((m) => m.group_id));
-
-      // Only fetch groups the user is still a member of
-      const activeGroupIds = groupIds.filter((id) => myGroupIds.has(id));
-      if (activeGroupIds.length > 0) {
-        const { data: groups } = await supabase.from('groups').select('id, name, avatar_url').in('id', activeGroupIds);
-        (groups || []).forEach((g) => { groupMap[g.id] = g; });
-      }
-    }
-
-    // Filter out group conversations where the group no longer exists or user is no longer a member
-    const orphanedConvIds = convs
-      .filter((conv) => conv.type === 'group' && conv.group_id && !groupMap[conv.group_id])
-      .map((conv) => conv.id);
-    const validConvs = convs.filter((conv) => !orphanedConvIds.includes(conv.id));
-    const validConvIds = validConvs.map((c) => c.id);
-
-    // Cleanup orphaned conversation_members so they don't reappear
-    if (orphanedConvIds.length > 0) {
-      try {
-        await supabase.from('conversation_members')
-          .delete()
-          .in('conversation_id', orphanedConvIds)
+      // Ensure all user's groups have a group chat (one-time per session)
+      if (!groupChatsEnsured) {
+        groupChatsEnsured = true;
+        const { data: myGroups } = await supabase
+          .from('group_members')
+          .select('group_id')
           .eq('user_id', user.id);
-      } catch (e) {
-        console.error('Failed to clean up orphaned conversation memberships:', e);
-      }
-    }
-
-    // Get last message per conversation
-    const { data: lastMessages } = await supabase
-      .from('messages')
-      .select('conversation_id, content, created_at, user_id')
-      .in('conversation_id', validConvIds)
-      .order('created_at', { ascending: false });
-
-    const lastMsgMap: Record<string, any> = {};
-    (lastMessages || []).forEach((m) => {
-      if (!lastMsgMap[m.conversation_id]) lastMsgMap[m.conversation_id] = m;
-    });
-
-    // Build last_read_at map
-    const lastReadMap: Record<string, string | null> = {};
-    (memberships || []).forEach((m) => { lastReadMap[m.conversation_id] = m.last_read_at; });
-
-    // Build previews
-    const previews: ConversationPreview[] = validConvs.map((conv) => {
-      const lastMsg = lastMsgMap[conv.id];
-      const convMembers = (allMembers || []).filter((m) => m.conversation_id === conv.id);
-
-      let name = '';
-      let avatar_url: string | null = null;
-      let other_user_id: string | null = null;
-
-      if (conv.type === 'group' && conv.group_id && groupMap[conv.group_id]) {
-        name = groupMap[conv.group_id].name;
-        avatar_url = groupMap[conv.group_id].avatar_url;
-      } else {
-        const other = convMembers.find((m) => m.user_id !== user.id);
-        const otherProfile = other ? profileMap[other.user_id] : null;
-        name = otherProfile?.full_name || 'Onbekend';
-        avatar_url = otherProfile?.avatar_url || null;
-        other_user_id = other?.user_id || null;
+        if (myGroups && myGroups.length > 0) {
+          await Promise.all(
+            myGroups.map((g) =>
+              supabase.rpc('get_or_create_group_chat', { p_group_id: g.group_id }).then(() => {}, () => {})
+            )
+          );
+        }
       }
 
-      const lastRead = lastReadMap[conv.id];
-      const isUnread = lastMsg && lastMsg.user_id !== user.id && (
-        !lastRead || new Date(lastMsg.created_at) > new Date(lastRead)
-      );
+      // Single round-trip: get all chats + top N messages per chat
+      const { data, error } = await supabase.rpc('get_preloaded_chats', { p_messages_per_chat: 20 });
+      if (error) throw error;
 
-      return {
-        id: conv.id,
-        type: conv.type,
-        group_id: conv.group_id,
-        other_user_id,
-        name,
-        avatar_url,
-        last_message: lastMsg?.content || null,
-        last_message_at: lastMsg?.created_at || conv.created_at,
-        last_message_by: lastMsg ? profileMap[lastMsg.user_id]?.full_name || null : null,
-        unread: isUnread ? 1 : 0,
-      };
-    });
+      const chats = ((data as any[]) || []) as (ConversationPreview & { messages: any[] })[];
 
-    previews.sort((a, b) => {
-      const ta = a.last_message_at || a.id;
-      const tb = b.last_message_at || b.id;
-      return tb.localeCompare(ta);
-    });
+      // Seed the existing preload cache so opening a chat is instant
+      try {
+        const { seedPreloadCache } = await import('./useMessagePreloadCache');
+        chats.forEach((c) => {
+          if (c.messages && c.messages.length > 0) {
+            seedPreloadCache(c.id, c.messages);
+          }
+        });
+      } catch {
+        // seedPreloadCache may not exist yet — that's fine for now
+      }
 
-    setConversations(previews);
-    setLoading(false);
-    hasLoadedRef.current = true;
-  }, [user]);
+      // Strip messages from the returned shape so the list stays lightweight
+      return chats.map(({ messages, ...rest }) => rest);
+    },
+  });
 
-  useEffect(() => { fetchConversations(); }, [fetchConversations]);
-
-  // Realtime: new messages trigger refresh
+  // Realtime: invalidate on new messages
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel('chat-updates')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        fetchConversations();
+        queryClient.invalidateQueries({ queryKey: ['chats', user.id] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  }, [user, queryClient]);
 
   const markAsRead = useCallback(async (conversationId: string) => {
-    setConversations((prev) =>
-      prev.map((c) => c.id === conversationId ? { ...c, unread: 0 } : c)
+    queryClient.setQueryData<ConversationPreview[]>(['chats', user?.id], (prev) =>
+      (prev || []).map((c) => c.id === conversationId ? { ...c, unread: 0 } : c)
     );
     if (user) {
       await supabase.from('conversation_members')
@@ -251,9 +130,14 @@ export function useConversations() {
         .eq('conversation_id', conversationId)
         .eq('user_id', user.id);
     }
-  }, [user]);
+  }, [user, queryClient]);
 
-  return { conversations, loading, refresh: fetchConversations, markAsRead };
+  return {
+    conversations,
+    loading: isLoading,
+    refresh: refetch,
+    markAsRead,
+  };
 }
 
 export function useChatMessages(conversationId: string | null) {
