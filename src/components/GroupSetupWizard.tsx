@@ -832,8 +832,13 @@ const ws = StyleSheet.create({
     width: '100%',
   },
 
-  // Bottom bar
+  // Bottom bar — absolute at the bottom so it never gets pushed off-screen
+  // by greedy flex:1 siblings or a keyboard push.
   bottomBar: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
