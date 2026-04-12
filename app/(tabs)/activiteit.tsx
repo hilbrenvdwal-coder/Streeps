@@ -26,7 +26,6 @@ import { useHistory, formatTimeAgo } from '@/src/hooks/useHistory';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import * as Haptics from 'expo-haptics';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
-import TabFadeIn from '@/src/components/TabFadeIn';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
@@ -205,7 +204,7 @@ export default function ActiviteitScreen() {
   const grandTotal = bills.reduce((sum, b) => sum + b.total, 0);
 
   return (
-    <TabFadeIn>
+    <View style={{ flex: 1 }}>
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
       {/* Status bar spacer + aurora + title + tab switcher are fixed at top */}
@@ -442,7 +441,7 @@ export default function ActiviteitScreen() {
           </MaskedView>
         </View>
       </Animated.ScrollView>
-    </TabFadeIn>
+    </View>
   );
 }
 

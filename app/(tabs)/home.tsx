@@ -5,7 +5,6 @@ import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
 import GroupSetupWizard from '@/src/components/GroupSetupWizard';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
-import TabFadeIn from '@/src/components/TabFadeIn';
 import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
 import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
@@ -612,7 +611,6 @@ export default function HomeScreen() {
   }
 
   return (
-    <TabFadeIn>
     <View style={s.container}>
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
@@ -1235,7 +1233,6 @@ export default function HomeScreen() {
         </ScrollView>
       </SlideModal>
     </View>
-    </TabFadeIn>
   );
 }
 
