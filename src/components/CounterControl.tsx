@@ -1,12 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, PanResponder, StyleSheet, Text, View, Pressable } from 'react-native';
-import ReAnimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View, Pressable } from 'react-native';
+
+const DEFAULT_COLOR = '#FF0085';
 
 /**
  * Counter Control — native translation of "Counter" group from Home_fixed_v4.svg
@@ -25,20 +20,8 @@ interface CounterControlProps {
   onDecrement: () => void;
   onSubmit?: () => void;
   auroraColors?: string[];
-  /**
-   * Called when the user horizontally swipes past the threshold over the counter.
-   * 'next' = swipe left (reveal next category), 'prev' = swipe right (previous).
-   * The component does NOT cycle state itself — parent handles it.
-   */
-  onSwipeCycle?: (direction: 'next' | 'prev') => void;
-  /** Disables the swipe gesture entirely when true. */
-  disabled?: boolean;
+  activeColor?: string;
 }
-
-// Swipe tuning constants
-const SWIPE_THRESHOLD = 60;   // px — distance at which a cycle is committed on release
-const SWIPE_MAX_TRANSLATE = 40; // px — visual cap for translateX during drag
-const SWIPE_DIR_MIN = 10;    // px — must move horizontally before we claim the gesture
 
 function usePressAnim() {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -90,76 +73,37 @@ function useRepeatPress(onAction: () => void) {
   return { start, stop, fired };
 }
 
-export default function CounterControl({ value, onIncrement, onDecrement, onSubmit, auroraColors, onSwipeCycle, disabled }: CounterControlProps) {
+export default function CounterControl({ value, onIncrement, onDecrement, onSubmit, auroraColors, activeColor }: CounterControlProps) {
   const minus = usePressAnim();
   const plus = usePressAnim();
+
+  // ── Ring color crossfade animation ──
+  const resolvedColor = activeColor ?? auroraColors?.[0] ?? DEFAULT_COLOR;
+  const colorProgress = useRef(new Animated.Value(0)).current;
+  const prevColorRef = useRef(resolvedColor);
+  const currentColorRef = useRef(resolvedColor);
+  const [colorPair, setColorPair] = useState<[string, string]>([resolvedColor, resolvedColor]);
+
+  useEffect(() => {
+    if (resolvedColor === currentColorRef.current) return;
+    prevColorRef.current = currentColorRef.current;
+    currentColorRef.current = resolvedColor;
+    colorProgress.setValue(0);
+    setColorPair([prevColorRef.current, currentColorRef.current]);
+    Animated.timing(colorProgress, {
+      toValue: 1,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [resolvedColor]);
+
+  const animatedRingColor = colorProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colorPair[0], colorPair[1]],
+  });
   const minusRepeat = useRepeatPress(onDecrement);
   const plusRepeat = useRepeatPress(onIncrement);
-
-  // ── Horizontal swipe → category cycle (via PanResponder) ──
-  // We use PanResponder (vs gesture-handler) because RNGH is not installed
-  // in this project. The reanimated v4 shared value drives a smooth translateX
-  // that follows the finger (capped at SWIPE_MAX_TRANSLATE) and springs back
-  // on release.
-  const swipeX = useSharedValue(0);
-
-  // Latest callback/disabled refs so PanResponder closure stays stable.
-  const onSwipeCycleRef = useRef(onSwipeCycle);
-  const disabledRef = useRef(disabled);
-  useEffect(() => { onSwipeCycleRef.current = onSwipeCycle; }, [onSwipeCycle]);
-  useEffect(() => { disabledRef.current = disabled; }, [disabled]);
-
-  const panResponder = useMemo(() => PanResponder.create({
-    // Do NOT claim the gesture on touch start — let child Pressables (minus,
-    // display-tap-to-submit, plus) handle taps normally.
-    onStartShouldSetPanResponder: () => false,
-    onStartShouldSetPanResponderCapture: () => false,
-    // Only claim once the user clearly moves horizontally. This prevents the
-    // ScrollView parent from stealing vertical drags AND keeps taps working.
-    onMoveShouldSetPanResponder: (_, g) => {
-      if (disabledRef.current) return false;
-      if (!onSwipeCycleRef.current) return false;
-      return Math.abs(g.dx) > SWIPE_DIR_MIN && Math.abs(g.dx) > Math.abs(g.dy);
-    },
-    onMoveShouldSetPanResponderCapture: (_, g) => {
-      if (disabledRef.current) return false;
-      if (!onSwipeCycleRef.current) return false;
-      return Math.abs(g.dx) > SWIPE_DIR_MIN && Math.abs(g.dx) > Math.abs(g.dy);
-    },
-    onPanResponderGrant: () => {
-      swipeX.value = 0;
-    },
-    onPanResponderMove: (_, g) => {
-      // Follow finger but cap visually. We use a soft clamp so it doesn't feel
-      // hard-capped — linear up to the cap, no overshoot.
-      const clamped = Math.max(-SWIPE_MAX_TRANSLATE, Math.min(SWIPE_MAX_TRANSLATE, g.dx));
-      swipeX.value = clamped;
-    },
-    onPanResponderRelease: (_, g) => {
-      if (Math.abs(g.dx) >= SWIPE_THRESHOLD && onSwipeCycleRef.current) {
-        // Fire callback. Swipe left (negative dx) = next; right = prev.
-        const dir: 'next' | 'prev' = g.dx < 0 ? 'next' : 'prev';
-        onSwipeCycleRef.current(dir);
-        // Briefly overshoot in the swipe direction, then spring back — this
-        // makes the cycle moment feel tactile ("iPod wheel" click).
-        const overshoot = g.dx < 0 ? -SWIPE_MAX_TRANSLATE : SWIPE_MAX_TRANSLATE;
-        swipeX.value = withSequence(
-          withTiming(overshoot, { duration: 80 }),
-          withSpring(0, { damping: 14, stiffness: 180, mass: 0.8 }),
-        );
-      } else {
-        swipeX.value = withSpring(0, { damping: 16, stiffness: 200, mass: 0.8 });
-      }
-    },
-    onPanResponderTerminate: () => {
-      swipeX.value = withSpring(0, { damping: 16, stiffness: 200, mass: 0.8 });
-    },
-    onPanResponderTerminationRequest: () => false,
-  }), [swipeX]);
-
-  const swipeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: swipeX.value }],
-  }));
 
   useEffect(() => {
     return () => { minusRepeat.stop(); plusRepeat.stop(); };
@@ -256,7 +200,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
   }, [onSubmit]);
 
   return (
-    <ReAnimated.View style={[s.row, swipeStyle]} {...panResponder.panHandlers}>
+    <View style={s.row}>
       {/* ── Minus button ── */}
       <Pressable style={[s.glowWrap, s.minusGlow]} onPress={() => { if (!minusRepeat.fired.current) onDecrement(); }} onPressIn={() => { minus.fadeIn(); minusRepeat.start(); }} onPressOut={() => { minus.fadeOut(); minusRepeat.stop(); }} onResponderTerminate={() => { minusRepeat.stop(); }} hitSlop={10}>
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(minus.opacity, 0.4) as any) as any }]}>
@@ -274,8 +218,8 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
             style={[
               s.ringOuter,
               {
-                borderColor: auroraColors?.[0] ?? '#FF0085',
-                shadowColor: auroraColors?.[0] ?? '#FF0085',
+                borderColor: animatedRingColor,
+                shadowColor: animatedRingColor,
                 opacity: pulseOpacity,
                 transform: [{ scale: pulseScale }],
               },
@@ -287,7 +231,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
             style={[
               s.ringInner,
               {
-                shadowColor: auroraColors?.[0] ?? '#FF0085',
+                shadowColor: animatedRingColor,
                 opacity: pulseOpacity,
                 transform: [{ scale: pulseScale }],
               },
@@ -319,7 +263,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
           </View>
         </Animated.View>
       </Pressable>
-    </ReAnimated.View>
+    </View>
   );
 }
 
