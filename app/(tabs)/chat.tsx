@@ -4,6 +4,7 @@ import {
   StyleSheet, View, Text, Pressable, FlatList, TextInput,
   Dimensions, Animated, Easing, ScrollView, Alert, Platform, PanResponder,
   Keyboard, Share, ActivityIndicator, Switch, Modal, InteractionManager,
+  AppState,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -913,6 +914,37 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   const seenIds = useRef(new Set<string>()).current;
   const initialLoadDone = useRef(false);
   const prevMsgCountRef = useRef(0);
+
+  // LIVE indicator — true if the newest message is within the LIVE window.
+  // Re-evaluated on new messages, on an interval, and on AppState resume.
+  const newestAt = messages.length > 0 ? messages[0]?.created_at : null;
+  const [isLive, setIsLive] = useState(false);
+  useEffect(() => {
+    const evaluate = () => {
+      if (!newestAt) {
+        setIsLive(false);
+        return null;
+      }
+      const age = Date.now() - new Date(newestAt).getTime();
+      if (age >= LIVE_WINDOW_MS) {
+        setIsLive(false);
+        return null;
+      }
+      setIsLive(true);
+      return setTimeout(() => setIsLive(false), LIVE_WINDOW_MS - age);
+    };
+    let timer = evaluate();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        if (timer) clearTimeout(timer);
+        timer = evaluate();
+      }
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.remove();
+    };
+  }, [newestAt]);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
   const [aiMode, setAiMode] = useState(false);
   const [waitingForBot, setWaitingForBot] = useState(false);
@@ -1158,6 +1190,12 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
             </View>
           )}
           <Text style={dt.headerName} numberOfLines={1}>{name}</Text>
+          {isLive && (
+            <View style={dt.headerLiveBadge}>
+              <View style={dt.headerLiveDot} />
+              <Text style={dt.headerLiveText}>LIVE</Text>
+            </View>
+          )}
         </Pressable>
       </View>
 
@@ -1187,6 +1225,14 @@ const dt = StyleSheet.create({
   headerAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
   headerAvatarText: { color: '#333', fontSize: 14, fontWeight: '600' },
   headerName: { fontFamily: 'Unbounded', fontSize: 18, color: '#FFFFFF', flex: 1 },
+  headerLiveBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10,
+    backgroundColor: 'rgba(0,254,150,0.15)',
+    marginLeft: 4,
+  },
+  headerLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00FE96' },
+  headerLiveText: { fontFamily: 'Unbounded', fontSize: 9, fontWeight: '700', color: '#00FE96', letterSpacing: 0.5 },
   bubble: { maxWidth: '82%', marginBottom: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#FF0085', borderBottomRightRadius: 4 },
   bubbleOther: { alignSelf: 'flex-start', backgroundColor: 'rgba(78,78,78,0.3)', borderBottomLeftRadius: 4 },
@@ -2861,6 +2907,12 @@ const sk = StyleSheet.create({
 });
 
 // ── Main chat screen ──
+const LIVE_WINDOW_MS = 10 * 60 * 1000;
+const isConvLive = (lastAt: string | null | undefined) => {
+  if (!lastAt) return false;
+  return Date.now() - new Date(lastAt).getTime() < LIVE_WINDOW_MS;
+};
+
 export default function ChatScreen() {
   const mode = useColorScheme();
   const t = getTheme(mode);
@@ -2868,6 +2920,21 @@ export default function ChatScreen() {
   const { user } = useAuth();
   const { conversations, loading, refresh, markAsRead } = useConversations();
   const { contacts, refresh: refreshContacts } = useContacts();
+
+  // Tick every 30s so the LIVE badges in the overview re-evaluate.
+  // Also force a tick when the app returns from background so stale
+  // badges flip off immediately on resume.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => forceTick((t) => t + 1), 30_000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') forceTick((t) => t + 1);
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
+  }, []);
 
   // Refresh conversations silently when screen comes into focus
   useFocusEffect(
@@ -3283,6 +3350,12 @@ export default function ChatScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     {item.type === 'group' && <Ionicons name="people" size={14} color="#848484" style={{ marginRight: 6 }} />}
                     <Text style={cs.convName} numberOfLines={1}>{item.name}</Text>
+                    {isConvLive(item.last_message_at) && (
+                      <View style={cs.liveBadge}>
+                        <View style={cs.liveDot} />
+                        <Text style={cs.liveBadgeText}>LIVE</Text>
+                      </View>
+                    )}
                     <Text style={[cs.convTime, item.unread > 0 && { color: '#00BEAE' }]}>{formatTime(item.last_message_at)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -3386,6 +3459,16 @@ const cs = StyleSheet.create({
   convPreview: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 3, flex: 1 },
   convPreviewUnread: { color: '#FFFFFF', fontWeight: '600' },
   unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#00BEAE', marginLeft: 10 },
+
+  // LIVE badge
+  liveBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10,
+    backgroundColor: 'rgba(0,254,150,0.15)',
+    marginRight: 8,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00FE96' },
+  liveBadgeText: { fontFamily: 'Unbounded', fontSize: 9, fontWeight: '700', color: '#00FE96', letterSpacing: 0.5 },
 
   // Contacts
   contactsLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', paddingHorizontal: 20, marginBottom: 10 },
