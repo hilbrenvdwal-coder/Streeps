@@ -17,10 +17,8 @@ import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withRepeat,
-  Easing as REasing,
   interpolate,
-  cancelAnimation,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,6 +51,9 @@ interface Props {
   onCreated?: (group: { id: string; name: string; invite_code: string }) => void;
 }
 
+// Action row fixed height so absolute-positioned layers can fill it cleanly
+const ACTION_ROW_HEIGHT = 48;
+
 export default function GroupSelector({
   groups,
   selectedId,
@@ -70,7 +71,7 @@ export default function GroupSelector({
   const insets = useSafeAreaInsets();
   const [showOpen, setShowOpen] = useState(false);
 
-  // Overlay animation
+  // Overlay animation (old Animated API — Fix C would migrate these, we leave them)
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   const listAnim = useRef(new Animated.Value(0)).current;
 
@@ -80,11 +81,48 @@ export default function GroupSelector({
   const [joinCode, setJoinCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const morphProgress = useSharedValue(0);
-  const hourglassRotation = useSharedValue(0);
+  const spinAnim = useRef(new Animated.Value(0)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const actionRowRef = useRef<View>(null);
+
+  // ── Morph animation shared values ──────────────────────────────────────────
+  // morphProgress: 0 = pills visible, 1 = input+circle visible
+  const morphProgress = useSharedValue(0);
+  // modeProgress: -1 = create-circle visible, 0 = none, 1 = join-circle visible
+  // We use two separate values so each circle can animate independently.
+  const createProgress = useSharedValue(0); // 0→1 when mode = 'create'
+  const joinProgress = useSharedValue(0);   // 0→1 when mode = 'join'
+
+  const MORPH_DURATION = 220;
+
+  // Pills layer: visible when morphProgress = 0, hidden when morphProgress = 1
+  const pillsStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(morphProgress.value, [0, 1], [1, 0], Extrapolation.CLAMP);
+    const scale = interpolate(morphProgress.value, [0, 1], [1, 0.85], Extrapolation.CLAMP);
+    return { opacity, transform: [{ scale }] };
+  });
+
+  // Input layer: visible when morphProgress = 1, hidden when morphProgress = 0
+  const inputLayerStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(morphProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP);
+    const scale = interpolate(morphProgress.value, [0, 1], [0.85, 1], Extrapolation.CLAMP);
+    return { opacity, transform: [{ scale }] };
+  });
+
+  // Create circle button
+  const createCircleStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(createProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP);
+    const scale = interpolate(createProgress.value, [0, 1], [0.7, 1], Extrapolation.CLAMP);
+    return { opacity, transform: [{ scale }] };
+  });
+
+  // Join circle button
+  const joinCircleStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(joinProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP);
+    const scale = interpolate(joinProgress.value, [0, 1], [0.7, 1], Extrapolation.CLAMP);
+    return { opacity, transform: [{ scale }] };
+  });
 
   // Auto-scroll to input when keyboard opens
   useEffect(() => {
@@ -116,11 +154,18 @@ export default function GroupSelector({
       hideSub.remove();
     };
   }, []);
+
+  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
+
   // Open overlay
   useEffect(() => {
     if (visible) {
       setShowOpen(true);
       setInlineMode('none');
+      // Reset morph to default (pills)
+      morphProgress.value = 0;
+      createProgress.value = 0;
+      joinProgress.value = 0;
       scrimOpacity.setValue(0);
       listAnim.setValue(0);
       Animated.parallel([
@@ -132,42 +177,29 @@ export default function GroupSelector({
 
   const switchInlineMode = useCallback((mode: 'none' | 'create' | 'join') => {
     setInlineMode(mode);
-    if (mode !== 'none') {
-      morphProgress.value = withTiming(1, { duration: 300, easing: REasing.out(REasing.cubic) });
-      setTimeout(() => inputRef.current?.focus(), 150);
+
+    if (mode === 'create') {
+      morphProgress.value = withTiming(1, { duration: MORPH_DURATION });
+      createProgress.value = withTiming(1, { duration: MORPH_DURATION });
+      joinProgress.value = withTiming(0, { duration: MORPH_DURATION });
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } else if (mode === 'join') {
+      morphProgress.value = withTiming(1, { duration: MORPH_DURATION });
+      createProgress.value = withTiming(0, { duration: MORPH_DURATION });
+      joinProgress.value = withTiming(1, { duration: MORPH_DURATION });
+      setTimeout(() => inputRef.current?.focus(), 100);
     } else {
-      morphProgress.value = withTiming(0, { duration: 250, easing: REasing.in(REasing.cubic) });
+      // Dismiss back to pills
+      morphProgress.value = withTiming(0, { duration: MORPH_DURATION });
+      createProgress.value = withTiming(0, { duration: MORPH_DURATION });
+      joinProgress.value = withTiming(0, { duration: MORPH_DURATION });
       setNewName('');
       setJoinCode('');
     }
   }, []);
 
-  // De knop die NIET gekozen is: fade + shrink weg
-  const hiddenButtonStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(morphProgress.value, [0, 0.3], [1, 0]),
-    transform: [{ scale: interpolate(morphProgress.value, [0, 0.4], [1, 0.8]) }],
-    flex: interpolate(morphProgress.value, [0, 0.4], [1, 0]),
-    maxWidth: interpolate(morphProgress.value, [0, 0.4], [200, 0]),
-    marginLeft: interpolate(morphProgress.value, [0, 0.4], [0, -12]),
-    overflow: 'hidden' as const,
-  }));
-
-  // Het input veld: fade + expand in
-  const inputFieldStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(morphProgress.value, [0.15, 0.5], [0, 1]),
-    flex: interpolate(morphProgress.value, [0, 0.4, 1], [0.001, 0.5, 1]),
-    overflow: 'hidden' as const,
-  }));
-
-  // Zandloper rotatie
-  const hourglassStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${hourglassRotation.value}deg` }],
-  }));
-
   const handleClose = useCallback(() => {
     Keyboard.dismiss();
-    morphProgress.value = 0;
-    hourglassRotation.value = 0;
     Animated.parallel([
       Animated.timing(scrimOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(listAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
@@ -187,17 +219,12 @@ export default function GroupSelector({
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    hourglassRotation.value = 0;
-    hourglassRotation.value = withRepeat(
-      withTiming(180, { duration: 1000, easing: REasing.linear }),
-      -1,
-      false
-    );
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     setSubmitting(true);
     const result = await onCreate(newName.trim());
     setSubmitting(false);
-    cancelAnimation(hourglassRotation);
-    hourglassRotation.value = withTiming(0, { duration: 200 });
+    spinAnim.setValue(0);
     if (result && 'error' in result && result.error) { Alert.alert('Fout', result.error as string); return; }
     setNewName('');
     setInlineMode('none');
@@ -210,17 +237,12 @@ export default function GroupSelector({
 
   const handleJoin = async () => {
     if (!joinCode.trim()) return;
-    hourglassRotation.value = 0;
-    hourglassRotation.value = withRepeat(
-      withTiming(180, { duration: 1000, easing: REasing.linear }),
-      -1,
-      false
-    );
+    spinAnim.setValue(0);
+    Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     setSubmitting(true);
     const result = await onJoin(joinCode.trim());
     setSubmitting(false);
-    cancelAnimation(hourglassRotation);
-    hourglassRotation.value = withTiming(0, { duration: 200 });
+    spinAnim.setValue(0);
     if (result.error) { Alert.alert('Fout', result.error); return; }
     setJoinCode('');
     setInlineMode('none');
@@ -310,10 +332,36 @@ export default function GroupSelector({
               </MaskedView>
 
               {/* ── Action row ── */}
+              {/*
+                Layout:
+                  - Fixed height container with position: 'relative' and overflow: 'hidden'
+                  - Layer 1 (pills): flex row with two pill buttons, animates opacity+scale out
+                  - Layer 2 (input): absolute fill, animates opacity+scale in
+                  - Layer 3 (circle create): absolute right, animates opacity+scale in when mode=create
+                  - Layer 4 (circle join): absolute right, animates opacity+scale in when mode=join
+                All layers always mounted — only opacity/scale driven by morphProgress.
+              */}
               <View ref={actionRowRef} style={st.actionRow}>
-                {/* Input field — geanimeerd */}
-                {isActive && (
-                  <ReAnimated.View style={[st.inlineInputWrap, inputFieldStyle]}>
+
+                {/* Layer 1: Pills — always mounted, fades out on morph */}
+                <ReAnimated.View style={[st.pillsLayer, pillsStyle]} pointerEvents={isActive ? 'none' : 'auto'}>
+                  <Pressable
+                    style={[st.actionBtn, { backgroundColor: t.brand.magenta }]}
+                    onPress={() => switchInlineMode('create')}
+                  >
+                    <Text style={st.actionText}>+ Nieuw</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[st.actionBtn, { backgroundColor: t.brand.cyan }]}
+                    onPress={() => switchInlineMode('join')}
+                  >
+                    <Text style={[st.actionText, { color: '#1A1A2E' }]}>Deelnemen</Text>
+                  </Pressable>
+                </ReAnimated.View>
+
+                {/* Layer 2: Input field — absolute, fades in on morph */}
+                <ReAnimated.View style={[st.inputLayer, inputLayerStyle]} pointerEvents={isActive ? 'auto' : 'none'}>
+                  <View style={st.inlineInputWrap}>
                     <TextInput
                       ref={inputRef}
                       style={st.inlineInput}
@@ -324,59 +372,39 @@ export default function GroupSelector({
                       autoCapitalize={isJoin ? 'none' : 'sentences'}
                       returnKeyType="done"
                       onSubmitEditing={isCreate ? handleCreate : handleJoin}
+                      editable={isActive}
+                      focusable={isActive}
+                      importantForAccessibility={isActive ? 'yes' : 'no-hide-descendants'}
                     />
-                  </ReAnimated.View>
-                )}
+                  </View>
+                </ReAnimated.View>
 
-                {/* Active circle button — altijd direct naast input */}
-                {isCreate && (
+                {/* Layer 3: Create circle button — absolute right, fades in when mode=create */}
+                <ReAnimated.View style={[st.circleLayer, createCircleStyle]} pointerEvents={isCreate ? 'auto' : 'none'}>
                   <Pressable
                     style={[st.circleBtn, { backgroundColor: t.brand.magenta }]}
                     onPress={handleCreate}
-                    disabled={submitting}
+                    disabled={submitting && isCreate}
                   >
-                    {submitting ? (
-                      <ReAnimated.View style={hourglassStyle}>
-                        <Ionicons name="hourglass" size={20} color="#FFFFFF" />
-                      </ReAnimated.View>
-                    ) : (
-                      <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-                    )}
+                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                      <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#FFFFFF" />
+                    </Animated.View>
                   </Pressable>
-                )}
-                {isJoin && (
+                </ReAnimated.View>
+
+                {/* Layer 4: Join circle button — absolute right, fades in when mode=join */}
+                <ReAnimated.View style={[st.circleLayer, joinCircleStyle]} pointerEvents={isJoin ? 'auto' : 'none'}>
                   <Pressable
                     style={[st.circleBtn, { backgroundColor: t.brand.cyan }]}
                     onPress={handleJoin}
-                    disabled={submitting}
+                    disabled={submitting && isJoin}
                   >
-                    {submitting ? (
-                      <ReAnimated.View style={hourglassStyle}>
-                        <Ionicons name="hourglass" size={20} color="#1A1A2E" />
-                      </ReAnimated.View>
-                    ) : (
-                      <Ionicons name="arrow-forward" size={20} color="#1A1A2E" />
-                    )}
+                    <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                      <Ionicons name={submitting ? 'hourglass' : 'arrow-forward'} size={22} color="#1A1A2E" />
+                    </Animated.View>
                   </Pressable>
-                )}
+                </ReAnimated.View>
 
-                {/* Default: beide pill-knoppen */}
-                {!isActive && (
-                  <>
-                    <Pressable
-                      style={[st.actionBtn, { backgroundColor: t.brand.magenta }]}
-                      onPress={() => switchInlineMode('create')}
-                    >
-                      <Text style={st.actionText}>+ Nieuw</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[st.actionBtn, { backgroundColor: t.brand.cyan }]}
-                      onPress={() => switchInlineMode('join')}
-                    >
-                      <Text style={[st.actionText, { color: '#1A1A2E' }]}>Deelnemen</Text>
-                    </Pressable>
-                  </>
-                )}
               </View>
             </Animated.View>
           </View>
@@ -409,11 +437,51 @@ const st = StyleSheet.create({
   groupMeta: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 2 },
   emptyText: { fontFamily: 'Unbounded', color: '#848484', textAlign: 'center', paddingVertical: 20, fontSize: 14 },
 
-  // Action row
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 8, alignItems: 'center' },
+  // Action row — fixed height, relative position for absolute layers
+  actionRow: {
+    height: ACTION_ROW_HEIGHT,
+    marginTop: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+
+  // Pills layer — flex row filling the action row
+  pillsLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+
+  // Input layer — absolute fill (leaves room for circle on the right)
+  inputLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    // Right side reserved for the circle button (48px) + 12px gap
+    right: ACTION_ROW_HEIGHT + 12,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+
+  // Circle button layer — absolute right
+  circleLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: ACTION_ROW_HEIGHT,
+    height: ACTION_ROW_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   actionBtn: {
     flex: 1,
-    height: 48,
+    height: ACTION_ROW_HEIGHT,
     borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
@@ -427,9 +495,9 @@ const st = StyleSheet.create({
 
   // Circle submit button
   circleBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: ACTION_ROW_HEIGHT,
+    height: ACTION_ROW_HEIGHT,
+    borderRadius: ACTION_ROW_HEIGHT / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -437,7 +505,7 @@ const st = StyleSheet.create({
   // Inline input
   inlineInputWrap: {
     flex: 1,
-    height: 48,
+    height: ACTION_ROW_HEIGHT,
     borderRadius: 9999,
     backgroundColor: 'rgba(78, 78, 78, 0.4)',
     justifyContent: 'center',
@@ -448,6 +516,6 @@ const st = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     paddingHorizontal: 20,
-    height: 48,
+    height: ACTION_ROW_HEIGHT,
   },
 });
