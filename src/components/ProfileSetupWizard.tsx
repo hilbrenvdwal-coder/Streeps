@@ -58,7 +58,7 @@ export default function ProfileSetupWizard({
   const [gender, setGender] = useState<'man' | 'vrouw' | 'anders' | 'onbekend' | null>(null);
   const genderBtnAnim = useRef(new Animated.Value(0)).current;
 
-  // Animate gender button morph
+  // Animate gender button morph (Overslaan → Volgende)
   useEffect(() => {
     Animated.timing(genderBtnAnim, {
       toValue: gender !== null ? 1 : 0,
@@ -66,6 +66,26 @@ export default function ProfileSetupWizard({
       easing: Easing.out(Easing.ease),
       useNativeDriver: false,
     }).start();
+  }, [gender]);
+
+  // Animated values for each gender option card
+  const genderAnims = useRef({
+    man: new Animated.Value(0),
+    vrouw: new Animated.Value(0),
+    anders: new Animated.Value(0),
+    onbekend: new Animated.Value(0),
+  }).current;
+
+  // Crossfade gender option cards when selection changes
+  useEffect(() => {
+    (Object.entries(genderAnims) as [string, Animated.Value][]).forEach(([key, anim]) => {
+      Animated.timing(anim, {
+        toValue: gender === key ? 1 : 0,
+        duration: 250,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    });
   }, [gender]);
 
   // Step 3: Avatar
@@ -228,16 +248,46 @@ export default function ProfileSetupWizard({
       <Text style={ws.stepSubtitleGender}>Hoe wil je aangesproken worden?</Text>
 
       <View style={ws.genderGrid}>
-        {GENDER_OPTIONS.map((opt) => (
-          <Pressable
-            key={opt.value}
-            style={[ws.genderOption, gender === opt.value && ws.genderOptionSelected]}
-            onPress={() => setGender(opt.value)}
-          >
-            <Ionicons name={opt.icon as any} size={32} color={gender === opt.value ? '#00BEAE' : '#848484'} />
-            <Text style={[ws.genderLabel, gender === opt.value && ws.genderLabelSelected]}>{opt.label}</Text>
-          </Pressable>
-        ))}
+        {GENDER_OPTIONS.map((opt) => {
+          const anim = genderAnims[opt.value];
+          const animBorderColor = anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['rgba(255,255,255,0.15)', '#00BEAE'],
+          });
+          const animBgColor = anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['rgba(255,255,255,0.06)', 'rgba(0,190,174,0.1)'],
+          });
+          const animIconColor = anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['#848484', '#00BEAE'],
+          });
+          const animTextColor = anim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['#FFFFFF', '#00BEAE'],
+          });
+          return (
+            <Animated.View
+              key={opt.value}
+              style={[
+                ws.genderOption,
+                { borderColor: animBorderColor, backgroundColor: animBgColor },
+              ]}
+            >
+              <Pressable
+                style={ws.genderOptionPressable}
+                onPress={() => setGender(opt.value)}
+              >
+                <Animated.Text style={{ color: animIconColor }}>
+                  <Ionicons name={opt.icon as any} size={32} />
+                </Animated.Text>
+                <Animated.Text style={[ws.genderLabel, { color: animTextColor }]}>
+                  {opt.label}
+                </Animated.Text>
+              </Pressable>
+            </Animated.View>
+          );
+        })}
       </View>
     </View>
   );
@@ -462,27 +512,21 @@ const ws = StyleSheet.create({
   genderOption: {
     width: '48.5%',
     aspectRatio: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+  },
+  genderOptionPressable: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
   },
-  genderOptionSelected: {
-    borderColor: '#00BEAE',
-    backgroundColor: 'rgba(0, 190, 174, 0.1)',
-  },
   genderLabel: {
     fontFamily: 'Unbounded',
     fontSize: 13,
-    color: '#FFFFFF',
     textAlign: 'center',
     paddingHorizontal: 8,
-  },
-  genderLabelSelected: {
-    color: '#00BEAE',
   },
   backBtn: {
     flex: 1,
