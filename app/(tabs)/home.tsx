@@ -225,7 +225,7 @@ export default function HomeScreen() {
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmCount, setConfirmCount] = useState<number>(999); // default 999 voorkomt FOUC bij mount
-  const hintOpacity = useRef(new Animated.Value(0)).current;
+  const hintProgress = useRef(new Animated.Value(0)).current;
 
   // Toast feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -259,11 +259,11 @@ export default function HomeScreen() {
   // Animate "Tik om te bevestigen" hint — only shown until user has confirmed 5+ times
   useEffect(() => {
     const shouldShow = tallyCount >= 1 && confirmCount < 5;
-    Animated.timing(hintOpacity, {
+    Animated.timing(hintProgress, {
       toValue: shouldShow ? 1 : 0,
       duration: shouldShow ? 200 : 150,
       easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
+      useNativeDriver: false,  // layout props → non-native
     }).start();
   }, [tallyCount, confirmCount]);
 
@@ -624,9 +624,16 @@ export default function HomeScreen() {
                   <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
                 </View>
               )}
-              <Animated.Text style={[s.submitHint, { opacity: hintOpacity }]}>
-                Tik om te bevestigen
-              </Animated.Text>
+              <Animated.View
+                style={{
+                  height: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
+                  marginTop: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
+                  opacity: hintProgress,
+                  overflow: 'hidden',
+                }}
+              >
+                <Text style={s.submitHint}>Tik om te bevestigen</Text>
+              </Animated.View>
             </View>
 
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
@@ -1492,7 +1499,7 @@ const styles = StyleSheet.create({
   emptyStateText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', textAlign: 'center' },
 
   // ── Submit hint ──
-  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 12, textAlign: 'center' },
+  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center' },
 
   // ── Meer opties toggle ──
   moreOptionsToggle: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 24 },
