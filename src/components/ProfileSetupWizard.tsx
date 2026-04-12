@@ -56,6 +56,17 @@ export default function ProfileSetupWizard({
 
   // Step 2: Gender
   const [gender, setGender] = useState<'man' | 'vrouw' | 'anders' | 'onbekend' | null>(null);
+  const genderBtnAnim = useRef(new Animated.Value(0)).current;
+
+  // Animate gender button morph
+  useEffect(() => {
+    Animated.timing(genderBtnAnim, {
+      toValue: gender !== null ? 1 : 0,
+      duration: 250,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [gender]);
 
   // Step 3: Avatar
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -297,15 +308,29 @@ export default function ProfileSetupWizard({
     }
 
     if (step === 2) {
-      // Step 2: gender (optional)
+      // Step 2: gender — single button that morphs from "Overslaan" to "Volgende"
+      const hasGender = gender !== null;
+      const btnBg = genderBtnAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['rgba(255,255,255,0.08)', 'rgba(0, 190, 174, 1)'],
+      });
+      const textColor = genderBtnAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['#848484', '#FFFFFF'],
+      });
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-          <Pressable style={ws.skipBtn} onPress={handleSkipStep2Gender}>
-            <Text style={ws.skipBtnText}>Overslaan</Text>
-          </Pressable>
-          <Pressable style={ws.nextBtn} onPress={handleNextStep2Gender}>
-            <Text style={ws.nextBtnText}>Volgende</Text>
-          </Pressable>
+          <View style={{ flex: 1 }} />
+          <Animated.View style={[ws.genderBtn, { backgroundColor: btnBg }]}>
+            <Pressable
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' }}
+              onPress={hasGender ? handleNextStep2Gender : handleSkipStep2Gender}
+            >
+              <Animated.Text style={[ws.genderBtnText, { color: textColor }]}>
+                {hasGender ? 'Volgende' : 'Overslaan'}
+              </Animated.Text>
+            </Pressable>
+          </Animated.View>
         </View>
       );
     }
@@ -450,6 +475,26 @@ const ws = StyleSheet.create({
   },
   genderLabelSelected: {
     color: '#00BEAE',
+  },
+  genderBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  genderBtnActive: {
+    backgroundColor: '#00BEAE',
+  },
+  genderBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#848484',
+    fontWeight: '600',
+  },
+  genderBtnTextActive: {
+    color: '#FFFFFF',
   },
 
   // Step 3: Avatar
