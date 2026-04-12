@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Dimensions, Animated, Easing } from 'react-native';
+import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Dimensions, Animated, Easing, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,19 +54,22 @@ export default function ProfielScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
+  const [gender, setGender] = useState<string | null>(null);
+  const [genderModalVisible, setGenderModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       if (!user) return;
       supabase
         .from('profiles')
-        .select('name_changed_at, avatar_url')
+        .select('name_changed_at, avatar_url, gender')
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
           if (data) {
             setNameChangedAt(data.name_changed_at);
             setAvatarUrl(data.avatar_url);
+            setGender(data.gender ?? null);
           }
         });
     }, [user])
@@ -132,6 +135,26 @@ export default function ProfielScreen() {
     await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
     setAvatarUrl(publicUrl);
     setUploadingAvatar(false);
+  };
+
+  type GenderValue = 'man' | 'vrouw' | 'anders' | 'onbekend';
+  const genderOptions: { value: GenderValue; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
+    { value: 'man', label: 'Man', icon: 'male-outline' },
+    { value: 'vrouw', label: 'Vrouw', icon: 'female-outline' },
+    { value: 'anders', label: 'Anders', icon: 'transgender-outline' },
+    { value: 'onbekend', label: 'Zeg ik liever niet', icon: 'remove-circle-outline' },
+  ];
+
+  const genderLabel = (value: string | null) => {
+    if (!value) return 'Niet ingesteld';
+    return genderOptions.find((o) => o.value === value)?.label ?? value;
+  };
+
+  const handleSelectGender = async (value: GenderValue) => {
+    setGenderModalVisible(false);
+    if (!user) return;
+    setGender(value);
+    await supabase.from('profiles').update({ gender: value }).eq('id', user.id);
   };
 
   const handleSignOut = () => {
@@ -307,8 +330,49 @@ export default function ProfielScreen() {
             <Text style={styles.rowLabel}>E-mail</Text>
             <Text style={styles.rowValue} numberOfLines={1}>{user?.email || '-'}</Text>
           </View>
+          <View style={styles.divider} />
+          <Pressable style={styles.row} onPress={() => setGenderModalVisible(true)}>
+            <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
+            <Text style={styles.rowLabel}>Geslacht</Text>
+            <Text style={[styles.rowValue, !gender && styles.rowValueUnset]}>{genderLabel(gender)}</Text>
+            <Ionicons name="chevron-forward" size={16} color="#848484" style={{ marginLeft: 4 }} />
+          </Pressable>
         </View>
         </AnimatedCard>
+
+        {/* Gender picker modal */}
+        <Modal
+          visible={genderModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setGenderModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setGenderModalVisible(false)}>
+            <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.modalTitle}>Geslacht</Text>
+              {genderOptions.map((opt, i) => (
+                <React.Fragment key={opt.value}>
+                  {i > 0 && <View style={styles.modalDivider} />}
+                  <Pressable
+                    style={styles.modalOption}
+                    onPress={() => handleSelectGender(opt.value)}
+                  >
+                    <Ionicons name={opt.icon} size={20} color={gender === opt.value ? '#00BEAE' : '#FFFFFF'} style={{ marginRight: 12 }} />
+                    <Text style={[styles.modalOptionText, gender === opt.value && styles.modalOptionActive]}>
+                      {opt.label}
+                    </Text>
+                    {gender === opt.value && (
+                      <Ionicons name="checkmark" size={18} color="#00BEAE" style={{ marginLeft: 'auto' }} />
+                    )}
+                  </Pressable>
+                </React.Fragment>
+              ))}
+              <Pressable style={styles.modalCancel} onPress={() => setGenderModalVisible(false)}>
+                <Text style={styles.modalCancelText}>Annuleren</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {/* ── WEERGAVE section ── */}
         <AnimatedCard index={1}>
@@ -556,6 +620,66 @@ function createStyles(t: Theme) {
       fontSize: 16,
       fontWeight: '400',
       color: '#EB5466',
+    },
+
+    // Row value unset state
+    rowValueUnset: {
+      color: '#555',
+      fontStyle: 'italic',
+    },
+
+    // Gender modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'flex-end',
+    },
+    modalSheet: {
+      backgroundColor: '#1A1A2E',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: s(20),
+      paddingTop: s(24),
+      paddingBottom: s(36),
+    },
+    modalTitle: {
+      fontFamily: 'Unbounded',
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      textAlign: 'center',
+      marginBottom: s(20),
+    },
+    modalOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: s(14),
+    },
+    modalOptionText: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      color: '#FFFFFF',
+    },
+    modalOptionActive: {
+      color: '#00BEAE',
+      fontWeight: '600',
+    },
+    modalDivider: {
+      height: 1,
+      backgroundColor: 'rgba(78, 78, 78, 0.3)',
+    },
+    modalCancel: {
+      marginTop: s(20),
+      height: s(50),
+      borderRadius: 25,
+      backgroundColor: 'rgba(78, 78, 78, 0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalCancelText: {
+      fontFamily: 'Unbounded',
+      fontSize: 14,
+      color: '#848484',
     },
 
     // Delete account
