@@ -1,9 +1,12 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, Text, Pressable, Platform } from 'react-native';
+import React, { useCallback, useEffect } from 'react';
+import { StyleSheet, Pressable, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  interpolateColor,
+  Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -24,6 +27,7 @@ interface CategoryRowProps {
 }
 
 const SPRING_CONFIG = { damping: 18, stiffness: 200 };
+const TRANSITION_DURATION = 220;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -40,6 +44,16 @@ export default function CategoryRow({
   // Press scale
   const scale = useSharedValue(1);
 
+  // State-transition progress (0 = inactive, 1 = active)
+  const selectedProgress = useSharedValue(selected ? 1 : 0);
+
+  useEffect(() => {
+    selectedProgress.value = withTiming(selected ? 1 : 0, {
+      duration: TRANSITION_DURATION,
+      easing: Easing.out(Easing.ease),
+    });
+  }, [selected, selectedProgress]);
+
   const handlePressIn = useCallback(() => {
     scale.value = withSpring(0.97, SPRING_CONFIG);
   }, []);
@@ -55,8 +69,31 @@ export default function CategoryRow({
     onPress();
   }, [onPress]);
 
-  const scaleStyle = useAnimatedStyle(() => ({
+  const pillAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
+    backgroundColor: interpolateColor(
+      selectedProgress.value,
+      [0, 1],
+      [color + '1F', color]
+    ),
+  }));
+
+  const nameAnimatedStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      selectedProgress.value,
+      [0, 1],
+      [color, '#0F0F1E']
+    ),
+    fontWeight: selectedProgress.value > 0.5 ? ('600' as const) : ('500' as const),
+  }));
+
+  const priceAnimatedStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      selectedProgress.value,
+      [0, 1],
+      [color + '99', 'rgba(15,15,30,0.65)']
+    ),
+    fontWeight: selectedProgress.value > 0.5 ? ('500' as const) : ('400' as const),
   }));
 
   return (
@@ -64,21 +101,14 @@ export default function CategoryRow({
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={[
-        s.pill,
-        {
-          backgroundColor: selected ? color + '25' : color + '10',
-          borderColor: selected ? color + '60' : color + '20',
-        },
-        scaleStyle,
-      ]}
+      style={[s.pill, pillAnimatedStyle]}
     >
-      <Text style={[s.name, { color: selected ? '#FFFFFF' : 'rgba(255,255,255,0.6)' }]}>
+      <Animated.Text style={[s.name, nameAnimatedStyle]}>
         {name}
-      </Text>
-      <Text style={[s.price, { color: selected ? color : 'rgba(255,255,255,0.3)' }]}>
+      </Animated.Text>
+      <Animated.Text style={[s.price, priceAnimatedStyle]}>
         {priceStr}
-      </Text>
+      </Animated.Text>
     </AnimatedPressable>
   );
 }
@@ -87,21 +117,18 @@ const s = StyleSheet.create({
   pill: {
     height: 50,
     borderRadius: 25,
-    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 9,
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
   name: {
     fontFamily: 'Unbounded',
     fontSize: 18,
-    fontWeight: '400',
   },
   price: {
     fontFamily: 'Unbounded',
-    fontSize: 16,
-    fontWeight: '400',
+    fontSize: 15,
   },
 });
