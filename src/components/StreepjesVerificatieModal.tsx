@@ -147,33 +147,14 @@ export default function StreepjesVerificatieModal({
     setConfirming(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Fire onConfirm and close modal immediately — don't wait for animation
+    // Fire onConfirm immediately
     onConfirm();
-    setShow(false);
-    setConfirming(false);
 
     flashScale.setValue(0);
     flashOpacity.setValue(0);
 
-    // Confirm pulse + card shrink + sheet slide down + aurora flash
+    // Skip button pulse — start close animation directly
     Animated.sequence([
-      // Confirm button pulse
-      Animated.sequence([
-        Animated.spring(confirmScale, {
-          toValue: 1.05,
-          damping: 10,
-          stiffness: 300,
-          mass: 1,
-          useNativeDriver: true,
-        }),
-        Animated.spring(confirmScale, {
-          toValue: 1,
-          damping: 10,
-          stiffness: 300,
-          mass: 1,
-          useNativeDriver: true,
-        }),
-      ]),
       // Card shrink + sheet slide + aurora
       Animated.parallel([
         Animated.timing(cardScale, {
@@ -224,7 +205,10 @@ export default function StreepjesVerificatieModal({
           useNativeDriver: true,
         }),
       ]),
-    ]).start();
+    ]).start(() => {
+      setShow(false);
+      setConfirming(false);
+    });
   }, [onConfirm]);
 
   const handleCancel = useCallback(() => {
