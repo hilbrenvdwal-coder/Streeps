@@ -197,6 +197,13 @@ export default function HomeScreen() {
     if (!selectedGroupId && groups.length > 0) setSelectedGroupId(groups[0].id);
   }, [groups, selectedGroupId]);
 
+  useEffect(() => {
+    AsyncStorage.getItem('streeps_confirm_count').then((val) => {
+      const parsed = val ? parseInt(val, 10) : 0;
+      setConfirmCount(isNaN(parsed) ? 0 : parsed);
+    });
+  }, []);
+
   const {
     group, members, drinks, tallyCounts, tallyCategoryCounts, recentTallies, credits,
     loading: detailLoading, isAdmin, addTally, addTallyForMember, addTallyForMemberByCategory, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
@@ -218,6 +225,8 @@ export default function HomeScreen() {
   const [showVerification, setShowVerification] = useState(false);
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmCount, setConfirmCount] = useState<number>(999); // default 999 voorkomt FOUC bij mount
+  const hintOpacity = useRef(new Animated.Value(0)).current;
 
   // Toast feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -247,6 +256,18 @@ export default function HomeScreen() {
       setContentReady(false);
     }
   }, [group?.id, selectedGroupId]);
+
+  // Animate "Tik om te bevestigen" hint — only shown until user has confirmed 5+ times
+  useEffect(() => {
+    const shouldShow = tallyCount >= 1 && confirmCount < 5;
+    Animated.timing(hintOpacity, {
+      toValue: shouldShow ? 1 : 0,
+      duration: shouldShow ? 200 : 150,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [tallyCount, confirmCount]);
+
 
   // Expand/collapse animations
   const membersExpandAnim = useRef(new Animated.Value(1)).current;
@@ -424,6 +445,9 @@ export default function HomeScreen() {
     try {
       await addTally(selectedCategory as 1 | 2 | 3 | 4, count);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const newCount = confirmCount + 1;
+      setConfirmCount(newCount);
+      AsyncStorage.setItem('streeps_confirm_count', String(newCount));
       showToast(`${count}× ${catName} toegevoegd`);
       setTallyCount(0);
     } catch {
@@ -606,9 +630,9 @@ export default function HomeScreen() {
                   <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
                 </View>
               )}
-              {tallyCount >= 1 && (
-                <Text style={s.submitHint}>Tik om te bevestigen</Text>
-              )}
+              <Animated.Text style={[s.submitHint, { opacity: hintOpacity }]}>
+                Tik om te bevestigen
+              </Animated.Text>
             </View>
 
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
@@ -1484,7 +1508,7 @@ const styles = StyleSheet.create({
   emptyStateText: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', textAlign: 'center' },
 
   // ── Submit hint ──
-  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 4, textAlign: 'center' },
+  submitHint: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', marginTop: 12, textAlign: 'center' },
 
   // ── Meer opties toggle ──
   moreOptionsToggle: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 24 },
