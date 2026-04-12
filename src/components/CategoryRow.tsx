@@ -84,7 +84,7 @@ export default function CategoryRow({
       [0, 1],
       [color, '#0F0F1E']
     ),
-    fontWeight: selectedProgress.value > 0.5 ? ('600' as const) : ('500' as const),
+    fontWeight: '400' as const,
   }));
 
   const priceAnimatedStyle = useAnimatedStyle(() => ({
@@ -93,7 +93,7 @@ export default function CategoryRow({
       [0, 1],
       [color + '99', 'rgba(15,15,30,0.65)']
     ),
-    fontWeight: selectedProgress.value > 0.5 ? ('500' as const) : ('400' as const),
+    fontWeight: '400' as const,
   }));
 
   return (
