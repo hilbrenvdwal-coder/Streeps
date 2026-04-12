@@ -65,7 +65,7 @@ function RootLayoutNav() {
         colors: {
           ...DarkTheme.colors,
           primary: t.colors.tint,
-          background: t.colors.background.primary,
+          background: '#0E0D1C',
           card: t.colors.surface.default,
           text: t.colors.text.primary,
           border: t.colors.border.default,
@@ -76,7 +76,7 @@ function RootLayoutNav() {
         colors: {
           ...DefaultTheme.colors,
           primary: t.colors.tint,
-          background: t.colors.background.primary,
+          background: '#0E0D1C',
           card: t.colors.surface.default,
           text: t.colors.text.primary,
           border: t.colors.border.default,

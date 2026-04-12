@@ -16,7 +16,6 @@ export default function TabLayout() {
   return (
     <NavBarAnimContext.Provider value={navBarAnim}>
     <Tabs
-      sceneContainerStyle={{ backgroundColor: '#0E0D1C' }}
       tabBar={(props) => (
         <Animated.View
           style={{
@@ -31,6 +30,7 @@ export default function TabLayout() {
         </Animated.View>
       )}
       screenOptions={{
+        sceneStyle: { backgroundColor: '#0E0D1C' },
         headerStyle: {
           backgroundColor: t.colors.background.primary,
           shadowColor: 'transparent',
