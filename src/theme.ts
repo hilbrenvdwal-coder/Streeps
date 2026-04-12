@@ -140,7 +140,13 @@ export const colors = { dark: darkColors, light: lightColors } as const;
 
 // ─── Spacing (4px grid) ─────────────────────────────────────────────────────
 
+/**
+ * Standard spacing scale (4/8/12/16/20/24/32/40).
+ * Use for paddings, margins, gaps throughout the app.
+ * Use xs for tight spacing, lg/xl for section-level rhythm.
+ */
 export const space = {
+  // Numeric grid keys (legacy — kept for backward compatibility)
   0: 0,
   0.5: 2,
   1: 4,
@@ -153,6 +159,15 @@ export const space = {
   10: 40,
   12: 48,
   16: 64,
+  // Named semantic keys
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  xxxxl: 40,
 } as const;
 
 // ─── Border Radius ──────────────────────────────────────────────────────────
