@@ -320,7 +320,9 @@ export default function ProfileSetupWizard({
       });
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={{ flex: 1 }} />
+          <Pressable style={ws.backBtn} onPress={() => goToStep(1)}>
+            <Text style={ws.backBtnText}>Terug</Text>
+          </Pressable>
           <Animated.View style={[ws.genderBtn, { backgroundColor: btnBg }]}>
             <Pressable
               style={{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' }}
@@ -338,8 +340,8 @@ export default function ProfileSetupWizard({
     // Step 3: avatar (optional)
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable style={ws.skipBtn} onPress={handleSkipStep3Avatar}>
-          <Text style={ws.skipBtnText}>Overslaan</Text>
+        <Pressable style={ws.backBtn} onPress={() => goToStep(2)}>
+          <Text style={ws.backBtnText}>Terug</Text>
         </Pressable>
         <Pressable style={ws.nextBtn} onPress={handleNextStep3Avatar}>
           <Text style={ws.nextBtnText}>Volgende</Text>
@@ -475,6 +477,20 @@ const ws = StyleSheet.create({
   },
   genderLabelSelected: {
     color: '#00BEAE',
+  },
+  backBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  backBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#848484',
+    fontWeight: '600',
   },
   genderBtn: {
     flex: 1,
