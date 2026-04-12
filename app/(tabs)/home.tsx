@@ -4,7 +4,6 @@ import CategoryRow from '@/src/components/CategoryRow';
 import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
 import GroupSetupWizard from '@/src/components/GroupSetupWizard';
-import ProfileSetupWizard from '@/src/components/ProfileSetupWizard';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
@@ -328,11 +327,6 @@ export default function HomeScreen() {
       toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true,
     }).start();
   }, [navBarAnim]);
-
-  // TIJDELIJK: verberg navbar voor ProfileSetupWizard preview (visible={true})
-  useEffect(() => {
-    Animated.timing(navBarAnim, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Avatar preview
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
@@ -923,16 +917,6 @@ export default function HomeScreen() {
         groupId={wizardGroup?.id ?? ''}
         groupName={wizardGroup?.name ?? ''}
         inviteCode={wizardGroup?.invite_code ?? ''}
-      />
-
-      {/* ── TIJDELIJK: ProfileSetupWizard preview ── */}
-      <ProfileSetupWizard
-        visible={true}
-        onComplete={() => {
-          Animated.timing(navBarAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }).start();
-          console.log('[Preview] ProfileSetupWizard onComplete');
-        }}
-        userId={user?.id ?? ''}
       />
 
       {/* ── Settings overlay ── */}
