@@ -101,10 +101,14 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
   const currentColorRef = useRef(resolvedColor);
   const colorProgress = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    if (currentColorRef.current === resolvedColor) return;
+  // Update refs SYNCHRONOUSLY during render so the interpolation below picks
+  // up the new colors on the same render the prop changes, not a render later.
+  if (currentColorRef.current !== resolvedColor) {
     prevColorRef.current = currentColorRef.current;
     currentColorRef.current = resolvedColor;
+  }
+
+  useEffect(() => {
     colorProgress.setValue(0);
     Animated.timing(colorProgress, {
       toValue: 1,

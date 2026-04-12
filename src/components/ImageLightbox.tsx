@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 export interface ImageLayout {
   x: number;
@@ -20,6 +18,7 @@ interface Props {
 }
 
 export default function ImageLightbox({ visible, uri, origin, onClose }: Props) {
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
   const anim = useRef(new Animated.Value(0)).current;
   // Keep last-known values so the close animation can finish after the
   // parent clears its lightbox state.
