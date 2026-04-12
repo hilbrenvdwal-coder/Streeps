@@ -140,8 +140,6 @@ export default function CameraModal({
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') return;
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.5,
     });
     if (!result.canceled && result.assets[0]) {
@@ -153,8 +151,6 @@ export default function CameraModal({
   const handleGallery = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.5,
     });
     if (!result.canceled && result.assets[0]) {
