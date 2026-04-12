@@ -833,7 +833,7 @@ export default function SettingsOverlay({
                   <Animated.View style={[s.catToggleWrapper, { opacity: catOpacityAnims[i] }]}>
                     <Pressable
                       onPress={() => toggleCategory(catNum)}
-                      style={({ pressed }) => [s.catToggle, { backgroundColor: enabled ? categoryColors[i] : '#3A3A3A' }, pressed && { opacity: 0.7 }]}
+                      style={({ pressed }) => [s.catToggle, enabled ? { borderWidth: 2, borderColor: categoryColors[i], backgroundColor: categoryColors[i] + '1F' } : { borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'transparent' }, pressed && { opacity: 0.7 }]}
                     >
                       <Ionicons
                         name={enabled ? 'checkmark' : 'close'}
