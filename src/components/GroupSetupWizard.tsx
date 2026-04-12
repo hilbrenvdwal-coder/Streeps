@@ -9,6 +9,7 @@ import {
   Alert,
   Animated,
   Easing,
+  Modal,
   Share,
   Platform,
   Switch,
@@ -513,34 +514,42 @@ export default function GroupSetupWizard({
   };
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      {/* Frosted scrim */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]} pointerEvents="auto">
-        <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
-        <View style={ws.scrim} />
-      </Animated.View>
-
-      {/* Content */}
-      <Animated.View style={[ws.container, { paddingTop: insets.top + 20 }, contentStyle]} pointerEvents="auto">
-        {renderProgress()}
-
-        <Animated.View style={[ws.stepContainer, { opacity: stepOpacity }]}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <View style={{ flex: 1 }}>
-              {renderCurrentStep()}
-            </View>
-          </TouchableWithoutFeedback>
+    <Modal
+      visible={showOpen}
+      transparent
+      statusBarTranslucent
+      animationType="none"
+      onRequestClose={handleClose}
+    >
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        {/* Frosted scrim */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]} pointerEvents="auto">
+          <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+          <View style={ws.scrim} />
         </Animated.View>
 
-        {renderBottomBar()}
-      </Animated.View>
+        {/* Content */}
+        <Animated.View style={[ws.container, { paddingTop: insets.top + 20 }, contentStyle]} pointerEvents="auto">
+          {renderProgress()}
 
-      <CameraModal
-        visible={cameraVisible}
-        onClose={() => setCameraVisible(false)}
-        onImageCaptured={handleImageCaptured}
-      />
-    </View>
+          <Animated.View style={[ws.stepContainer, { opacity: stepOpacity }]}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+              <View style={{ flex: 1 }}>
+                {renderCurrentStep()}
+              </View>
+            </TouchableWithoutFeedback>
+          </Animated.View>
+
+          {renderBottomBar()}
+        </Animated.View>
+
+        <CameraModal
+          visible={cameraVisible}
+          onClose={() => setCameraVisible(false)}
+          onImageCaptured={handleImageCaptured}
+        />
+      </View>
+    </Modal>
   );
 }
 
