@@ -81,6 +81,14 @@ export default function GroupSelector({
   const insets = useSafeAreaInsets();
   const [showOpen, setShowOpen] = useState(false);
 
+  // ── Tick: force re-render every 30s while visible so isGroupLive() stays accurate ──
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (!visible) return;
+    const interval = setInterval(() => forceTick(t => t + 1), 30_000);
+    return () => clearInterval(interval);
+  }, [visible]);
+
   // Overlay animation (old Animated API — Fix C would migrate these, we leave them)
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   const listAnim = useRef(new Animated.Value(0)).current;

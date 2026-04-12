@@ -397,15 +397,26 @@ export default function HomeScreen() {
     return ([1, 2, 3, 4] as const).filter((cat) => catsWithDrinks.has(cat));
   }, [drinks]);
 
-  // ── Live badge: any tally in the last 10 minutes = "LIVE" ──
-  const isLive = useMemo(() => {
-    if (!recentTallies || recentTallies.length === 0) return false;
-    const now = Date.now();
+  // ── Live badge: auto-expires at the exact moment the 10-min window closes ──
+  const [isLive, setIsLive] = useState(false);
+
+  useEffect(() => {
     const WINDOW_MS = 10 * 60 * 1000;
-    return recentTallies.some((tt: any) => {
-      const ts = tt?.created_at ? new Date(tt.created_at).getTime() : 0;
-      return !isNaN(ts) && now - ts < WINDOW_MS;
-    });
+    if (!recentTallies || recentTallies.length === 0) {
+      setIsLive(false);
+      return;
+    }
+    const newest = Math.max(
+      ...recentTallies.map((t: { created_at: string }) => new Date(t.created_at).getTime())
+    );
+    const age = Date.now() - newest;
+    if (age >= WINDOW_MS) {
+      setIsLive(false);
+      return;
+    }
+    setIsLive(true);
+    const timer = setTimeout(() => setIsLive(false), WINDOW_MS - age);
+    return () => clearTimeout(timer);
   }, [recentTallies]);
 
   const livePulse = useRef(new Animated.Value(1)).current;
