@@ -56,6 +56,7 @@ export interface ConversationPreview {
   last_message: string | null;
   last_message_at: string | null;
   last_message_by: string | null;
+  last_tally_at: string | null;
   unread: number;
 }
 

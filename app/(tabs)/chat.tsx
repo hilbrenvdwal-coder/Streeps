@@ -903,10 +903,11 @@ function BotIcon({ size = 22, color = '#FFFFFF' }: { size?: number; color?: stri
 
 // ── Chat detail view (inline, not a separate screen) ──
 
-function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeight, bottomInset, onProfilePress, onGroupPress, groupId, otherUserId, onGiftPress, botEnabled }: {
+function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeight, bottomInset, onProfilePress, onGroupPress, groupId, otherUserId, onGiftPress, botEnabled, lastTallyAt }: {
   conversationId: string; name: string; avatarUrl: string | null; onBack: () => void;
   type: 'dm' | 'group'; navBarHeight: number; bottomInset: number; onProfilePress?: () => void; onGroupPress?: () => void;
   groupId?: string | null; otherUserId?: string | null; onGiftPress?: () => void; botEnabled?: boolean;
+  lastTallyAt?: string | null;
 }) {
   const { user } = useAuth();
   const { messages, loading: messagesLoading, loadingMore, hasMore, loadMore, sendMessage, sendImage, reactions, toggleLike } = useChatMessages(conversationId);
@@ -915,17 +916,17 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   const initialLoadDone = useRef(false);
   const prevMsgCountRef = useRef(0);
 
-  // LIVE indicator — true if the newest message is within the LIVE window.
-  // Re-evaluated on new messages, on an interval, and on AppState resume.
-  const newestAt = messages.length > 0 ? messages[0]?.created_at : null;
+  // LIVE indicator — true if a tally was added in this (group) conversation
+  // within the last 10 min. Same logic as home.tsx. DMs have no tally signal,
+  // so the badge never shows for them.
   const [isLive, setIsLive] = useState(false);
   useEffect(() => {
     const evaluate = () => {
-      if (!newestAt) {
+      if (!lastTallyAt) {
         setIsLive(false);
         return null;
       }
-      const age = Date.now() - new Date(newestAt).getTime();
+      const age = Date.now() - new Date(lastTallyAt).getTime();
       if (age >= LIVE_WINDOW_MS) {
         setIsLive(false);
         return null;
@@ -944,7 +945,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
       if (timer) clearTimeout(timer);
       sub.remove();
     };
-  }, [newestAt]);
+  }, [lastTallyAt]);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
   const [aiMode, setAiMode] = useState(false);
   const [waitingForBot, setWaitingForBot] = useState(false);
@@ -2908,9 +2909,11 @@ const sk = StyleSheet.create({
 
 // ── Main chat screen ──
 const LIVE_WINDOW_MS = 10 * 60 * 1000;
-const isConvLive = (lastAt: string | null | undefined) => {
-  if (!lastAt) return false;
-  return Date.now() - new Date(lastAt).getTime() < LIVE_WINDOW_MS;
+// LIVE = a tally was added in the group within the last 10 minutes.
+// Only applies to group chats; DMs have no tally activity signal.
+const isConvLive = (lastTallyAt: string | null | undefined) => {
+  if (!lastTallyAt) return false;
+  return Date.now() - new Date(lastTallyAt).getTime() < LIVE_WINDOW_MS;
 };
 
 export default function ChatScreen() {
@@ -3141,6 +3144,7 @@ export default function ChatScreen() {
         last_message: null,
         last_message_at: null,
         last_message_by: null,
+        last_tally_at: null,
         unread: 0,
       });
       router.setParams({ openDmConvId: undefined, openDmUserId: undefined, openDmName: undefined, openDmAvatar: undefined });
@@ -3211,7 +3215,7 @@ export default function ChatScreen() {
       const convId = await startDM(contactId, user.id);
       openChat({
         id: convId, type: 'dm', group_id: null, other_user_id: contactId, name: contactName, avatar_url: contactAvatar,
-        last_message: null, last_message_at: null, last_message_by: null, unread: 0,
+        last_message: null, last_message_at: null, last_message_by: null, last_tally_at: null, unread: 0,
       });
     } catch (e) {
       console.error('Error starting DM:', e);
@@ -3350,7 +3354,7 @@ export default function ChatScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     {item.type === 'group' && <Ionicons name="people" size={14} color="#848484" style={{ marginRight: 6 }} />}
                     <Text style={cs.convName} numberOfLines={1}>{item.name}</Text>
-                    {isConvLive(item.last_message_at) && (
+                    {isConvLive(item.last_tally_at) && (
                       <View style={cs.liveBadge}>
                         <View style={cs.liveDot} />
                         <Text style={cs.liveBadgeText}>LIVE</Text>
@@ -3404,6 +3408,7 @@ export default function ChatScreen() {
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
             onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
+            lastTallyAt={currentConv.last_tally_at}
           />
         </Animated.View>
       )}
