@@ -441,6 +441,14 @@ export default function SettingsOverlay({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [tallyAdj, setTallyAdj] = useState<Record<string, Record<number, number>>>({});
+  const tallyAdjResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleTallyAdjReset = useCallback(() => {
+    if (tallyAdjResetRef.current) clearTimeout(tallyAdjResetRef.current);
+    tallyAdjResetRef.current = setTimeout(() => {
+      setTallyAdj({});
+      tallyAdjResetRef.current = null;
+    }, 1500);
+  }, []);
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -460,8 +468,8 @@ export default function SettingsOverlay({
     enabledCats: Set<number>;
   } | null>(null);
 
-  // Reset optimistic adjustments when real data arrives
-  useEffect(() => { setTallyAdj({}); }, [recentTallies]);
+  // Reset optimistic adjustments is timer-based (see scheduleTallyAdjReset)
+  // so they don't flash back when unrelated realtime events refetch.
 
   // Reset newDrinkCat when selected category is no longer enabled
   useEffect(() => {
@@ -981,6 +989,7 @@ export default function SettingsOverlay({
                                     [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) + 1 },
                                   }));
                                   addTally(cat as 1|2|3|4, member.user_id);
+                                  scheduleTallyAdjReset();
                                 }}
                                 style={({ pressed }) => [s.tallyBtn, pressed && { opacity: 0.7 }]}
                                 hitSlop={4}
@@ -1005,6 +1014,7 @@ export default function SettingsOverlay({
                                           [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
                                         }));
                                         removeTally(memberRecentTallies[0].id);
+                                        scheduleTallyAdjReset();
                                       } },
                                     ]);
                                   }

@@ -493,7 +493,8 @@ export default function GroupSetupWizard({
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={ws.backBtn} onPress={handleBack}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={18} color="#848484" />
+          <Text style={ws.backBtnText}>Terug</Text>
         </Pressable>
         <Pressable style={[ws.nextBtn, { flex: 1 }]} onPress={handleNext}>
           <Text style={ws.nextBtnText}>Volgende</Text>
@@ -845,12 +846,20 @@ const ws = StyleSheet.create({
     paddingTop: 16,
   },
   backBtn: {
-    width: 52,
+    flex: 1,
     height: 52,
     borderRadius: 26,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
     backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  backBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#848484',
   },
   morphBtn: {
     flex: 1,
