@@ -147,8 +147,10 @@ export default function StreepjesVerificatieModal({
     setConfirming(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Fire onConfirm immediately — don't wait for animation
+    // Fire onConfirm and close modal immediately — don't wait for animation
     onConfirm();
+    setShow(false);
+    setConfirming(false);
 
     flashScale.setValue(0);
     flashOpacity.setValue(0);
@@ -222,10 +224,7 @@ export default function StreepjesVerificatieModal({
           useNativeDriver: true,
         }),
       ]),
-    ]).start(() => {
-      setShow(false);
-      setConfirming(false);
-    });
+    ]).start();
   }, [onConfirm]);
 
   const handleCancel = useCallback(() => {
