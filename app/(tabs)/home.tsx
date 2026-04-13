@@ -194,8 +194,15 @@ export default function HomeScreen() {
   }, [selectedGroupId]);
 
   useEffect(() => {
+    if (groupsLoading) return;
+    if (selectedGroupId && !groups.some((g) => g.id === selectedGroupId)) {
+      // Persisted group no longer exists (deleted/left) — clear and let auto-select kick in
+      setSelectedGroupId(null);
+      AsyncStorage.removeItem(STORAGE_KEY);
+      return;
+    }
     if (!selectedGroupId && groups.length > 0) setSelectedGroupId(groups[0].id);
-  }, [groups, selectedGroupId]);
+  }, [groups, groupsLoading, selectedGroupId]);
 
   useEffect(() => {
     AsyncStorage.getItem('streeps_confirm_count').then((val) => {
