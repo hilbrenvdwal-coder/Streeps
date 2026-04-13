@@ -28,6 +28,7 @@ import CameraModal from '@/src/components/CameraModal';
 import ImageLightbox, { type ImageLayout } from '@/src/components/ImageLightbox';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
+import { BOT_UUID, BOT_DEFAULT_NAME, MAX_BOT_NAME_LENGTH } from '@/src/constants/bot';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -607,11 +608,12 @@ function ShimmerText({ text, style }: { text: string; style: any }) {
 }
 
 // ── Memoized chat bubble (prevents re-render when messages array changes) ──
-const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversationId, isNew, likedBy, onDoubleTap, onImagePress }: {
+const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversationId, isNew, likedBy, onDoubleTap, onImagePress, botName }: {
   item: any; nextCreatedAt: string | null; isMine: boolean;
   type: 'dm' | 'group'; conversationId: string; isNew: boolean;
   likedBy: string[]; onDoubleTap: () => void;
   onImagePress?: (uri: string, origin: { x: number; y: number; width: number; height: number }) => void;
+  botName?: string;
 }) => {
   const lastTapRef = useRef(0);
   const imageRef = useRef<View>(null);
@@ -690,7 +692,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         {showTime && <Text style={dt.timeSeparator}>{formatMessageTime(item.created_at)}</Text>}
         {!isMine && type === 'group' && (
           <Text style={[dt.bubbleSender, { color: getSenderColor(item.user_id, conversationId) }]}>
-            {item.profile?.full_name || 'Onbekend'}
+            {item.user_id === BOT_UUID ? (botName ?? BOT_DEFAULT_NAME) : (item.profile?.full_name || 'Onbekend')}
           </Text>
         )}
         <View style={!isMine && type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined}>
@@ -730,15 +732,16 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
     return isNew ? <AnimatedBubble>{imgEl}</AnimatedBubble> : imgEl;
   }
 
-  const senderName = item.profile?.full_name || 'Onbekend';
-  const isBot = item.profile?.full_name === 'Streeps Bot';
+  const isBot = item.user_id === BOT_UUID;
+  const resolvedBotName = botName ?? BOT_DEFAULT_NAME;
+  const senderName = isBot ? resolvedBotName : (item.profile?.full_name || 'Onbekend');
   const bubble = (
     <View>
       {showTime && <Text style={dt.timeSeparator}>{formatMessageTime(item.created_at)}</Text>}
       {!isMine && type === 'group' ? (
         <>
           {isBot ? (
-            <ShimmerText text="Streeps Bot" style={[dt.bubbleSender, { marginLeft: 28 }]} />
+            <ShimmerText text={resolvedBotName} style={[dt.bubbleSender, { marginLeft: 28 }]} />
           ) : (
             <Text style={[dt.bubbleSender, { color: getSenderColor(item.user_id, conversationId) }]}>{senderName}</Text>
           )}
@@ -776,7 +779,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
 });
 
 // ── Skeleton bot bubble with green glow ──
-function SkeletonBotBubble() {
+function SkeletonBotBubble({ botName }: { botName?: string }) {
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
@@ -792,7 +795,7 @@ function SkeletonBotBubble() {
 
   return (
     <View style={{ marginBottom: 8 }}>
-      <ShimmerText text="Streeps Bot" style={[dt.bubbleSender, { marginLeft: 28 }]} />
+      <ShimmerText text={botName ?? BOT_DEFAULT_NAME} style={[dt.bubbleSender, { marginLeft: 28 }]} />
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
         <View style={[dt.bubbleAvatar, { backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }]}>
           <BotIcon size={20} color="#00BEAE" />
@@ -903,10 +906,11 @@ function BotIcon({ size = 22, color = '#FFFFFF' }: { size?: number; color?: stri
 
 // ── Chat detail view (inline, not a separate screen) ──
 
-function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeight, bottomInset, onProfilePress, onGroupPress, groupId, otherUserId, onGiftPress, botEnabled, lastTallyAt }: {
+function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeight, bottomInset, onProfilePress, onGroupPress, groupId, otherUserId, onGiftPress, botEnabled, botName, lastTallyAt }: {
   conversationId: string; name: string; avatarUrl: string | null; onBack: () => void;
   type: 'dm' | 'group'; navBarHeight: number; bottomInset: number; onProfilePress?: () => void; onGroupPress?: () => void;
   groupId?: string | null; otherUserId?: string | null; onGiftPress?: () => void; botEnabled?: boolean;
+  botName?: string;
   lastTallyAt?: string | null;
 }) {
   const { user } = useAuth();
@@ -1009,7 +1013,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   // Clear bot skeleton when bot response arrives
   useEffect(() => {
     if (!waitingForBot) return;
-    if (messages[0]?.profile?.full_name === 'Streeps Bot' && !messages[0]?.id.startsWith('temp-')) {
+    if (messages[0]?.user_id === BOT_UUID && !messages[0]?.id.startsWith('temp-')) {
       setWaitingForBot(false);
     }
   }, [messages, waitingForBot]);
@@ -1138,7 +1142,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         maxToRenderPerBatch={10}
         windowSize={11}
         removeClippedSubviews={Platform.OS === 'android'}
-        ListHeaderComponent={waitingForBot ? <SkeletonBotBubble /> : null}
+        ListHeaderComponent={waitingForBot ? <SkeletonBotBubble botName={botName} /> : null}
         ListFooterComponent={loadingMore ? (
           <View style={{ paddingVertical: 20, alignItems: 'center' }}>
             <ActivityIndicator size="small" color="#FF0085" />
@@ -1160,6 +1164,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
               likedBy={reactions[item.id] || []}
               onDoubleTap={() => toggleLike(item.id)}
               onImagePress={handleImagePress}
+              botName={botName}
             />
           );
         }}
@@ -1955,11 +1960,12 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
 }
 
 // ── Group profile overlay ──
-function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle }: {
+function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange }: {
   visible: boolean; groupId: string | null; onClose: () => void;
   onViewProfile: (userId: string) => void;
   cachedData?: { group: any; members: any[]; activeCategories?: any[] };
   onBotToggle?: (groupId: string, enabled: boolean) => void;
+  onBotNameChange?: (groupId: string, newName: string) => void;
 }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -1970,6 +1976,8 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [botEnabled, setBotEnabled] = useState(true);
+  const [botNameDraft, setBotNameDraft] = useState('');
+  const [savingBotName, setSavingBotName] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -2036,6 +2044,26 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
     }
   };
 
+  const handleSaveBotName = async () => {
+    if (!groupId || savingBotName) return;
+    const trimmed = botNameDraft.trim();
+    const current = group?.bot_name ?? BOT_DEFAULT_NAME;
+    if (!trimmed || trimmed === current) {
+      setBotNameDraft(current);
+      return;
+    }
+    setSavingBotName(true);
+    const { error } = await supabase.from('groups').update({ bot_name: trimmed }).eq('id', groupId);
+    setSavingBotName(false);
+    if (error) {
+      Alert.alert('Fout', 'Kon botnaam niet opslaan.');
+      setBotNameDraft(current);
+      return;
+    }
+    setGroup((g: any) => (g ? { ...g, bot_name: trimmed } : g));
+    onBotNameChange?.(groupId, trimmed);
+  };
+
   const animateClose = useCallback(() => {
     Animated.timing(anim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(({ finished }) => {
       if (finished) { setShow(false); onClose(); }
@@ -2049,6 +2077,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
         setGroup(cachedData.group);
         setMembers(cachedData.members);
         setBotEnabled(cachedData.group?.bot_enabled !== false);
+        setBotNameDraft(cachedData.group?.bot_name ?? BOT_DEFAULT_NAME);
       } else {
         fetchGroup();
       }
@@ -2068,6 +2097,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
     ]);
     setGroup(g);
     setBotEnabled(g?.bot_enabled !== false);
+    setBotNameDraft(g?.bot_name ?? BOT_DEFAULT_NAME);
     if (gm && gm.length > 0) {
       const userIds = gm.map((m: any) => m.user_id);
       const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
@@ -2217,6 +2247,29 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                     style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
                   />
                 </View>
+                {botEnabled && (
+                  <>
+                    <View style={gp.divider} />
+                    <View style={gp.settingRow}>
+                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="text-outline" size={18} color="#D9D9D9" />
+                      </View>
+                      <Text style={gp.settingLabel}>Botnaam</Text>
+                      <TextInput
+                        style={gp.botNameInput}
+                        value={botNameDraft}
+                        onChangeText={setBotNameDraft}
+                        onBlur={handleSaveBotName}
+                        onSubmitEditing={handleSaveBotName}
+                        returnKeyType="done"
+                        maxLength={MAX_BOT_NAME_LENGTH}
+                        placeholder={BOT_DEFAULT_NAME}
+                        placeholderTextColor="#848484"
+                        textAlign="right"
+                      />
+                    </View>
+                  </>
+                )}
               </View>
             </>
           )}
@@ -2276,6 +2329,16 @@ const gp = StyleSheet.create({
   shareText: { fontFamily: 'Unbounded', fontSize: 14, color: '#00BEAE' },
   settingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 55 },
   settingLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1, lineHeight: 20 },
+  botNameInput: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    color: '#FFFFFF',
+    minWidth: 120,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 8,
+  },
   createdAt: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center', marginTop: 24 },
   nameEditRow: {
     flexDirection: 'row',
@@ -3142,6 +3205,7 @@ export default function ChatScreen() {
   const [viewGroupId, setViewGroupId] = useState<string | null>(null);
   const [showGiftOverlay, setShowGiftOverlay] = useState(false);
   const [botEnabledMap, setBotEnabledMap] = useState<Record<string, boolean>>({});
+  const [botNameMap, setBotNameMap] = useState<Record<string, string>>({});
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
@@ -3222,7 +3286,10 @@ export default function ChatScreen() {
       .filter((cat) => catsWithDrinks.has(cat))
       .map((cat) => ({ category: cat, name: catNames[cat - 1] || `Categorie ${cat}` }));
     groupProfileCache[groupId] = { group: g, members, activeCategories };
-    if (g) setBotEnabledMap((prev) => ({ ...prev, [groupId]: g.bot_enabled !== false }));
+    if (g) {
+      setBotEnabledMap((prev) => ({ ...prev, [groupId]: g.bot_enabled !== false }));
+      setBotNameMap((prev) => ({ ...prev, [groupId]: g.bot_name ?? BOT_DEFAULT_NAME }));
+    }
   }, []);
 
   // Animations
@@ -3561,6 +3628,7 @@ export default function ChatScreen() {
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
             onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
+            botName={currentConv.group_id ? botNameMap[currentConv.group_id] : undefined}
             lastTallyAt={currentConv.last_tally_at}
           />
         </Animated.View>
@@ -3570,7 +3638,7 @@ export default function ChatScreen() {
       <ProfileOverlay visible={showProfile} onClose={() => setShowProfile(false)} />
       <AddPeopleOverlay visible={showAddPeople} onClose={closeAddPeople} onFriendshipChange={refreshContacts} onViewProfile={(id) => setViewProfileUserId(id)} refreshKey={friendshipRefreshKey} />
       <UserProfileOverlay visible={!!viewProfileUserId} userId={viewProfileUserId} onClose={() => setViewProfileUserId(null)} cachedData={viewProfileUserId ? profileCache[viewProfileUserId] : undefined} onFriendshipChange={() => { refreshContacts(); setFriendshipRefreshKey((k) => k + 1); }} />
-      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} />
+      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} />
       {showGiftOverlay && currentConv && (
         <GiftOverlay
           conversationId={currentConv.id}
