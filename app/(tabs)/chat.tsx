@@ -608,17 +608,25 @@ function ShimmerText({ text, style }: { text: string; style: any }) {
 }
 
 // ── Memoized chat bubble (prevents re-render when messages array changes) ──
-const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversationId, isNew, likedBy, onDoubleTap, onImagePress, botName }: {
+const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversationId, isNew, likedBy, onDoubleTap, onImagePress, botName, onLongPress, isInDeleteMode, onDeletePress, onDismissDeleteMode }: {
   item: any; nextCreatedAt: string | null; isMine: boolean;
   type: 'dm' | 'group'; conversationId: string; isNew: boolean;
   likedBy: string[]; onDoubleTap: () => void;
   onImagePress?: (uri: string, origin: { x: number; y: number; width: number; height: number }) => void;
   botName?: string;
+  onLongPress: () => void;
+  isInDeleteMode: boolean;
+  onDeletePress: () => void;
+  onDismissDeleteMode: () => void;
 }) => {
   const lastTapRef = useRef(0);
   const imageRef = useRef<View>(null);
   const [imageAspect, setImageAspect] = useState<number>(4 / 3);
   const handlePress = useCallback(() => {
+    if (isInDeleteMode) {
+      onDismissDeleteMode();
+      return;
+    }
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
       onDoubleTap();
@@ -627,10 +635,14 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
     } else {
       lastTapRef.current = now;
     }
-  }, [onDoubleTap]);
+  }, [onDoubleTap, isInDeleteMode, onDismissDeleteMode]);
 
   // Image-only tap handler: single tap opens lightbox, double tap still likes.
   const handleImageTap = useCallback(() => {
+    if (isInDeleteMode) {
+      onDismissDeleteMode();
+      return;
+    }
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
       // Double tap → like
@@ -651,7 +663,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         });
       }
     }, 300);
-  }, [onDoubleTap, onImagePress, item]);
+  }, [onDoubleTap, onImagePress, item, isInDeleteMode, onDismissDeleteMode]);
 
   const showTime = !nextCreatedAt || (
     Math.abs(new Date(item.created_at).getTime() - new Date(nextCreatedAt).getTime()) > 5 * 60 * 1000
@@ -695,7 +707,11 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             {item.user_id === BOT_UUID ? (botName ?? BOT_DEFAULT_NAME) : (item.profile?.full_name || 'Onbekend')}
           </Text>
         )}
-        <View style={!isMine && type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined}>
+        <View style={
+          isMine
+            ? { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }
+            : (type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined)
+        }>
           {!isMine && type === 'group' && (
             item.profile?.avatar_url ? (
               <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
@@ -705,8 +721,19 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               </View>
             )
           )}
-          <Pressable onPress={handleImageTap}>
-            <View style={[{ marginBottom: 8, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }]}>
+          {isMine && isInDeleteMode && (
+            <Pressable
+              onPress={onDeletePress}
+              hitSlop={12}
+              style={dt.deleteTrash}
+              accessibilityLabel="Verwijder bericht"
+              accessibilityRole="button"
+            >
+              <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
+            </Pressable>
+          )}
+          <Pressable onPress={handleImageTap} onLongPress={isMine ? onLongPress : undefined} delayLongPress={400}>
+            <View style={[{ marginBottom: 8, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }, isMine && isInDeleteMode && { opacity: 0.7 }]}>
               <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
                 <Image
                   source={{ uri: item.metadata.image_url }}
@@ -765,11 +792,31 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             </Pressable>
           </View>
         </>
+      ) : isMine ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+          {isInDeleteMode && (
+            <Pressable
+              onPress={onDeletePress}
+              hitSlop={12}
+              style={dt.deleteTrash}
+              accessibilityLabel="Verwijder bericht"
+              accessibilityRole="button"
+            >
+              <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
+            </Pressable>
+          )}
+          <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400}>
+            <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, isInDeleteMode && { opacity: 0.7 }]}>
+              <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
+              {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+            </View>
+          </Pressable>
+        </View>
       ) : (
         <Pressable onPress={handlePress}>
-          <View style={[dt.bubble, isMine ? dt.bubbleMine : dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
-            <Text style={[dt.bubbleText, isMine && { color: '#FFFFFF' }]}>{item.content}</Text>
-            {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+          <View style={[dt.bubble, dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
+            <Text style={dt.bubbleText}>{item.content}</Text>
+            {hasLikes && <HeartBadge count={likedBy.length} isMine={false} />}
           </View>
         </Pressable>
       )}
@@ -914,11 +961,42 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   lastTallyAt?: string | null;
 }) {
   const { user } = useAuth();
-  const { messages, loading: messagesLoading, loadingMore, hasMore, loadMore, sendMessage, sendImage, reactions, toggleLike } = useChatMessages(conversationId);
+  const { messages, loading: messagesLoading, loadingMore, hasMore, loadMore, sendMessage, sendImage, reactions, toggleLike, deleteMessage } = useChatMessages(conversationId);
   const [text, setText] = useState('');
+  const [deleteModeId, setDeleteModeId] = useState<string | null>(null);
   const seenIds = useRef(new Set<string>()).current;
   const initialLoadDone = useRef(false);
   const prevMsgCountRef = useRef(0);
+
+  const dismissDeleteMode = useCallback(() => setDeleteModeId(null), []);
+
+  const handleLongPress = useCallback((messageId: string, createdAt: string, isMine: boolean, messageType: string) => {
+    if (!isMine) return;
+    if (messageType === 'gift') return;
+    if (messageId.startsWith('temp-')) return;
+    const ageMs = Date.now() - new Date(createdAt).getTime();
+    if (ageMs > 10 * 60 * 1000) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setDeleteModeId(messageId);
+  }, []);
+
+  const handleDeletePress = useCallback(async (messageId: string) => {
+    try {
+      await deleteMessage(messageId);
+      setDeleteModeId(null);
+    } catch (e: any) {
+      setDeleteModeId(null);
+      const msg = e?.message ?? '';
+      if (msg.includes('message_too_old')) {
+        Alert.alert('Te oud', 'Dit bericht is te oud om te verwijderen.');
+      } else {
+        Alert.alert('Fout', 'Verwijderen mislukt.');
+      }
+    }
+  }, [deleteMessage]);
 
   // LIVE indicator — true if a tally was added in this (group) conversation
   // within the last 10 min. Same logic as home.tsx. DMs have no tally signal,
@@ -1165,6 +1243,10 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
               onDoubleTap={() => toggleLike(item.id)}
               onImagePress={handleImagePress}
               botName={botName}
+              onLongPress={() => handleLongPress(item.id, item.created_at, isMine, item.message_type)}
+              isInDeleteMode={deleteModeId === item.id}
+              onDeletePress={() => handleDeletePress(item.id)}
+              onDismissDeleteMode={dismissDeleteMode}
             />
           );
         }}
@@ -1264,6 +1346,12 @@ const dt = StyleSheet.create({
   heartBadgeMine: { right: 8 },
   heartBadgeOther: { left: 8 },
   heartEmoji: { fontSize: 13 },
+  deleteTrash: {
+    marginRight: 8,
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 // ── Profiel overlay (full features from profiel.tsx) ──

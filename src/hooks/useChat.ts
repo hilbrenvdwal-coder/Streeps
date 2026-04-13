@@ -356,6 +356,18 @@ export function useChatMessages(conversationId: string | null) {
                 });
             });
         })
+        .on('postgres_changes', {
+          event: 'DELETE', schema: 'public', table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        }, (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (!deletedId) return;
+          setMessages((prev) => {
+            const next = prev.filter((m) => m.id !== deletedId);
+            if (conversationId) saveCache(conversationId, next, oldestCursorRef.current, hasMoreRef.current);
+            return next;
+          });
+        })
         .subscribe();
     });
     return () => { handle.cancel(); if (channel) supabase.removeChannel(channel); };
@@ -439,6 +451,30 @@ export function useChatMessages(conversationId: string | null) {
         .insert({ message_id: messageId, user_id: user.id });
     }
   }, [user, reactions]);
+
+  // ── Delete own message (optimistic) ──
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!user || !messageId || messageId.startsWith('temp-')) return;
+
+    const prevMessages = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    if (conversationId) {
+      const filtered = prevMessages.filter((m) => m.id !== messageId);
+      saveCache(conversationId, filtered, oldestCursorRef.current, hasMoreRef.current);
+    }
+
+    const { error } = await supabase.rpc('delete_own_message', { p_message_id: messageId });
+    if (error) {
+      // Rollback — use functional set so new realtime inserts aren't lost
+      setMessages((current) => {
+        const stillExists = current.some((m) => m.id === messageId);
+        if (stillExists) return current;
+        const merged = [...current, ...prevMessages.filter((m) => m.id === messageId)];
+        return merged.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      });
+      throw error;
+    }
+  }, [user, conversationId, messages]);
 
   // ── Send message (optimistic) ──
   const sendMessage = useCallback(async (content: string) => {
@@ -547,7 +583,7 @@ export function useChatMessages(conversationId: string | null) {
     });
   }, [user, conversationId]);
 
-  return { messages, loading, loadingMore, hasMore, loadMore, sendMessage, sendImage, sendGift, reactions, toggleLike, refresh: fetchInitial };
+  return { messages, loading, loadingMore, hasMore, loadMore, sendMessage, sendImage, sendGift, reactions, toggleLike, deleteMessage, refresh: fetchInitial };
 }
 
 export interface Contact {
