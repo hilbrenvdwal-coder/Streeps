@@ -849,7 +849,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
             </Pressable>
             <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
-              <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { opacity: 0.7 }]}>
+              <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { opacity: 0.7, maxWidth: undefined, alignSelf: 'auto' }]}>
                 <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
                 {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
               </View>
