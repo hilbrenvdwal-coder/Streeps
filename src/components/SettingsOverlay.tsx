@@ -891,7 +891,12 @@ export default function SettingsOverlay({
             <View style={s.divider} />
             <View style={s.addDrinkRow}>
               <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor="#848484" value={newDrinkName} onChangeText={setNewDrinkName} />
-              <TextInput style={s.addDrinkEmoji} placeholder={'🍺'} placeholderTextColor="#848484" value={newDrinkEmoji} onChangeText={setNewDrinkEmoji} />
+              <View style={[s.addDrinkEmojiWrap, newDrinkEmoji === '' ? s.addDrinkEmojiEmpty : s.addDrinkEmojiFilled]}>
+                {newDrinkEmoji === '' && (
+                  <Text style={s.addDrinkEmojiPlaceholder} pointerEvents="none">🍺</Text>
+                )}
+                <TextInput style={s.addDrinkEmoji} value={newDrinkEmoji} onChangeText={setNewDrinkEmoji} />
+              </View>
               <Pressable onPress={handleAddDrink} hitSlop={4} style={({ pressed }) => [s.addDrinkBtn, pressed && { opacity: 0.7 }]} accessibilityLabel="Drankje toevoegen" accessibilityRole="button">
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </Pressable>
@@ -1157,7 +1162,11 @@ const s = StyleSheet.create({
   emptyText: { fontFamily: 'Unbounded', color: '#848484', padding: 16, fontSize: 14 },
   addDrinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52, gap: 8 },
   addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 48 },
-  addDrinkEmoji: { fontFamily: 'Unbounded', width: 48, fontSize: 14, color: '#FFFFFF', textAlign: 'center', height: 48 },
+  addDrinkEmojiWrap: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  addDrinkEmojiEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.06)' },
+  addDrinkEmojiFilled: { borderWidth: 1.5, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.15)' },
+  addDrinkEmojiPlaceholder: { position: 'absolute', fontSize: 20, opacity: 0.35, textAlign: 'center' },
+  addDrinkEmoji: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', textAlign: 'center', width: 48, height: 48 },
   addDrinkBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
   drinkCatBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
   drinkCatBadgeText: { fontFamily: 'Unbounded', fontSize: 11 },
