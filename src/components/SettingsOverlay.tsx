@@ -95,6 +95,14 @@ function formatEuroStr(str: string): string | null {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
+const ITEM_HEIGHT = 44;
+const ITEM_GAP = 8;
+const ITEM_STRIDE = ITEM_HEIGHT + ITEM_GAP; // 52
+const VISIBLE_ITEMS = 4;
+const CONTAINER_HEIGHT = VISIBLE_ITEMS * ITEM_STRIDE; // 208
+const WHEEL_WIDTH = 200;
+const CENTER_PADDING = (CONTAINER_HEIGHT - ITEM_HEIGHT) / 2; // 82
+
 function CategoryBadgeSelector({
   value,
   onChange,
@@ -110,80 +118,80 @@ function CategoryBadgeSelector({
   getCategoryName?: (cat: number) => string;
   onScrollEnable?: (enabled: boolean) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [isDragMode, setIsDragMode] = useState(false);
-  const [hoveredCat, setHoveredCat] = useState<number | null>(null);
+  const insets = useSafeAreaInsets();
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [tapMode, setTapMode] = useState(false);
+  const [centerIndex, setCenterIndex] = useState(0);
   const [badgePos, setBadgePos] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const badgeRef = useRef<View>(null);
 
-  // Refs for use inside PanResponder (avoids stale closures)
-  const expandedRef = useRef(false);
-  const isDragModeRef = useRef(false);
-  const hoveredCatRef = useRef<number | null>(null);
+  const badgeRef = useRef<View>(null);
+  const scrollOffset = useRef(new Animated.Value(0)).current;
+
+  // Mirror refs for PanResponder closures
+  const wheelOpenRef = useRef(false);
+  const tapModeRef = useRef(false);
+  const centerIndexRef = useRef(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
   const grantPageYRef = useRef(0);
   const grantPageXRef = useRef(0);
+  const startOffsetRef = useRef(0);
   const badgePosRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const enabledCategoriesRef = useRef(enabledCategories);
   const onChangeRef = useRef(onChange);
   const onScrollEnableRef = useRef(onScrollEnable);
   const valueRef = useRef(value);
 
-  useEffect(() => { expandedRef.current = expanded; }, [expanded]);
-  useEffect(() => { isDragModeRef.current = isDragMode; }, [isDragMode]);
   useEffect(() => { enabledCategoriesRef.current = enabledCategories; }, [enabledCategories]);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onScrollEnableRef.current = onScrollEnable; }, [onScrollEnable]);
   useEffect(() => { valueRef.current = value; }, [value]);
+  useEffect(() => () => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }, []);
 
   const color = colors[(value - 1) % colors.length];
   const label = getCategoryName?.(value) ?? `Cat ${value}`;
 
-  const chipHeight = 44;
-  const chipGap = 8;
-
-  /** Compute the Y range for each chip based on badge position and selected index */
-  const getChipY = useCallback((catIndex: number, selectedIndex: number, bPos: { y: number }) => {
-    const topOfList = bPos.y - selectedIndex * (chipHeight + chipGap);
-    const chipTop = topOfList + catIndex * (chipHeight + chipGap);
-    return { top: chipTop, bottom: chipTop + chipHeight };
+  const closeWheel = useCallback(() => {
+    setWheelOpen(false); wheelOpenRef.current = false;
+    setTapMode(false); tapModeRef.current = false;
+    onScrollEnableRef.current?.(true);
   }, []);
 
-  const findHoveredCat = useCallback((fingerY: number, bPos: { y: number }) => {
+  const openWheelDragMode = useCallback(() => {
     const cats = enabledCategoriesRef.current;
-    const selectedIndex = cats.indexOf(valueRef.current);
-    const si = selectedIndex >= 0 ? selectedIndex : 0;
-    for (let i = 0; i < cats.length; i++) {
-      const { top, bottom } = getChipY(i, si, bPos);
-      if (fingerY >= top && fingerY <= bottom) {
-        return cats[i];
-      }
-    }
-    return null;
-  }, [getChipY]);
+    const startIdx = Math.max(0, cats.indexOf(valueRef.current));
+    centerIndexRef.current = startIdx;
+    setCenterIndex(startIdx);
+    const startOff = -startIdx * ITEM_STRIDE;
+    scrollOffset.setValue(startOff);
+    startOffsetRef.current = startOff;
+    setWheelOpen(true); wheelOpenRef.current = true;
+    setTapMode(false); tapModeRef.current = false;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [scrollOffset]);
 
-  const handleSelect = useCallback((cat: number) => {
-    onChangeRef.current(cat);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded(false);
-    expandedRef.current = false;
-    setIsDragMode(false);
-    isDragModeRef.current = false;
-    setHoveredCat(null);
-    hoveredCatRef.current = null;
-    onScrollEnableRef.current?.(true);
-  }, []);
+  const openWheelTapMode = useCallback(() => {
+    const cats = enabledCategoriesRef.current;
+    const startIdx = Math.max(0, cats.indexOf(valueRef.current));
+    centerIndexRef.current = startIdx;
+    setCenterIndex(startIdx);
+    scrollOffset.setValue(-startIdx * ITEM_STRIDE);
+    setWheelOpen(true); wheelOpenRef.current = true;
+    setTapMode(true); tapModeRef.current = true;
+    onScrollEnableRef.current?.(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [scrollOffset]);
 
-  const handleClose = useCallback(() => {
-    setExpanded(false);
-    expandedRef.current = false;
-    setIsDragMode(false);
-    isDragModeRef.current = false;
-    setHoveredCat(null);
-    hoveredCatRef.current = null;
-    onScrollEnableRef.current?.(true);
-  }, []);
+  const commitCenter = useCallback(() => {
+    const cats = enabledCategoriesRef.current;
+    const idx = Math.min(Math.max(0, centerIndexRef.current), cats.length - 1);
+    const target = -idx * ITEM_STRIDE;
+    Animated.timing(scrollOffset, { toValue: target, duration: 150, useNativeDriver: true }).start(() => {
+      onChangeRef.current(cats[idx]);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      closeWheel();
+    });
+  }, [closeWheel, scrollOffset]);
 
   const panResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -192,168 +200,143 @@ function CategoryBadgeSelector({
     onPanResponderTerminationRequest: () => false,
 
     onPanResponderGrant: (evt) => {
-      // Disable parent ScrollView immediately
       onScrollEnableRef.current?.(false);
-
       grantPageYRef.current = evt.nativeEvent.pageY;
       grantPageXRef.current = evt.nativeEvent.pageX;
       longPressFiredRef.current = false;
-
-      // Measure badge position synchronously at grant time
-      badgeRef.current?.measureInWindow((x, y, width, height) => {
-        const pos = { x, y, width, height };
+      badgeRef.current?.measureInWindow((x, y, w, h) => {
+        const pos = { x, y, width: w, height: h };
         badgePosRef.current = pos;
         setBadgePos(pos);
       });
-
-      // Start 300ms long press timer
       longPressTimerRef.current = setTimeout(() => {
         longPressFiredRef.current = true;
-        isDragModeRef.current = true;
-        setIsDragMode(true);
-        setHoveredCat(null);
-        hoveredCatRef.current = null;
-        expandedRef.current = true;
-        setExpanded(true);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        openWheelDragMode();
       }, 300);
     },
 
-    onPanResponderMove: (evt) => {
-      const fingerY = evt.nativeEvent.pageY;
-      const fingerX = evt.nativeEvent.pageX;
-
-      // Before long press fired: check if user is scrolling (cancel timer)
+    onPanResponderMove: (evt, gesture) => {
       if (!longPressFiredRef.current) {
-        const dx = Math.abs(fingerX - grantPageXRef.current);
-        const dy = Math.abs(fingerY - grantPageYRef.current);
-        if (dx > 5 || dy > 5) {
-          // User is scrolling, not long pressing - cancel timer and release scroll
-          if (longPressTimerRef.current !== null) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-          }
+        if (Math.abs(gesture.dx) > 5 || Math.abs(gesture.dy) > 5) {
+          if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
           onScrollEnableRef.current?.(true);
         }
         return;
       }
-
-      // After long press: track finger over chips
-      if (isDragModeRef.current) {
-        const found = findHoveredCat(fingerY, badgePosRef.current);
-        if (found !== hoveredCatRef.current) {
-          hoveredCatRef.current = found;
-          setHoveredCat(found);
-          if (found !== null) Haptics.selectionAsync();
+      if (wheelOpenRef.current && !tapModeRef.current) {
+        const cats = enabledCategoriesRef.current;
+        const maxIdx = cats.length - 1;
+        const minOffset = -maxIdx * ITEM_STRIDE;
+        const raw = startOffsetRef.current + gesture.dy;
+        const clamped = Math.min(0, Math.max(minOffset, raw));
+        scrollOffset.setValue(clamped);
+        const newIdx = Math.round(-clamped / ITEM_STRIDE);
+        if (newIdx !== centerIndexRef.current) {
+          centerIndexRef.current = newIdx;
+          setCenterIndex(newIdx);
+          Haptics.selectionAsync();
         }
       }
     },
 
     onPanResponderRelease: () => {
-      // Clear any pending long press timer
-      if (longPressTimerRef.current !== null) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
-
-      if (longPressFiredRef.current && isDragModeRef.current) {
-        // Drag mode release: select hovered chip or close
-        if (hoveredCatRef.current !== null) {
-          handleSelect(hoveredCatRef.current);
-        } else {
-          handleClose();
-        }
+      if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+      if (longPressFiredRef.current && wheelOpenRef.current) {
+        commitCenter();
       } else if (!longPressFiredRef.current) {
-        // Short tap: measure badge and open tap mode
-        badgeRef.current?.measureInWindow((x, y, width, height) => {
-          const pos = { x, y, width, height };
-          badgePosRef.current = pos;
-          setBadgePos(pos);
-          isDragModeRef.current = false;
-          setIsDragMode(false);
-          setHoveredCat(null);
-          hoveredCatRef.current = null;
-          expandedRef.current = true;
-          setExpanded(true);
-          onScrollEnableRef.current?.(false);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        });
+        openWheelTapMode();
       }
     },
 
     onPanResponderTerminate: () => {
-      if (longPressTimerRef.current !== null) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
-      handleClose();
+      if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+      closeWheel();
     },
   })).current;
 
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (longPressTimerRef.current !== null) {
-        clearTimeout(longPressTimerRef.current);
-      }
-    };
-  }, []);
-
-  const selectedIndex = enabledCategories.indexOf(value);
-  const listTop = badgePos.y - (selectedIndex >= 0 ? selectedIndex : 0) * (chipHeight + chipGap);
+  // Wheel positioning with safe-area clamp
+  const rawTop = badgePos.y + badgePos.height / 2 - CONTAINER_HEIGHT / 2;
+  const wheelTop = Math.max(insets.top + 16, rawTop);
+  const wheelLeft = Math.max(16, badgePos.x + badgePos.width / 2 - WHEEL_WIDTH / 2);
 
   return (
     <>
       <View ref={badgeRef} collapsable={false} {...panResponder.panHandlers}>
-        <View
-          style={[cbs.badge, { backgroundColor: color + '20' }]}
-        >
+        <View style={[cbs.badge, { backgroundColor: color + '20' }]}>
           <Text style={[cbs.badgeLabel, { color }]} numberOfLines={1}>{label}</Text>
         </View>
       </View>
 
-      <Modal visible={expanded} transparent statusBarTranslucent animationType="fade" onRequestClose={handleClose}>
+      <Modal
+        visible={wheelOpen}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={closeWheel}
+      >
         <View style={cbs.modalRoot}>
-          {/* Scrim: tappable in tap mode, pass-through in drag mode */}
-          {isDragMode ? (
-            <Pressable style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          {tapMode ? (
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={closeWheel}>
               <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
               <View style={cbs.scrim} />
             </Pressable>
           ) : (
-            <Pressable style={StyleSheet.absoluteFillObject} onPress={handleClose} pointerEvents="auto">
+            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
               <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
               <View style={cbs.scrim} />
-            </Pressable>
+            </View>
           )}
 
-          <View style={[cbs.chipList, { top: listTop }]} pointerEvents={isDragMode ? 'none' : 'auto'}>
-            {enabledCategories.map((cat) => {
-              const catColor = colors[(cat - 1) % colors.length];
-              const catLabel = getCategoryName?.(cat) ?? `Cat ${cat}`;
-              const isSelected = cat === value;
-              const isHovered = hoveredCat === cat;
-              const highlighted = isSelected || isHovered;
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => handleSelect(cat)}
-                  style={[
-                    cbs.chip,
-                    { backgroundColor: catColor + '20' },
-                    highlighted && { borderWidth: 2, borderColor: catColor, transform: [{ scale: 1.08 }] },
-                    !highlighted && { borderWidth: 2, borderColor: 'transparent' },
-                  ]}
-                >
-                  <Text style={[cbs.chipLabel, { color: catColor }]} numberOfLines={1}>{catLabel}</Text>
-                </Pressable>
-              );
-            })}
+          <View
+            style={[cbs.wheelContainer, { top: wheelTop, left: wheelLeft, width: WHEEL_WIDTH, height: CONTAINER_HEIGHT }]}
+            pointerEvents={tapMode ? 'auto' : 'none'}
+          >
+            {/* Center indicator rail */}
+            <View pointerEvents="none" style={[cbs.centerIndicator, { top: CENTER_PADDING, height: ITEM_HEIGHT }]} />
+
+            <Animated.View
+              style={{
+                paddingTop: CENTER_PADDING,
+                paddingBottom: CENTER_PADDING,
+                transform: [{ translateY: scrollOffset }],
+              }}
+            >
+              {enabledCategories.map((cat, idx) => {
+                const distancePx = Animated.add(scrollOffset, new Animated.Value(idx * ITEM_STRIDE));
+                const distanceItems = Animated.divide(distancePx, new Animated.Value(ITEM_STRIDE));
+                const opacity = distanceItems.interpolate({
+                  inputRange: [-2, -1, 0, 1, 2],
+                  outputRange: [0.25, 0.55, 1, 0.55, 0.25],
+                  extrapolate: 'clamp',
+                });
+                const scale = distanceItems.interpolate({
+                  inputRange: [-2, -1, 0, 1, 2],
+                  outputRange: [0.82, 0.92, 1, 0.92, 0.82],
+                  extrapolate: 'clamp',
+                });
+                const catColor = colors[(cat - 1) % colors.length];
+                const catLabel = getCategoryName?.(cat) ?? `Cat ${cat}`;
+                const isCenter = idx === centerIndex;
+
+                const chipContent = (
+                  <Animated.View style={[cbs.chip, { backgroundColor: catColor + '20', opacity, transform: [{ scale }] }, isCenter && cbs.chipCenter]}>
+                    <Text style={[cbs.chipLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                  </Animated.View>
+                );
+
+                return tapMode ? (
+                  <Pressable key={cat} onPress={() => { onChange(cat); closeWheel(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
+                    {chipContent}
+                  </Pressable>
+                ) : (
+                  <View key={cat}>{chipContent}</View>
+                );
+              })}
+            </Animated.View>
           </View>
 
-          {/* Hint text */}
           <View style={cbs.hintContainer}>
-            <Text style={cbs.hintText}>Houd ingedrukt</Text>
+            <Text style={cbs.hintText}>{tapMode ? 'Tik om te kiezen' : 'Sleep om te kiezen, laat los om te bevestigen'}</Text>
           </View>
         </View>
       </Modal>
@@ -365,9 +348,37 @@ const cbs = StyleSheet.create({
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
   badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400' },
   modalRoot: { flex: 1 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
-  chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  wheelContainer: {
+    position: 'absolute',
+    backgroundColor: 'rgba(20,20,28,0.95)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  centerIndicator: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    height: ITEM_HEIGHT,
+    borderRadius: 22,
+    marginBottom: ITEM_GAP,
+    alignSelf: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  chipCenter: { borderColor: '#FFFFFF' },
   chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '400' },
   hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
   hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
