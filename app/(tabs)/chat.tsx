@@ -4,7 +4,7 @@ import {
   StyleSheet, View, Text, Pressable, FlatList, TextInput,
   Dimensions, Animated, Easing, ScrollView, Alert, Platform, PanResponder,
   Keyboard, Share, ActivityIndicator, Switch, Modal, InteractionManager,
-  AppState,
+  AppState, KeyboardAvoidingView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -2219,6 +2219,11 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
         opacity: anim,
         transform: [{ translateX: Animated.add(gpSwipeX, anim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] })) }],
       }]} pointerEvents="auto" {...gpPan}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
         <View style={gp.header}>
           <Pressable onPress={animateClose} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
@@ -2385,6 +2390,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
             <Text style={gp.createdAt}>Aangemaakt op {createdDate}</Text>
           ) : null}
         </ScrollView>
+        </KeyboardAvoidingView>
       </Animated.View>
     </View>
   );
