@@ -306,8 +306,9 @@ function CategoryBadgeSelector({
     <>
       <View ref={badgeRef} collapsable={false} {...panResponder.panHandlers}>
         <View
-          style={[cbs.badge, { backgroundColor: color + '20' }]}
+          style={[cbs.badge, { backgroundColor: color + '20', borderColor: color + '40' }]}
         >
+          <View style={[cbs.badgeDot, { backgroundColor: color }]} />
           <Text style={[cbs.badgeLabel, { color }]} numberOfLines={1}>{label}</Text>
         </View>
       </View>
@@ -341,11 +342,12 @@ function CategoryBadgeSelector({
                   style={[
                     cbs.chip,
                     { backgroundColor: catColor + '20' },
-                    highlighted && { borderWidth: 2, borderColor: catColor, transform: [{ scale: 1.08 }] },
+                    highlighted && { borderWidth: 2, borderColor: '#FFFFFF', transform: [{ scale: 1.08 }] },
                     !highlighted && { borderWidth: 2, borderColor: 'transparent' },
                   ]}
                 >
-                  <Text style={[cbs.chipLabel, { color: catColor }]} numberOfLines={1}>{catLabel}</Text>
+                  <View style={[cbs.chipDot, { backgroundColor: catColor }]} />
+                  <Text style={[cbs.chipLabel, { color: highlighted ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
                 </Pressable>
               );
             })}
@@ -362,13 +364,15 @@ function CategoryBadgeSelector({
 }
 
 const cbs = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
-  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400' },
+  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, alignSelf: 'flex-start' },
+  badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '500' },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
   chipList: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, height: 44, borderRadius: 22, alignSelf: 'center' },
-  chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '400' },
+  chipDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '500' },
   hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
   hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
@@ -441,14 +445,6 @@ export default function SettingsOverlay({
   const [cameraVisible, setCameraVisible] = useState(false);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [tallyAdj, setTallyAdj] = useState<Record<string, Record<number, number>>>({});
-  const tallyAdjResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleTallyAdjReset = useCallback(() => {
-    if (tallyAdjResetRef.current) clearTimeout(tallyAdjResetRef.current);
-    tallyAdjResetRef.current = setTimeout(() => {
-      setTallyAdj({});
-      tallyAdjResetRef.current = null;
-    }, 1500);
-  }, []);
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -468,8 +464,8 @@ export default function SettingsOverlay({
     enabledCats: Set<number>;
   } | null>(null);
 
-  // Reset optimistic adjustments is timer-based (see scheduleTallyAdjReset)
-  // so they don't flash back when unrelated realtime events refetch.
+  // Reset optimistic adjustments when real data arrives
+  useEffect(() => { setTallyAdj({}); }, [recentTallies]);
 
   // Reset newDrinkCat when selected category is no longer enabled
   useEffect(() => {
@@ -663,6 +659,7 @@ export default function SettingsOverlay({
           useNativeDriver: true,
         }).start();
       }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return next;
     });
   };
@@ -818,7 +815,6 @@ export default function SettingsOverlay({
                 onChangeText={setGroupName}
                 placeholder="Groepsnaam"
                 placeholderTextColor="#848484"
-                maxLength={20}
               />
               <Ionicons name="create-outline" size={18} color="#848484" style={{ marginLeft: 8 }} />
             </View>
@@ -838,7 +834,7 @@ export default function SettingsOverlay({
                   <Animated.View style={[s.catToggleWrapper, { opacity: catOpacityAnims[i] }]}>
                     <Pressable
                       onPress={() => toggleCategory(catNum)}
-                      style={({ pressed }) => [s.catToggle, enabled ? { borderWidth: 2, borderColor: categoryColors[i], backgroundColor: categoryColors[i] + '1F' } : { borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'transparent' }, pressed && { opacity: 0.7 }]}
+                      style={({ pressed }) => [s.catToggle, { backgroundColor: enabled ? categoryColors[i] : '#3A3A3A' }, pressed && { opacity: 0.7 }]}
                     >
                       <Ionicons
                         name={enabled ? 'checkmark' : 'close'}
@@ -868,7 +864,6 @@ export default function SettingsOverlay({
                         placeholder={`Categorie ${catNum}`}
                         placeholderTextColor="#848484"
                         editable={enabled}
-                        maxLength={15}
                       />
                       {enabled ? (
                         <View style={s.catPriceWrapper}>
@@ -898,7 +893,7 @@ export default function SettingsOverlay({
           </View>
 
           {/* Drinks */}
-          <Text style={s.sectionHeader}>DRANKJES</Text>
+          <Text style={s.sectionHeader}>DE KAART</Text>
           <View style={s.card}>
             {drinks.length === 0 && (
               <Text style={s.emptyText}>Geen drankjes</Text>
@@ -991,7 +986,6 @@ export default function SettingsOverlay({
                                     [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) + 1 },
                                   }));
                                   addTally(cat as 1|2|3|4, member.user_id);
-                                  scheduleTallyAdjReset();
                                 }}
                                 style={({ pressed }) => [s.tallyBtn, pressed && { opacity: 0.7 }]}
                                 hitSlop={4}
@@ -1016,7 +1010,6 @@ export default function SettingsOverlay({
                                           [member.user_id]: { ...prev[member.user_id], [cat]: (prev[member.user_id]?.[cat] || 0) - 1 },
                                         }));
                                         removeTally(memberRecentTallies[0].id);
-                                        scheduleTallyAdjReset();
                                       } },
                                     ]);
                                   }
