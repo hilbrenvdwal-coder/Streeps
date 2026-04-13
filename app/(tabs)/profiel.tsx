@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Dimensions, Animated, Easing, Modal } from 'react-native';
+import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Dimensions, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,10 +10,10 @@ import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme, type Theme } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import CameraModal from '@/src/components/CameraModal';
+import FeedbackOverlay from '@/src/components/FeedbackOverlay';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -43,7 +43,6 @@ export default function ProfielScreen() {
   const t = getTheme(mode);
   const styles = useMemo(() => createStyles(t), [mode]);
   const { user, signOut } = useAuth();
-  const { preference, setPreference } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -56,6 +55,7 @@ export default function ProfielScreen() {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [gender, setGender] = useState<string | null>(null);
   const [genderModalVisible, setGenderModalVisible] = useState(false);
+  const [feedbackOverlayVisible, setFeedbackOverlayVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -219,39 +219,6 @@ export default function ProfielScreen() {
     );
   };
 
-  const themeOptions = [
-    { key: 'system' as const, label: 'Systeem' },
-    { key: 'light' as const, label: 'Licht' },
-    { key: 'dark' as const, label: 'Donker' },
-  ];
-
-  // Animated segmented indicator
-  const segLayouts = useRef<{ x: number; w: number }[]>([]).current;
-  const segX = useRef(new Animated.Value(0)).current;
-  const segW = useRef(new Animated.Value(0)).current;
-  const segReady = useRef(false);
-
-  const activeSegIndex = themeOptions.findIndex((o) => o.key === preference);
-
-  const onSegLayout = useCallback((index: number, x: number, w: number) => {
-    segLayouts[index] = { x, w };
-    if (segLayouts.filter(Boolean).length === themeOptions.length && !segReady.current) {
-      segReady.current = true;
-      const cur = segLayouts[activeSegIndex] ?? segLayouts[0];
-      segX.setValue(cur.x);
-      segW.setValue(cur.w);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!segReady.current) return;
-    const target = segLayouts[activeSegIndex];
-    if (!target) return;
-    const ease = { duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false };
-    Animated.timing(segX, { toValue: target.x, ...ease }).start();
-    Animated.timing(segW, { toValue: target.w, ...ease }).start();
-  }, [activeSegIndex]);
-
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
@@ -375,30 +342,10 @@ export default function ProfielScreen() {
           </Pressable>
         </Modal>
 
-        {/* ── WEERGAVE section ── */}
+        {/* ── OVER section ── */}
         <AnimatedCard index={1}>
-        <Text style={styles.sectionHeader}>WEERGAVE</Text>
+        <Text style={styles.sectionHeader}>OVER</Text>
         <View style={styles.card}>
-          <View style={styles.row}>
-            <Ionicons name="color-palette-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
-            <Text style={styles.rowLabel}>Thema</Text>
-            <View style={styles.segmented}>
-              <Animated.View style={[styles.segIndicator, { left: segX, width: segW }]} />
-              {themeOptions.map((opt, i) => (
-                <Pressable
-                  key={opt.key}
-                  style={styles.segmentBtn}
-                  onPress={() => setPreference(opt.key)}
-                  onLayout={(e) => onSegLayout(i, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
-                >
-                  <Text style={[styles.segmentText, preference === opt.key && styles.segmentActiveText]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-          <View style={styles.divider} />
           <View style={styles.row}>
             <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
             <Text style={styles.rowLabel}>Versie</Text>
@@ -407,15 +354,27 @@ export default function ProfielScreen() {
         </View>
         </AnimatedCard>
 
-        {/* ── Uitloggen ── */}
+        {/* ── FEEDBACK section ── */}
         <AnimatedCard index={2}>
+        <Text style={styles.sectionHeader}>FEEDBACK</Text>
+        <View style={styles.card}>
+          <Pressable style={styles.row} onPress={() => setFeedbackOverlayVisible(true)}>
+            <Ionicons name="chatbox-ellipses-outline" size={20} color="#FFFFFF" style={styles.rowIcon} />
+            <Text style={styles.rowLabel}>Ik heb een idee of probleem</Text>
+            <Ionicons name="chevron-forward" size={16} color="#848484" style={{ marginLeft: 4 }} />
+          </Pressable>
+        </View>
+        </AnimatedCard>
+
+        {/* ── Uitloggen ── */}
+        <AnimatedCard index={3}>
         <Pressable style={styles.logoutBtn} onPress={handleSignOut}>
           <Text style={styles.logoutText}>Uitloggen</Text>
         </Pressable>
         </AnimatedCard>
 
         {/* ── Account verwijderen ── */}
-        <AnimatedCard index={3}>
+        <AnimatedCard index={4}>
           <Pressable style={styles.deleteBtn} onPress={handleDeleteAccount}>
             <Text style={styles.deleteText}>Account verwijderen</Text>
           </Pressable>
@@ -427,6 +386,12 @@ export default function ProfielScreen() {
         visible={cameraVisible}
         onClose={() => setCameraVisible(false)}
         onImageCaptured={handleImageCaptured}
+      />
+
+      <FeedbackOverlay
+        visible={feedbackOverlayVisible}
+        onClose={() => setFeedbackOverlayVisible(false)}
+        userId={user?.id ?? null}
       />
     </View>
   );
@@ -574,36 +539,6 @@ function createStyles(t: Theme) {
       fontSize: 11,
       paddingHorizontal: s(74),
       paddingBottom: s(8),
-    },
-
-    // Theme segmented
-    segmented: {
-      flexDirection: 'row',
-      borderRadius: 8,
-      backgroundColor: 'rgba(78, 78, 78, 0.3)',
-      padding: 2,
-    },
-    segIndicator: {
-      position: 'absolute',
-      top: 2,
-      bottom: 2,
-      borderRadius: 6,
-      backgroundColor: 'rgba(0, 190, 174, 0.2)',
-    },
-    segmentBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 6,
-    },
-    segmentText: {
-      fontFamily: 'Unbounded',
-      fontSize: 11,
-      fontWeight: '400',
-      color: '#848484',
-    },
-    segmentActiveText: {
-      color: '#00BEAE',
-      fontWeight: '600',
     },
 
     // Logout
