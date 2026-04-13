@@ -622,6 +622,21 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
   const lastTapRef = useRef(0);
   const imageRef = useRef<View>(null);
   const [imageAspect, setImageAspect] = useState<number>(4 / 3);
+  const [showDelete, setShowDelete] = useState(false);
+  const deleteAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isInDeleteMode) {
+      setShowDelete(true);
+      Animated.timing(deleteAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    } else if (showDelete) {
+      Animated.timing(deleteAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) setShowDelete(false);
+      });
+    }
+  }, [isInDeleteMode]);
+  const bubbleOpacity = deleteAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] });
+  const trashTranslateX = deleteAnim.interpolate({ inputRange: [0, 1], outputRange: [36, 0] });
+  const trashOpacity = deleteAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
   const handlePress = useCallback(() => {
     if (isInDeleteMode) {
       onDismissDeleteMode();
@@ -708,19 +723,21 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
           </Text>
         )}
         {isMine ? (
-          isInDeleteMode ? (
+          showDelete ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }}>
-              <Pressable
-                onPress={onDeletePress}
-                hitSlop={12}
-                style={dt.deleteTrash}
-                accessibilityLabel="Verwijder bericht"
-                accessibilityRole="button"
-              >
-                <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
-              </Pressable>
+              <Animated.View style={{ opacity: trashOpacity, transform: [{ translateX: trashTranslateX }] }}>
+                <Pressable
+                  onPress={onDeletePress}
+                  hitSlop={12}
+                  style={dt.deleteTrash}
+                  accessibilityLabel="Verwijder bericht"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
+                </Pressable>
+              </Animated.View>
               <Pressable onPress={handleImageTap} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
-                <View style={[{ marginBottom: 8, overflow: 'visible', alignSelf: 'flex-end' }, hasLikes && { marginBottom: 18 }, { opacity: 0.7 }]}>
+                <Animated.View style={[{ marginBottom: 8, overflow: 'visible', alignSelf: 'flex-end' }, hasLikes && { marginBottom: 18 }, { opacity: bubbleOpacity }]}>
                   <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
                     <Image
                       source={{ uri: item.metadata.image_url }}
@@ -738,7 +755,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
                     />
                   </View>
                   {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
-                </View>
+                </Animated.View>
               </Pressable>
             </View>
           ) : (
@@ -837,22 +854,24 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
           </View>
         </>
       ) : isMine ? (
-        isInDeleteMode ? (
+        showDelete ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }}>
-            <Pressable
-              onPress={onDeletePress}
-              hitSlop={12}
-              style={dt.deleteTrash}
-              accessibilityLabel="Verwijder bericht"
-              accessibilityRole="button"
-            >
-              <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
-            </Pressable>
+            <Animated.View style={{ opacity: trashOpacity, transform: [{ translateX: trashTranslateX }] }}>
+              <Pressable
+                onPress={onDeletePress}
+                hitSlop={12}
+                style={dt.deleteTrash}
+                accessibilityLabel="Verwijder bericht"
+                accessibilityRole="button"
+              >
+                <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
+              </Pressable>
+            </Animated.View>
             <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
-              <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { opacity: 0.7, maxWidth: undefined, alignSelf: 'auto' }]}>
+              <Animated.View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { maxWidth: undefined, alignSelf: 'auto', opacity: bubbleOpacity }]}>
                 <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
                 {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
-              </View>
+              </Animated.View>
             </Pressable>
           </View>
         ) : (
