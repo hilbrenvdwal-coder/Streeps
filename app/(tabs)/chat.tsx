@@ -1970,8 +1970,63 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [botEnabled, setBotEnabled] = useState(true);
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const nameInputRef = useRef<TextInput>(null);
 
   const isAdmin = members.some((m) => m.user_id === user?.id && m.is_admin);
+
+  const handleSaveName = async () => {
+    const trimmed = draftName.trim();
+    const currentName = group?.name ?? '';
+    if (!trimmed || trimmed === currentName || savingName) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    const { error } = await supabase.from('groups').update({ name: trimmed }).eq('id', groupId);
+    setSavingName(false);
+    setEditingName(false);
+    if (error) {
+      Alert.alert('Fout', 'Kon groepsnaam niet opslaan.');
+      return;
+    }
+    setGroup((g: any) => (g ? { ...g, name: trimmed } : g));
+  };
+
+  const handleLeaveGroup = () => {
+    Alert.alert(
+      'Groep verlaten',
+      `Weet je zeker dat je "${group?.name ?? ''}" wilt verlaten?`,
+      [
+        { text: 'Annuleer', style: 'cancel' },
+        {
+          text: 'Verlaten',
+          style: 'destructive',
+          onPress: async () => {
+            if (!groupId) return;
+            setLeaving(true);
+            const { error } = await supabase.rpc('leave_group', { p_group_id: groupId });
+            setLeaving(false);
+            if (error) {
+              if (error.message?.includes('last admin')) {
+                Alert.alert(
+                  'Kan niet verlaten',
+                  'Je bent de laatste admin. Maak eerst iemand anders admin voordat je de groep verlaat.'
+                );
+              } else {
+                Alert.alert('Fout', error.message || 'Kon groep niet verlaten.');
+              }
+              return;
+            }
+            onClose?.();
+          },
+        },
+      ]
+    );
+  };
 
   const handleToggleBot = async (value: boolean) => {
     setBotEnabled(value);
@@ -2065,7 +2120,42 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
               </View>
             )}
           </View>
-          <Text style={gp.displayName}>{group?.name || ''}</Text>
+          {editingName && isAdmin ? (
+            <View style={gp.nameEditRow}>
+              <TextInput
+                ref={nameInputRef}
+                style={gp.nameInput}
+                value={draftName}
+                onChangeText={setDraftName}
+                maxLength={20}
+                placeholder="Groepsnaam"
+                placeholderTextColor="#848484"
+                returnKeyType="done"
+                onSubmitEditing={handleSaveName}
+                onBlur={handleSaveName}
+                autoFocus
+                textAlign="center"
+              />
+              {savingName && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginLeft: 6 }} />}
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                if (isAdmin) {
+                  setDraftName(group?.name ?? '');
+                  setEditingName(true);
+                  setTimeout(() => nameInputRef.current?.focus(), 50);
+                }
+              }}
+              disabled={!isAdmin}
+              style={({ pressed }) => pressed && isAdmin ? { opacity: 0.6 } : undefined}
+            >
+              <View style={gp.nameDisplayRow}>
+                <Text style={gp.displayName}>{group?.name || ''}</Text>
+                {isAdmin && <Ionicons name="pencil" size={14} color="#848484" style={{ marginLeft: 6 }} />}
+              </View>
+            </Pressable>
+          )}
           <Text style={gp.memberCount}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
 
           {/* Leden */}
@@ -2131,6 +2221,24 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
             </>
           )}
 
+          {/* Groep verlaten */}
+          <View style={gp.section}>
+            <Pressable
+              onPress={handleLeaveGroup}
+              style={({ pressed }) => [gp.leaveBtn, pressed && { opacity: 0.7 }]}
+              disabled={leaving}
+            >
+              {leaving ? (
+                <ActivityIndicator size="small" color="#FF5A5A" />
+              ) : (
+                <>
+                  <Ionicons name="log-out-outline" size={18} color="#FF5A5A" />
+                  <Text style={gp.leaveBtnText}>Groep verlaten</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+
           {/* Aangemaakt */}
           {createdDate ? (
             <Text style={gp.createdAt}>Aangemaakt op {createdDate}</Text>
@@ -2169,6 +2277,51 @@ const gp = StyleSheet.create({
   settingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 55 },
   settingLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1, lineHeight: 20 },
   createdAt: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center', marginTop: 24 },
+  nameEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  nameInput: {
+    fontFamily: 'Unbounded',
+    fontSize: 24,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    minWidth: 140,
+    textAlign: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.3)',
+  },
+  nameDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  section: {
+    marginTop: 24,
+  },
+  leaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,90,90,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,90,90,0.25)',
+  },
+  leaveBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#FF5A5A',
+  },
 });
 
 // ── Animated row wrapper for fade-out + collapse ──
