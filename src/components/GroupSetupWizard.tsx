@@ -588,10 +588,10 @@ export default function GroupSetupWizard({
                 {renderCurrentStep()}
               </View>
             </Animated.View>
-
-            {renderBottomBar()}
           </Animated.View>
         </KeyboardAvoidingView>
+
+        {renderBottomBar()}
 
         <CameraModal
           visible={cameraVisible}
