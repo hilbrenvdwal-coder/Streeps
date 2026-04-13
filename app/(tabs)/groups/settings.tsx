@@ -271,7 +271,7 @@ export default function GroupSettingsScreen() {
         )}
 
         {/* Current drinks */}
-        <Text style={s.sectionHeader}>DE KAART</Text>
+        <Text style={s.sectionHeader}>DRANKJES</Text>
         <View style={s.card}>
           {drinks.length === 0 && (
             <View style={s.emptyRow}>
