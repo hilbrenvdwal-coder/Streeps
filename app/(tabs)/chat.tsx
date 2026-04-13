@@ -2124,7 +2124,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                     onValueChange={handleToggleBot}
                     trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
                     thumbColor="#FFFFFF"
-                    style={{ transform: [{ translateY: -1 }] }}
+                    style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
                   />
                 </View>
               </View>
