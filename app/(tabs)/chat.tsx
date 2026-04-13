@@ -953,11 +953,13 @@ function BotIcon({ size = 22, color = '#FFFFFF' }: { size?: number; color?: stri
 
 // ── Chat detail view (inline, not a separate screen) ──
 
-function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeight, bottomInset, onProfilePress, onGroupPress, groupId, otherUserId, onGiftPress, botEnabled, botName, lastTallyAt }: {
+function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeight, bottomInset, onProfilePress, onGroupPress, groupId, otherUserId, onGiftPress, botEnabled, botName, adminOnlyChat, isGroupAdmin, lastTallyAt }: {
   conversationId: string; name: string; avatarUrl: string | null; onBack: () => void;
   type: 'dm' | 'group'; navBarHeight: number; bottomInset: number; onProfilePress?: () => void; onGroupPress?: () => void;
   groupId?: string | null; otherUserId?: string | null; onGiftPress?: () => void; botEnabled?: boolean;
   botName?: string;
+  adminOnlyChat?: boolean;
+  isGroupAdmin?: boolean;
   lastTallyAt?: string | null;
 }) {
   const { user } = useAuth();
@@ -1149,6 +1151,18 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   const sendScale = sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
   const aiSlide = sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 46] });
 
+  const adminOnlyLocked = type === 'group' && adminOnlyChat === true && !isGroupAdmin;
+
+  const lockedInputBar = (
+    <View style={dt.inputBar}>
+      <View style={dt.lockedInputWrap}>
+        <BlurView intensity={50} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+        <Ionicons name="lock-closed-outline" size={16} color="#848484" style={{ marginRight: 8 }} />
+        <Text style={dt.lockedInputText}>Alleen admins kunnen in deze groep typen</Text>
+      </View>
+    </View>
+  );
+
   const inputBar = (
     <View style={dt.inputBar}>
       <Animated.View style={[dt.inputGlowWrap, { shadowOpacity: glowShadowOpacity }]}>
@@ -1292,7 +1306,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
       </View>
       <Animated.View style={{ height: Platform.OS === 'ios' ? bottomAnim : restBottom }} />
       <Animated.View style={[dt.inputBarWrap, { bottom: Platform.OS === 'ios' ? bottomAnim : restBottom }]}>
-        {inputBar}
+        {adminOnlyLocked ? lockedInputBar : inputBar}
       </Animated.View>
       <CameraOverlay visible={showCamera} onClose={() => setShowCamera(false)} onSend={(uri) => sendImage(uri)} />
       <ImageLightbox
@@ -1335,6 +1349,18 @@ const dt = StyleSheet.create({
   inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   inputGlowWrap: { flex: 1, borderRadius: 27, shadowColor: '#00FE96', shadowOffset: { width: 0, height: 0 }, shadowRadius: 6.5, elevation: 8 },
   inputBlurWrap: { flex: 1, borderRadius: 25, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' },
+  lockedInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 25,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 20,
+    minHeight: 50,
+  },
+  lockedInputText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center' },
   input: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', paddingHorizontal: 20, paddingVertical: 16, minHeight: 50, maxHeight: 120 },
   sendBtn: { width: 52, height: 52, borderRadius: 25, backgroundColor: '#FF0085', alignItems: 'center', justifyContent: 'center' },
   actionBtn: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', margin: 6 },
@@ -2048,12 +2074,13 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
 }
 
 // ── Group profile overlay ──
-function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange }: {
+function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange }: {
   visible: boolean; groupId: string | null; onClose: () => void;
   onViewProfile: (userId: string) => void;
   cachedData?: { group: any; members: any[]; activeCategories?: any[] };
   onBotToggle?: (groupId: string, enabled: boolean) => void;
   onBotNameChange?: (groupId: string, newName: string) => void;
+  onAdminOnlyChatChange?: (groupId: string, enabled: boolean) => void;
 }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -2066,6 +2093,10 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const [botEnabled, setBotEnabled] = useState(true);
   const [botNameDraft, setBotNameDraft] = useState('');
   const [savingBotName, setSavingBotName] = useState(false);
+  const [tallyAnnouncementsEnabled, setTallyAnnouncementsEnabled] = useState(false);
+  const [settlementAnnouncementsEnabled, setSettlementAnnouncementsEnabled] = useState(false);
+  const [botWelcomeEnabled, setBotWelcomeEnabled] = useState(false);
+  const [adminOnlyChat, setAdminOnlyChat] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -2152,6 +2183,55 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
     onBotNameChange?.(groupId, trimmed);
   };
 
+  const handleToggleTallyAnnouncements = async (value: boolean) => {
+    setTallyAnnouncementsEnabled(value);
+    if (!groupId) return;
+    const { error } = await supabase.from('groups').update({ tally_announcements_enabled: value }).eq('id', groupId);
+    if (error) {
+      setTallyAnnouncementsEnabled(!value);
+      Alert.alert('Fout', 'Kon instelling niet opslaan.');
+      return;
+    }
+    setGroup((g: any) => (g ? { ...g, tally_announcements_enabled: value } : g));
+  };
+
+  const handleToggleSettlementAnnouncements = async (value: boolean) => {
+    setSettlementAnnouncementsEnabled(value);
+    if (!groupId) return;
+    const { error } = await supabase.from('groups').update({ settlement_announcements_enabled: value }).eq('id', groupId);
+    if (error) {
+      setSettlementAnnouncementsEnabled(!value);
+      Alert.alert('Fout', 'Kon instelling niet opslaan.');
+      return;
+    }
+    setGroup((g: any) => (g ? { ...g, settlement_announcements_enabled: value } : g));
+  };
+
+  const handleToggleBotWelcome = async (value: boolean) => {
+    setBotWelcomeEnabled(value);
+    if (!groupId) return;
+    const { error } = await supabase.from('groups').update({ bot_welcome_enabled: value }).eq('id', groupId);
+    if (error) {
+      setBotWelcomeEnabled(!value);
+      Alert.alert('Fout', 'Kon instelling niet opslaan.');
+      return;
+    }
+    setGroup((g: any) => (g ? { ...g, bot_welcome_enabled: value } : g));
+  };
+
+  const handleToggleAdminOnly = async (value: boolean) => {
+    setAdminOnlyChat(value);
+    if (!groupId) return;
+    const { error } = await supabase.from('groups').update({ admin_only_chat: value }).eq('id', groupId);
+    if (error) {
+      setAdminOnlyChat(!value);
+      Alert.alert('Fout', 'Kon instelling niet opslaan.');
+      return;
+    }
+    setGroup((g: any) => (g ? { ...g, admin_only_chat: value } : g));
+    onAdminOnlyChatChange?.(groupId, value);
+  };
+
   const animateClose = useCallback(() => {
     Animated.timing(anim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(({ finished }) => {
       if (finished) { setShow(false); onClose(); }
@@ -2166,6 +2246,10 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
         setMembers(cachedData.members);
         setBotEnabled(cachedData.group?.bot_enabled !== false);
         setBotNameDraft(cachedData.group?.bot_name ?? BOT_DEFAULT_NAME);
+        setTallyAnnouncementsEnabled(cachedData.group?.tally_announcements_enabled === true);
+        setSettlementAnnouncementsEnabled(cachedData.group?.settlement_announcements_enabled === true);
+        setBotWelcomeEnabled(cachedData.group?.bot_welcome_enabled === true);
+        setAdminOnlyChat(cachedData.group?.admin_only_chat === true);
       } else {
         fetchGroup();
       }
@@ -2186,6 +2270,10 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
     setGroup(g);
     setBotEnabled(g?.bot_enabled !== false);
     setBotNameDraft(g?.bot_name ?? BOT_DEFAULT_NAME);
+    setTallyAnnouncementsEnabled(g?.tally_announcements_enabled === true);
+    setSettlementAnnouncementsEnabled(g?.settlement_announcements_enabled === true);
+    setBotWelcomeEnabled(g?.bot_welcome_enabled === true);
+    setAdminOnlyChat(g?.admin_only_chat === true);
     if (gm && gm.length > 0) {
       const userIds = gm.map((m: any) => m.user_id);
       const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
@@ -2361,8 +2449,64 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                         textAlign="right"
                       />
                     </View>
+                    <View style={gp.divider} />
+                    <View style={gp.settingRow}>
+                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="megaphone-outline" size={18} color="#D9D9D9" />
+                      </View>
+                      <Text style={gp.settingLabel}>Streepjes aankondigen</Text>
+                      <Switch
+                        value={tallyAnnouncementsEnabled}
+                        onValueChange={handleToggleTallyAnnouncements}
+                        trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
+                        thumbColor="#FFFFFF"
+                        style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
+                      />
+                    </View>
+                    <View style={gp.divider} />
+                    <View style={gp.settingRow}>
+                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="receipt-outline" size={18} color="#D9D9D9" />
+                      </View>
+                      <Text style={gp.settingLabel}>Afrekening aankondigen</Text>
+                      <Switch
+                        value={settlementAnnouncementsEnabled}
+                        onValueChange={handleToggleSettlementAnnouncements}
+                        trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
+                        thumbColor="#FFFFFF"
+                        style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
+                      />
+                    </View>
+                    <View style={gp.divider} />
+                    <View style={gp.settingRow}>
+                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="hand-right-outline" size={18} color="#D9D9D9" />
+                      </View>
+                      <Text style={gp.settingLabel}>Welkom bericht</Text>
+                      <Switch
+                        value={botWelcomeEnabled}
+                        onValueChange={handleToggleBotWelcome}
+                        trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
+                        thumbColor="#FFFFFF"
+                        style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
+                      />
+                    </View>
                   </>
                 )}
+                <View style={gp.divider} />
+                <View style={gp.settingRow}>
+                  <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#D9D9D9" />
+                  </View>
+                  <Text style={gp.settingLabel}>Alleen admins kunnen typen</Text>
+                  <Switch
+                    value={adminOnlyChat}
+                    onValueChange={handleToggleAdminOnly}
+                    trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
+                    thumbColor="#FFFFFF"
+                    style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
+                  />
+                </View>
               </View>
             </>
           )}
@@ -3300,6 +3444,8 @@ export default function ChatScreen() {
   const [showGiftOverlay, setShowGiftOverlay] = useState(false);
   const [botEnabledMap, setBotEnabledMap] = useState<Record<string, boolean>>({});
   const [botNameMap, setBotNameMap] = useState<Record<string, string>>({});
+  const [adminOnlyChatMap, setAdminOnlyChatMap] = useState<Record<string, boolean>>({});
+  const [groupAdminMap, setGroupAdminMap] = useState<Record<string, boolean>>({});
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
@@ -3383,8 +3529,13 @@ export default function ChatScreen() {
     if (g) {
       setBotEnabledMap((prev) => ({ ...prev, [groupId]: g.bot_enabled !== false }));
       setBotNameMap((prev) => ({ ...prev, [groupId]: g.bot_name ?? BOT_DEFAULT_NAME }));
+      setAdminOnlyChatMap((prev) => ({ ...prev, [groupId]: g.admin_only_chat === true }));
     }
-  }, []);
+    if (user && members.length > 0) {
+      const me = members.find((m: any) => m.user_id === user.id);
+      setGroupAdminMap((prev) => ({ ...prev, [groupId]: !!me?.is_admin }));
+    }
+  }, [user]);
 
   // Animations
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -3723,6 +3874,8 @@ export default function ChatScreen() {
             onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
             botName={currentConv.group_id ? botNameMap[currentConv.group_id] : undefined}
+            adminOnlyChat={currentConv.group_id ? adminOnlyChatMap[currentConv.group_id] === true : false}
+            isGroupAdmin={currentConv.group_id ? groupAdminMap[currentConv.group_id] === true : false}
             lastTallyAt={currentConv.last_tally_at}
           />
         </Animated.View>
@@ -3732,7 +3885,7 @@ export default function ChatScreen() {
       <ProfileOverlay visible={showProfile} onClose={() => setShowProfile(false)} />
       <AddPeopleOverlay visible={showAddPeople} onClose={closeAddPeople} onFriendshipChange={refreshContacts} onViewProfile={(id) => setViewProfileUserId(id)} refreshKey={friendshipRefreshKey} />
       <UserProfileOverlay visible={!!viewProfileUserId} userId={viewProfileUserId} onClose={() => setViewProfileUserId(null)} cachedData={viewProfileUserId ? profileCache[viewProfileUserId] : undefined} onFriendshipChange={() => { refreshContacts(); setFriendshipRefreshKey((k) => k + 1); }} />
-      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} />
+      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} onAdminOnlyChatChange={(gid, enabled) => { setAdminOnlyChatMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, admin_only_chat: enabled }; }} />
       {showGiftOverlay && currentConv && (
         <GiftOverlay
           conversationId={currentConv.id}
