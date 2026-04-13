@@ -16,6 +16,12 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -77,6 +83,11 @@ export default function GroupSetupWizard({
   const [newDrinkName, setNewDrinkName] = useState('');
   const [newDrinkEmoji, setNewDrinkEmoji] = useState('');
   const [newDrinkCat, setNewDrinkCat] = useState(1);
+
+  const addBtnScale = useSharedValue(1);
+  const addBtnAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: addBtnScale.value }],
+  }));
 
   // Open animation
   useEffect(() => {
@@ -214,6 +225,11 @@ export default function GroupSetupWizard({
   // Step 3: Add drink
   const handleAddDrink = async () => {
     if (!newDrinkName.trim()) return;
+    addBtnScale.value = withSequence(
+      withSpring(1.22, { damping: 6, stiffness: 400, mass: 0.6 }),
+      withSpring(1,    { damping: 12, stiffness: 200 }),
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const emoji = newDrinkEmoji.trim() || '🍺';
     const { data, error } = await supabase.from('drinks').insert({
       group_id: groupId,
@@ -385,37 +401,54 @@ export default function GroupSetupWizard({
 
         <View style={ws.divider} />
         <View style={ws.addDrinkRow}>
-          <TextInput
-            style={ws.addDrinkEmoji}
-            placeholder="🍺"
-            placeholderTextColor="#848484"
-            value={newDrinkEmoji}
-            onChangeText={setNewDrinkEmoji}
-          />
-          <TextInput
-            style={ws.addDrinkInput}
-            placeholder="Naam"
-            placeholderTextColor="#848484"
-            value={newDrinkName}
-            onChangeText={setNewDrinkName}
-            returnKeyType="done"
-            onSubmitEditing={handleAddDrink}
-          />
-          {/* Category selector dots */}
-          <View style={ws.catSelectorRow}>
-            {[1, 2, 3, 4].filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled)).map((c) => (
-              <Pressable key={c} onPress={() => setNewDrinkCat(c)}>
-                <View style={[
-                  ws.catSelectorDot,
-                  { backgroundColor: categoryColors[(c - 1) % 4] },
-                  newDrinkCat === c && ws.catSelectorDotActive,
-                ]} />
-              </Pressable>
-            ))}
+          <View style={ws.addDrinkInputRow}>
+            <TextInput
+              style={ws.addDrinkEmoji}
+              placeholder="🍺"
+              placeholderTextColor="#848484"
+              value={newDrinkEmoji}
+              onChangeText={setNewDrinkEmoji}
+            />
+            <TextInput
+              style={ws.addDrinkInput}
+              placeholder="Naam"
+              placeholderTextColor="#848484"
+              value={newDrinkName}
+              onChangeText={setNewDrinkName}
+              returnKeyType="done"
+              onSubmitEditing={handleAddDrink}
+            />
           </View>
-          <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-          </Pressable>
+          <View style={ws.addDrinkCatRow}>
+            <View style={ws.catSelectorRow}>
+              {[1, 2, 3, 4]
+                .filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled))
+                .map((c) => {
+                  const isSelected = newDrinkCat === c;
+                  const color = categoryColors[(c - 1) % 4];
+                  const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Cat ${c}`;
+                  return (
+                    <Pressable
+                      key={c}
+                      onPress={() => setNewDrinkCat(c)}
+                      style={[
+                        ws.catSelectorPill,
+                        { backgroundColor: isSelected ? color : color + '30' },
+                      ]}
+                    >
+                      <Text style={[ws.catSelectorPillText, { color: isSelected ? '#0F0F1E' : color }]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+            </View>
+            <Reanimated.View style={addBtnAnimStyle}>
+              <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </Pressable>
+            </Reanimated.View>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -718,11 +751,21 @@ const ws = StyleSheet.create({
     flex: 1,
   },
   addDrinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     paddingVertical: 8,
     paddingHorizontal: 4,
     gap: 8,
+  },
+  addDrinkInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addDrinkCatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   addDrinkEmoji: {
     fontFamily: 'Unbounded',
@@ -748,18 +791,22 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     alignItems: 'center',
+    flexWrap: 'wrap',
+    flex: 1,
   },
-  catSelectorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    opacity: 0.4,
+  catSelectorPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  catSelectorDotActive: {
-    opacity: 1,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  catSelectorPillText: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    fontWeight: '600',
   },
   addDrinkBtn: {
     width: 36,
