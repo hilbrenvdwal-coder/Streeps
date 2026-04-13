@@ -1273,6 +1273,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
     <FadeMask>
       <FlatList
         data={messages}
+        extraData={deleteModeId}
         keyExtractor={(m) => m.id}
         inverted
         keyboardDismissMode="interactive"
