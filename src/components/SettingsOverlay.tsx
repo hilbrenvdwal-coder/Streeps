@@ -102,6 +102,7 @@ const VISIBLE_ITEMS = 4;
 const CONTAINER_HEIGHT = VISIBLE_ITEMS * ITEM_STRIDE; // 208
 const WHEEL_WIDTH = 200;
 const CENTER_PADDING = (CONTAINER_HEIGHT - ITEM_HEIGHT) / 2; // 82
+const LONG_PRESS_DURATION = 500;
 
 function CategoryBadgeSelector({
   value,
@@ -120,7 +121,6 @@ function CategoryBadgeSelector({
 }) {
   const insets = useSafeAreaInsets();
   const [wheelOpen, setWheelOpen] = useState(false);
-  const [tapMode, setTapMode] = useState(false);
   const [centerIndex, setCenterIndex] = useState(0);
   const [badgePos, setBadgePos] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -129,7 +129,6 @@ function CategoryBadgeSelector({
 
   // Mirror refs for PanResponder closures
   const wheelOpenRef = useRef(false);
-  const tapModeRef = useRef(false);
   const centerIndexRef = useRef(0);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
@@ -153,7 +152,6 @@ function CategoryBadgeSelector({
 
   const closeWheel = useCallback(() => {
     setWheelOpen(false); wheelOpenRef.current = false;
-    setTapMode(false); tapModeRef.current = false;
     onScrollEnableRef.current?.(true);
   }, []);
 
@@ -166,19 +164,6 @@ function CategoryBadgeSelector({
     scrollOffset.setValue(startOff);
     startOffsetRef.current = startOff;
     setWheelOpen(true); wheelOpenRef.current = true;
-    setTapMode(false); tapModeRef.current = false;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [scrollOffset]);
-
-  const openWheelTapMode = useCallback(() => {
-    const cats = enabledCategoriesRef.current;
-    const startIdx = Math.max(0, cats.indexOf(valueRef.current));
-    centerIndexRef.current = startIdx;
-    setCenterIndex(startIdx);
-    scrollOffset.setValue(-startIdx * ITEM_STRIDE);
-    setWheelOpen(true); wheelOpenRef.current = true;
-    setTapMode(true); tapModeRef.current = true;
-    onScrollEnableRef.current?.(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, [scrollOffset]);
 
@@ -212,7 +197,7 @@ function CategoryBadgeSelector({
       longPressTimerRef.current = setTimeout(() => {
         longPressFiredRef.current = true;
         openWheelDragMode();
-      }, 300);
+      }, LONG_PRESS_DURATION);
     },
 
     onPanResponderMove: (evt, gesture) => {
@@ -223,7 +208,7 @@ function CategoryBadgeSelector({
         }
         return;
       }
-      if (wheelOpenRef.current && !tapModeRef.current) {
+      if (wheelOpenRef.current) {
         const cats = enabledCategoriesRef.current;
         const maxIdx = cats.length - 1;
         const minOffset = -maxIdx * ITEM_STRIDE;
@@ -243,8 +228,6 @@ function CategoryBadgeSelector({
       if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
       if (longPressFiredRef.current && wheelOpenRef.current) {
         commitCenter();
-      } else if (!longPressFiredRef.current) {
-        openWheelTapMode();
       }
     },
 
@@ -275,25 +258,15 @@ function CategoryBadgeSelector({
         onRequestClose={closeWheel}
       >
         <View style={cbs.modalRoot}>
-          {tapMode ? (
-            <Pressable style={StyleSheet.absoluteFillObject} onPress={closeWheel}>
-              <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
-              <View style={cbs.scrim} />
-            </Pressable>
-          ) : (
-            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-              <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
-              <View style={cbs.scrim} />
-            </View>
-          )}
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
+            <View style={cbs.scrim} />
+          </View>
 
           <View
             style={[cbs.wheelContainer, { top: wheelTop, left: wheelLeft, width: WHEEL_WIDTH, height: CONTAINER_HEIGHT }]}
-            pointerEvents={tapMode ? 'auto' : 'none'}
+            pointerEvents="none"
           >
-            {/* Center indicator rail */}
-            <View pointerEvents="none" style={[cbs.centerIndicator, { top: CENTER_PADDING, height: ITEM_HEIGHT }]} />
-
             <Animated.View
               style={{
                 paddingTop: CENTER_PADDING,
@@ -318,25 +291,19 @@ function CategoryBadgeSelector({
                 const catLabel = getCategoryName?.(cat) ?? `Cat ${cat}`;
                 const isCenter = idx === centerIndex;
 
-                const chipContent = (
-                  <Animated.View style={[cbs.chip, { backgroundColor: catColor + '20', opacity, transform: [{ scale }] }, isCenter && cbs.chipCenter]}>
-                    <Text style={[cbs.chipLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
-                  </Animated.View>
-                );
-
-                return tapMode ? (
-                  <Pressable key={cat} onPress={() => { onChange(cat); closeWheel(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}>
-                    {chipContent}
-                  </Pressable>
-                ) : (
-                  <View key={cat}>{chipContent}</View>
+                return (
+                  <View key={cat}>
+                    <Animated.View style={[cbs.chip, { backgroundColor: catColor + '20', opacity, transform: [{ scale }] }, isCenter && cbs.chipCenter]}>
+                      <Text style={[cbs.chipLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                    </Animated.View>
+                  </View>
                 );
               })}
             </Animated.View>
           </View>
 
           <View style={cbs.hintContainer}>
-            <Text style={cbs.hintText}>{tapMode ? 'Tik om te kiezen' : 'Sleep om te kiezen, laat los om te bevestigen'}</Text>
+            <Text style={cbs.hintText}>Sleep om te kiezen, laat los om te bevestigen</Text>
           </View>
         </View>
       </Modal>
@@ -351,20 +318,7 @@ const cbs = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   wheelContainer: {
     position: 'absolute',
-    backgroundColor: 'rgba(20,20,28,0.95)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    overflow: 'hidden',
     alignItems: 'center',
-  },
-  centerIndicator: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
   },
   chip: {
     flexDirection: 'row',
