@@ -759,6 +759,7 @@ const ws = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     gap: 8,
+    width: '100%',
   },
   addDrinkInputRow: {
     flexDirection: 'row',
