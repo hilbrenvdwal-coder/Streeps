@@ -371,7 +371,11 @@ export default function GroupSetupWizard({
             <View style={ws.drinkRow}>
               <Text style={ws.drinkEmoji}>{drink.emoji}</Text>
               <Text style={ws.drinkName}>{drink.name}</Text>
-              <View style={[ws.drinkCatDot, { backgroundColor: categoryColors[(drink.category - 1) % 4] }]} />
+              <View style={[ws.catBadge, { backgroundColor: categoryColors[(drink.category - 1) % 4] + '30', marginRight: 12 }]}>
+                <Text style={[ws.catBadgeText, { color: categoryColors[(drink.category - 1) % 4] }]}>
+                  {[catName1, catName2, catName3, catName4][(drink.category - 1) % 4] || `Cat ${drink.category}`}
+                </Text>
+              </View>
               <Pressable onPress={() => handleRemoveDrink(drink.id)} hitSlop={8}>
                 <Ionicons name="close-circle" size={20} color="#EB5466" />
               </Pressable>
@@ -712,12 +716,6 @@ const ws = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     flex: 1,
-  },
-  drinkCatDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
   },
   addDrinkRow: {
     flexDirection: 'row',
