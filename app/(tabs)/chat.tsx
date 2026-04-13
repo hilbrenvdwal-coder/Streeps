@@ -709,7 +709,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         )}
         <View style={
           isMine
-            ? { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }
+            ? { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }
             : (type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined)
         }>
           {!isMine && type === 'group' && (
@@ -732,7 +732,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
             </Pressable>
           )}
-          <Pressable onPress={handleImageTap} onLongPress={isMine ? onLongPress : undefined} delayLongPress={400}>
+          <Pressable onPress={handleImageTap} onLongPress={isMine ? onLongPress : undefined} delayLongPress={400} style={isMine ? { flexShrink: 1 } : undefined}>
             <View style={[{ marginBottom: 8, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }, isMine && isInDeleteMode && { opacity: 0.7 }]}>
               <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
                 <Image
@@ -793,7 +793,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
           </View>
         </>
       ) : isMine ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }}>
           {isInDeleteMode && (
             <Pressable
               onPress={onDeletePress}
@@ -805,7 +805,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
             </Pressable>
           )}
-          <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400}>
+          <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
             <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, isInDeleteMode && { opacity: 0.7 }]}>
               <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
