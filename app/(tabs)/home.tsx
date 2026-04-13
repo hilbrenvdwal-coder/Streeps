@@ -856,7 +856,7 @@ export default function HomeScreen() {
                   <AuroraPresetView preset="drankenlijst" animated gentle />
                 </View>
                 <View style={s.drankenlijstHeader}>
-                  <Text style={s.drankenlijstTitle}>Drankenlijst</Text>
+                  <Text style={s.drankenlijstTitle}>De kaart</Text>
                   <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
                 </View>
                 <View style={s.drankenlijstList}>

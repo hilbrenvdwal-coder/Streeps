@@ -898,7 +898,7 @@ export default function SettingsOverlay({
           </View>
 
           {/* Drinks */}
-          <Text style={s.sectionHeader}>DRANKJES</Text>
+          <Text style={s.sectionHeader}>DE KAART</Text>
           <View style={s.card}>
             {drinks.length === 0 && (
               <Text style={s.emptyText}>Geen drankjes</Text>
