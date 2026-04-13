@@ -654,6 +654,8 @@ export default function HomeScreen() {
                 <Text
                   style={s.groupName}
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
                 >
                   {group.name}
                 </Text>

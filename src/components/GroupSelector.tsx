@@ -354,7 +354,7 @@ export default function GroupSelector({
                     <Text style={st.headerAvatarText}>{currentGroup?.name?.[0]?.toUpperCase() ?? '?'}</Text>
                   </View>
                 )}
-                <Text style={st.headerName} numberOfLines={1}>{currentGroup?.name ?? ''}</Text>
+                <Text style={st.headerName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{currentGroup?.name ?? ''}</Text>
                 <Ionicons name="chevron-up" size={20} color="#848484" style={{ marginLeft: 8 }} />
               </View>
             </Pressable>
@@ -382,7 +382,7 @@ export default function GroupSelector({
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
-                        <Text style={st.groupName}>{group.name}</Text>
+                        <Text style={st.groupName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{group.name}</Text>
                         <View style={st.groupMetaRow}>
                           <Text style={st.groupMeta}>{group.member_count} leden</Text>
                           {isGroupLive(group.last_tally_at) && (
