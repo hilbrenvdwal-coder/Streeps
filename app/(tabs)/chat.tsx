@@ -707,53 +707,97 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             {item.user_id === BOT_UUID ? (botName ?? BOT_DEFAULT_NAME) : (item.profile?.full_name || 'Onbekend')}
           </Text>
         )}
-        <View style={
-          isMine
-            ? { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }
-            : (type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined)
-        }>
-          {!isMine && type === 'group' && (
-            item.profile?.avatar_url ? (
-              <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
-            ) : (
-              <View style={[dt.bubbleAvatar, dt.bubbleAvatarFallback]}>
-                <Text style={dt.bubbleAvatarText}>{(item.profile?.full_name || '?')[0]?.toUpperCase()}</Text>
-              </View>
-            )
-          )}
-          {isMine && isInDeleteMode && (
-            <Pressable
-              onPress={onDeletePress}
-              hitSlop={12}
-              style={dt.deleteTrash}
-              accessibilityLabel="Verwijder bericht"
-              accessibilityRole="button"
-            >
-              <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
-            </Pressable>
-          )}
-          <Pressable onPress={handleImageTap} onLongPress={isMine ? onLongPress : undefined} delayLongPress={400} style={isMine ? { flexShrink: 1 } : undefined}>
-            <View style={[{ marginBottom: 8, overflow: 'visible' }, isMine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }, isMine && isInDeleteMode && { opacity: 0.7 }]}>
-              <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
-                <Image
-                  source={{ uri: item.metadata.image_url }}
-                  onLoad={(e: any) => {
-                    const src = e?.source;
-                    if (src && src.width && src.height) {
-                      const next = src.width / src.height;
-                      if (Math.abs(next - imageAspect) > 0.01) setImageAspect(next);
-                    }
-                  }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="cover"
-                  transition={200}
-                  cachePolicy="memory-disk"
-                />
-              </View>
-              {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+        {isMine ? (
+          isInDeleteMode ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }}>
+              <Pressable
+                onPress={onDeletePress}
+                hitSlop={12}
+                style={dt.deleteTrash}
+                accessibilityLabel="Verwijder bericht"
+                accessibilityRole="button"
+              >
+                <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
+              </Pressable>
+              <Pressable onPress={handleImageTap} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
+                <View style={[{ marginBottom: 8, overflow: 'visible', alignSelf: 'flex-end' }, hasLikes && { marginBottom: 18 }, { opacity: 0.7 }]}>
+                  <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
+                    <Image
+                      source={{ uri: item.metadata.image_url }}
+                      onLoad={(e: any) => {
+                        const src = e?.source;
+                        if (src && src.width && src.height) {
+                          const next = src.width / src.height;
+                          if (Math.abs(next - imageAspect) > 0.01) setImageAspect(next);
+                        }
+                      }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      transition={200}
+                      cachePolicy="memory-disk"
+                    />
+                  </View>
+                  {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+                </View>
+              </Pressable>
             </View>
-          </Pressable>
-        </View>
+          ) : (
+            <Pressable onPress={handleImageTap} onLongPress={onLongPress} delayLongPress={400}>
+              <View style={[{ marginBottom: 8, overflow: 'visible', alignSelf: 'flex-end' }, hasLikes && { marginBottom: 18 }]}>
+                <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
+                  <Image
+                    source={{ uri: item.metadata.image_url }}
+                    onLoad={(e: any) => {
+                      const src = e?.source;
+                      if (src && src.width && src.height) {
+                        const next = src.width / src.height;
+                        if (Math.abs(next - imageAspect) > 0.01) setImageAspect(next);
+                      }
+                    }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+                {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+              </View>
+            </Pressable>
+          )
+        ) : (
+          <View style={type === 'group' ? { flexDirection: 'row', alignItems: 'flex-end' } : undefined}>
+            {type === 'group' && (
+              item.profile?.avatar_url ? (
+                <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
+              ) : (
+                <View style={[dt.bubbleAvatar, dt.bubbleAvatarFallback]}>
+                  <Text style={dt.bubbleAvatarText}>{(item.profile?.full_name || '?')[0]?.toUpperCase()}</Text>
+                </View>
+              )
+            )}
+            <Pressable onPress={handleImageTap} delayLongPress={400}>
+              <View style={[{ marginBottom: 8, overflow: 'visible', alignSelf: 'flex-start' }, hasLikes && { marginBottom: 18 }]}>
+                <View ref={imageRef} collapsable={false} style={{ width: imgW, height: imgH, borderRadius: 16, overflow: 'hidden' }}>
+                  <Image
+                    source={{ uri: item.metadata.image_url }}
+                    onLoad={(e: any) => {
+                      const src = e?.source;
+                      if (src && src.width && src.height) {
+                        const next = src.width / src.height;
+                        if (Math.abs(next - imageAspect) > 0.01) setImageAspect(next);
+                      }
+                    }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+                {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+              </View>
+            </Pressable>
+          </View>
+        )}
       </View>
     );
     return isNew ? <AnimatedBubble>{imgEl}</AnimatedBubble> : imgEl;
@@ -793,8 +837,8 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
           </View>
         </>
       ) : isMine ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }}>
-          {isInDeleteMode && (
+        isInDeleteMode ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', maxWidth: '90%' }}>
             <Pressable
               onPress={onDeletePress}
               hitSlop={12}
@@ -804,14 +848,21 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             >
               <Ionicons name="trash-outline" size={22} color="#FF4D6D" />
             </Pressable>
-          )}
-          <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
-            <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, isInDeleteMode && { opacity: 0.7 }]}>
+            <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
+              <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { opacity: 0.7 }]}>
+                <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
+                {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
+              </View>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400}>
+            <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }]}>
               <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
             </View>
           </Pressable>
-        </View>
+        )
       ) : (
         <Pressable onPress={handlePress}>
           <View style={[dt.bubble, dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
