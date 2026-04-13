@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +18,19 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
 import AuroraLogin from '@/src/components/AuroraLogin';
+
+const mapAuthError = (msg?: string): string => {
+  if (!msg) return 'Er ging iets mis. Probeer het opnieuw.';
+  const m = msg.toLowerCase();
+  if (m.includes('invalid login credentials')) return 'E-mail of wachtwoord klopt niet.';
+  if (m.includes('email not confirmed')) return 'Bevestig eerst je e-mail via de link die we je stuurden.';
+  if (m.includes('user already registered')) return 'Dit e-mailadres heeft al een account.';
+  if (m.includes('password should be at least')) return 'Wachtwoord moet minimaal 6 tekens zijn.';
+  if (m.includes('network')) return 'Geen internetverbinding. Controleer je netwerk.';
+  return msg;
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Register screen — exact Figma node 78:12 (390×844)
@@ -41,49 +54,72 @@ export default function RegisterScreen() {
   const [passwordHidden, setPasswordHidden] = useState(true);
   const [confirmHidden, setConfirmHidden] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const emailRef = React.useRef<TextInput>(null);
+  const passwordRef = React.useRef<TextInput>(null);
+  const confirmRef = React.useRef<TextInput>(null);
+
+  const validateEmail = (v: string): string | null => {
+    const t = v.trim();
+    if (!t) return 'Vul je e-mailadres in.';
+    if (!EMAIL_RE.test(t)) return 'Dit ziet er niet uit als een geldig e-mailadres.';
+    return null;
+  };
+  const validatePassword = (v: string): string | null => {
+    if (!v) return 'Kies een wachtwoord.';
+    if (v.length < 6) return 'Minimaal 6 tekens.';
+    return null;
+  };
+  const validateConfirm = (v: string, pw: string): string | null => {
+    if (!v) return 'Herhaal je wachtwoord.';
+    if (v !== pw) return 'Wachtwoorden komen niet overeen.';
+    return null;
+  };
 
   const handleRegister = async () => {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('Vul alle velden in');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Wachtwoord moet minimaal 6 tekens zijn');
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert('Wachtwoorden komen niet overeen');
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      Alert.alert('Ongeldig e-mailadres', 'Controleer je e-mailadres en probeer opnieuw.');
-      return;
-    }
+    setFormError(null);
+    setSuccess(null);
+
+    const eErr = validateEmail(email);
+    const pErr = validatePassword(password);
+    const cErr = validateConfirm(confirmPassword, password);
+
+    setEmailError(eErr);
+    setPasswordError(pErr);
+    setConfirmError(cErr);
+
+    if (eErr) { emailRef.current?.focus(); return; }
+    if (pErr) { passwordRef.current?.focus(); return; }
+    if (cErr) { confirmRef.current?.focus(); return; }
+
     const normalizedEmail = email.trim().toLowerCase();
-    const { data: exists } = await supabase.rpc('email_exists', { check_email: normalizedEmail });
-    if (exists) {
-      Alert.alert('E-mailadres al in gebruik', 'Log in of gebruik een ander e-mailadres.');
-      return;
-    }
-    const confirmed = await new Promise<boolean>((resolve) =>
-      Alert.alert('Klopt dit?', `We sturen een bevestiging naar:\n\n${normalizedEmail}`, [
-        { text: 'Wijzig', style: 'cancel', onPress: () => resolve(false) },
-        { text: 'Klopt!', onPress: () => resolve(true) },
-      ])
-    );
-    if (!confirmed) return;
 
     setLoading(true);
-    // signUp without name — name comes later in onboarding
-    const { error } = await signUp(normalizedEmail, password, '');
-    setLoading(false);
-    if (error) {
-      Alert.alert('Fout', error.message);
-    } else {
-      Alert.alert('Gelukt!', 'Check je e-mail om je account te bevestigen.', [
-        { text: 'OK', onPress: () => router.replace('/(auth)/login') },
-      ]);
+    try {
+      const { data: exists } = await supabase.rpc('email_exists', { check_email: normalizedEmail });
+      if (exists) {
+        setEmailError('Dit e-mailadres heeft al een account. Log in of gebruik een ander adres.');
+        emailRef.current?.focus();
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await signUp(normalizedEmail, password, '');
+      if (error) {
+        setFormError(mapAuthError(error.message));
+        setLoading(false);
+        return;
+      }
+
+      setSuccess(`We hebben een bevestigingsmail gestuurd naar ${normalizedEmail}. Klik op de link om je account te activeren.`);
+      setLoading(false);
+    } catch (err: any) {
+      setFormError(mapAuthError(err?.message));
+      setLoading(false);
     }
   };
 
@@ -117,57 +153,140 @@ export default function RegisterScreen() {
             {/* Subtitle only — no heading per Figma */}
             <Text style={s.subtitle}>Voer uw gegevens in.</Text>
 
-            {/* Email */}
-            <View style={s.inputWrap}>
-              <TextInput
-                style={s.inputText}
-                placeholder="Email"
-                placeholderTextColor="#848484"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
+            {success ? (
+              <View style={s.successBox}>
+                <Ionicons name="checkmark-circle" size={32} color="#00FE96" />
+                <Text style={s.successTitle}>Check je e-mail.</Text>
+                <Text style={s.successText}>{success}</Text>
+                <Pressable
+                  style={({ pressed }) => [s.btnPrimary, pressed && s.btnPrimaryPressed]}
+                  onPress={() => router.replace('/(auth)/login')}
+                  accessibilityRole="button"
+                >
+                  <Text style={s.btnText}>Terug naar login</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                {/* Email */}
+                <View style={[s.inputWrap, emailError && s.inputWrapError]}>
+                  <TextInput
+                    ref={emailRef}
+                    style={s.inputText}
+                    placeholder="Email"
+                    placeholderTextColor="#848484"
+                    value={email}
+                    onChangeText={(v) => {
+                      setEmail(v);
+                      if (emailError) setEmailError(null);
+                    }}
+                    onBlur={() => setEmailError(validateEmail(email))}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    textContentType="emailAddress"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    blurOnSubmit={false}
+                  />
+                </View>
+                {emailError && <Text style={s.fieldError}>{emailError}</Text>}
 
-            {/* Wachtwoord */}
-            <View style={s.inputWrap}>
-              <TextInput
-                style={s.inputText}
-                placeholder="Wachtwoord"
-                placeholderTextColor="#737373"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={passwordHidden}
-              />
-              <Pressable onPress={() => setPasswordHidden((h) => !h)} style={s.eyeBtn} hitSlop={8}>
-                <Ionicons name={passwordHidden ? 'eye-off-outline' : 'eye-outline'} size={16} color="#848484" />
-              </Pressable>
-            </View>
+                {/* Wachtwoord */}
+                <View style={[s.inputWrap, passwordError && s.inputWrapError]}>
+                  <TextInput
+                    ref={passwordRef}
+                    style={s.inputText}
+                    placeholder="Wachtwoord"
+                    placeholderTextColor="#737373"
+                    value={password}
+                    onChangeText={(v) => {
+                      setPassword(v);
+                      if (passwordError) setPasswordError(null);
+                      if (confirmPassword && confirmError) {
+                        setConfirmError(validateConfirm(confirmPassword, v));
+                      }
+                    }}
+                    secureTextEntry={passwordHidden}
+                    textContentType="newPassword"
+                    autoComplete="password-new"
+                    passwordRules="minlength: 6;"
+                    returnKeyType="next"
+                    onSubmitEditing={() => confirmRef.current?.focus()}
+                    blurOnSubmit={false}
+                  />
+                  <Pressable
+                    onPress={() => setPasswordHidden((h) => !h)}
+                    style={({ pressed }) => [s.eyeBtn, pressed && { opacity: 0.6 }]}
+                    hitSlop={16}
+                    accessibilityRole="button"
+                    accessibilityLabel={passwordHidden ? 'Wachtwoord tonen' : 'Wachtwoord verbergen'}
+                  >
+                    <Ionicons name={passwordHidden ? 'eye-off-outline' : 'eye-outline'} size={16} color="#848484" />
+                  </Pressable>
+                </View>
+                {passwordError && <Text style={s.fieldError}>{passwordError}</Text>}
 
-            {/* Wachtwoord herhalen */}
-            <View style={s.inputWrap}>
-              <TextInput
-                style={s.inputText}
-                placeholder="Wachtwoord herhalen"
-                placeholderTextColor="#737373"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={confirmHidden}
-              />
-              <Pressable onPress={() => setConfirmHidden((h) => !h)} style={s.eyeBtn} hitSlop={8}>
-                <Ionicons name={confirmHidden ? 'eye-off-outline' : 'eye-outline'} size={16} color="#848484" />
-              </Pressable>
-            </View>
+                {/* Wachtwoord herhalen */}
+                <View style={[s.inputWrap, confirmError && s.inputWrapError]}>
+                  <TextInput
+                    ref={confirmRef}
+                    style={s.inputText}
+                    placeholder="Wachtwoord herhalen"
+                    placeholderTextColor="#737373"
+                    value={confirmPassword}
+                    onChangeText={(v) => {
+                      setConfirmPassword(v);
+                      if (confirmError) setConfirmError(null);
+                    }}
+                    secureTextEntry={confirmHidden}
+                    textContentType="newPassword"
+                    autoComplete="password-new"
+                    returnKeyType="done"
+                    onSubmitEditing={handleRegister}
+                  />
+                  <Pressable
+                    onPress={() => setConfirmHidden((h) => !h)}
+                    style={({ pressed }) => [s.eyeBtn, pressed && { opacity: 0.6 }]}
+                    hitSlop={16}
+                    accessibilityRole="button"
+                    accessibilityLabel={confirmHidden ? 'Wachtwoord tonen' : 'Wachtwoord verbergen'}
+                  >
+                    <Ionicons name={confirmHidden ? 'eye-off-outline' : 'eye-outline'} size={16} color="#848484" />
+                  </Pressable>
+                </View>
+                {confirmError && <Text style={s.fieldError}>{confirmError}</Text>}
 
-            {/* Button — 218×25, wider than login */}
-            <Pressable
-              style={[s.btn, loading && { opacity: 0.4 }]}
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              <Text style={s.btnText}>{loading ? 'Laden...' : 'Stuur e-mail verificatie'}</Text>
-            </Pressable>
+                {/* Form-level error */}
+                {formError && (
+                  <View style={s.formErrorBox}>
+                    <Ionicons name="alert-circle" size={14} color="#FF5A5A" />
+                    <Text style={s.formErrorText}>{formError}</Text>
+                  </View>
+                )}
+
+                {/* Register button */}
+                <Pressable
+                  style={({ pressed }) => [
+                    s.btnPrimary,
+                    pressed && s.btnPrimaryPressed,
+                    loading && s.btnDisabled,
+                  ]}
+                  onPress={handleRegister}
+                  disabled={loading}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: loading, busy: loading }}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#F1F1F1" />
+                  ) : (
+                    <Text style={s.btnText}>Stuur e-mail verificatie</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -267,9 +386,74 @@ const s = StyleSheet.create({
   },
   btnText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '400',
     color: '#F1F1F1',
     lineHeight: 15,
+  },
+
+  /* ── Field + form error styles ── */
+  inputWrapError: { borderWidth: 1, borderColor: '#FF5A5A' },
+  fieldError: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    color: '#FF5A5A',
+    marginTop: -16,
+    marginBottom: 12,
+    marginLeft: 12,
+    alignSelf: 'flex-start',
+  },
+  formErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 12,
+  },
+  formErrorText: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF5A5A' },
+
+  /* ── Upgraded primary button ── */
+  btnPrimary: {
+    alignSelf: 'center',
+    minWidth: 160,
+    paddingHorizontal: 28,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FF0085',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    ...Platform.select({
+      ios: { shadowColor: '#FF0085', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10 },
+      android: { elevation: 4 },
+      default: {},
+    }),
+  },
+  btnPrimaryPressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
+  btnDisabled: { opacity: 0.5 },
+
+  /* ── Success state ── */
+  successBox: {
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 8,
+  },
+  successTitle: {
+    fontFamily: 'Unbounded',
+    fontSize: 20,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  successText: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#D9D9D9',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 12,
   },
 });

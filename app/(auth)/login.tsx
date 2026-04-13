@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -17,6 +18,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuroraLogin from '@/src/components/AuroraLogin';
+
+const mapAuthError = (msg?: string): string => {
+  if (!msg) return 'Er ging iets mis. Probeer het opnieuw.';
+  const m = msg.toLowerCase();
+  if (m.includes('invalid login credentials')) return 'E-mail of wachtwoord klopt niet.';
+  if (m.includes('email not confirmed')) return 'Bevestig eerst je e-mail via de link die we je stuurden.';
+  if (m.includes('user already registered')) return 'Dit e-mailadres heeft al een account.';
+  if (m.includes('password should be at least')) return 'Wachtwoord moet minimaal 6 tekens zijn.';
+  if (m.includes('network')) return 'Geen internetverbinding. Controleer je netwerk.';
+  return msg;
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Login screen — pixel-exact from Figma CSS export (node 65:11, 390×844).
@@ -38,20 +52,39 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [passwordHidden, setPasswordHidden] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const passwordRef = React.useRef<TextInput>(null);
+  const emailRef = React.useRef<TextInput>(null);
+
+  const validateEmail = (v: string): string | null => {
+    const t = v.trim();
+    if (!t) return 'Vul je e-mailadres in.';
+    if (!EMAIL_RE.test(t)) return 'Dit ziet er niet uit als een geldig e-mailadres.';
+    return null;
+  };
+  const validatePassword = (v: string): string | null => {
+    if (!v) return 'Vul je wachtwoord in.';
+    return null;
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Vul alle velden in');
-      return;
-    }
+    setFormError(null);
+    const eErr = validateEmail(email);
+    const pErr = validatePassword(password);
+    setEmailError(eErr);
+    setPasswordError(pErr);
+    if (eErr) { emailRef.current?.focus(); return; }
+    if (pErr) { passwordRef.current?.focus(); return; }
     setLoading(true);
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(email.trim().toLowerCase(), password);
     setLoading(false);
     if (error) {
-      Alert.alert('Fout', error.message);
-    } else {
-      router.replace('/(tabs)');
+      setFormError(mapAuthError(error.message));
+      return;
     }
+    router.replace('/(tabs)');
   };
 
   return (
@@ -97,35 +130,58 @@ export default function LoginScreen() {
               Placeholder: font-size 12, color #848484
               padding-left: 82 - 56 = 26px
             */}
-            <View style={s.inputWrap}>
+            <View style={[s.inputWrap, emailError && s.inputWrapError]}>
               <TextInput
+                ref={emailRef}
                 style={s.inputText}
                 placeholder="Email"
                 placeholderTextColor="#848484"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  if (emailError) setEmailError(null);
+                }}
+                onBlur={() => setEmailError(validateEmail(email))}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                textContentType="emailAddress"
+                autoComplete="email"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </View>
+            {emailError && <Text style={s.fieldError}>{emailError}</Text>}
 
             {/* ── Wachtwoord input ──
               Same as email + eye icon 16×16, border 2px solid #848484
               at right edge (300 - 56 = 244px from input left)
             */}
-            <View style={s.inputWrap}>
+            <View style={[s.inputWrap, passwordError && s.inputWrapError]}>
               <TextInput
+                ref={passwordRef}
                 style={s.inputText}
                 placeholder="Wachtwoord"
                 placeholderTextColor="#737373"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => {
+                  setPassword(v);
+                  if (passwordError) setPasswordError(null);
+                }}
                 secureTextEntry={passwordHidden}
+                textContentType="password"
+                autoComplete="current-password"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
               />
               <Pressable
                 onPress={() => setPasswordHidden((h) => !h)}
-                style={s.eyeBtn}
-                hitSlop={8}
+                style={({ pressed }) => [s.eyeBtn, pressed && { opacity: 0.6 }]}
+                hitSlop={16}
+                accessibilityRole="button"
+                accessibilityLabel={passwordHidden ? 'Wachtwoord tonen' : 'Wachtwoord verbergen'}
               >
                 <Ionicons
                   name={passwordHidden ? 'eye-off-outline' : 'eye-outline'}
@@ -134,23 +190,42 @@ export default function LoginScreen() {
                 />
               </Pressable>
             </View>
+            {passwordError && <Text style={s.fieldError}>{passwordError}</Text>}
 
             {/* ── Wachtwoord vergeten? link ── */}
-            <Pressable onPress={() => router.push('/(auth)/forgot-password')}>
+            <Pressable
+              onPress={() => router.push('/(auth)/forgot-password')}
+              hitSlop={12}
+              style={({ pressed }) => pressed && { opacity: 0.6 }}
+            >
               <Text style={s.forgotLink}>Wachtwoord vergeten?</Text>
             </Pressable>
 
-            {/* ── "Log in." button ──
-              Figma: 144×25, bg #FF0085, border-radius 25,
-              box-shadow 0 0 6.8px #FF0085
-              Text: font-size 12, weight 400, color #F1F1F1
-            */}
+            {/* ── Form-level error ── */}
+            {formError && (
+              <View style={s.formErrorBox}>
+                <Ionicons name="alert-circle" size={14} color="#FF5A5A" />
+                <Text style={s.formErrorText}>{formError}</Text>
+              </View>
+            )}
+
+            {/* ── "Log in." button ── */}
             <Pressable
-              style={[s.btn, loading && { opacity: 0.4 }]}
+              style={({ pressed }) => [
+                s.btnPrimary,
+                pressed && s.btnPrimaryPressed,
+                loading && s.btnDisabled,
+              ]}
               onPress={handleLogin}
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: loading, busy: loading }}
             >
-              <Text style={s.btnText}>{loading ? 'Laden...' : 'Log in.'}</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#F1F1F1" />
+              ) : (
+                <Text style={s.btnText}>Log in.</Text>
+              )}
             </Pressable>
 
             {/* ── "Of" divider ──
@@ -189,14 +264,16 @@ export default function LoginScreen() {
             */}
             <Text style={s.bottomLabel}>Nog geen account?</Text>
 
-            {/* ── "Maak aan." button ──
-              Same style as login button: 144×25, #FF0085, glow
-            */}
+            {/* ── "Maak aan." button — secondary (outline) ── */}
             <Pressable
-              style={s.btn}
+              style={({ pressed }) => [
+                s.btnSecondary,
+                pressed && { opacity: 0.7 },
+              ]}
               onPress={() => router.push('/(auth)/register')}
+              accessibilityRole="button"
             >
-              <Text style={s.btnText}>Maak aan.</Text>
+              <Text style={s.btnSecondaryText}>Maak aan.</Text>
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -331,11 +408,66 @@ const s = StyleSheet.create({
   },
   btnText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '400',
     color: '#F1F1F1',
     lineHeight: 15,
   },
+
+  /* ── Field + form error styles ── */
+  inputWrapError: { borderWidth: 1, borderColor: '#FF5A5A' },
+  fieldError: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    color: '#FF5A5A',
+    marginTop: -16,
+    marginBottom: 12,
+    marginLeft: 12,
+    alignSelf: 'flex-start',
+  },
+  formErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 12,
+  },
+  formErrorText: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF5A5A' },
+
+  /* ── Upgraded primary/secondary buttons ── */
+  btnPrimary: {
+    alignSelf: 'center',
+    minWidth: 160,
+    paddingHorizontal: 28,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FF0085',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    ...Platform.select({
+      ios: { shadowColor: '#FF0085', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 10 },
+      android: { elevation: 4 },
+      default: {},
+    }),
+  },
+  btnPrimaryPressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
+  btnDisabled: { opacity: 0.5 },
+  btnSecondary: {
+    alignSelf: 'center',
+    minWidth: 160,
+    paddingHorizontal: 28,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  btnSecondaryText: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400', color: '#F1F1F1', lineHeight: 16 },
 
   /* ── "Of" divider ──
      Two lines 95×4 each, #D9D9D9, radius 25
