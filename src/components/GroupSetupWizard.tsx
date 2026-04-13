@@ -323,6 +323,7 @@ export default function GroupSetupWizard({
                     onChangeText={cat.setName}
                     placeholder={`Categorie ${i + 1}`}
                     placeholderTextColor="#848484"
+                    maxLength={15}
                   />
                   <View style={ws.catPriceWrapper}>
                     <Text style={ws.euroSign}>€</Text>

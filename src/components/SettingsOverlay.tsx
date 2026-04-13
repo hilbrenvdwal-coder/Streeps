@@ -818,6 +818,7 @@ export default function SettingsOverlay({
                 onChangeText={setGroupName}
                 placeholder="Groepsnaam"
                 placeholderTextColor="#848484"
+                maxLength={30}
               />
               <Ionicons name="create-outline" size={18} color="#848484" style={{ marginLeft: 8 }} />
             </View>
@@ -867,6 +868,7 @@ export default function SettingsOverlay({
                         placeholder={`Categorie ${catNum}`}
                         placeholderTextColor="#848484"
                         editable={enabled}
+                        maxLength={15}
                       />
                       {enabled ? (
                         <View style={s.catPriceWrapper}>

@@ -236,6 +236,7 @@ export default function ProfileSetupWizard({
         placeholderTextColor="#848484"
         autoFocus
         returnKeyType="done"
+        maxLength={30}
       />
     </View>
   );
