@@ -14,7 +14,7 @@ import {
   Platform,
   Switch,
   Keyboard,
-  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Reanimated, {
   useSharedValue,
@@ -572,19 +572,26 @@ export default function GroupSetupWizard({
         </Animated.View>
 
         {/* Content */}
-        <Animated.View style={[ws.container, { paddingTop: insets.top + 20 }, contentStyle]} pointerEvents="auto">
-          {renderProgress()}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <Animated.View style={[ws.container, { paddingTop: insets.top + 20 }, contentStyle]} pointerEvents="auto">
+            {renderProgress()}
 
-          <Animated.View style={[ws.stepContainer, { opacity: stepOpacity }]}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-              <View style={{ flex: 1 }}>
+            <Animated.View style={[ws.stepContainer, { opacity: stepOpacity }]}>
+              <View
+                style={{ flex: 1 }}
+                onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}
+              >
                 {renderCurrentStep()}
               </View>
-            </TouchableWithoutFeedback>
-          </Animated.View>
+            </Animated.View>
 
-          {renderBottomBar()}
-        </Animated.View>
+            {renderBottomBar()}
+          </Animated.View>
+        </KeyboardAvoidingView>
 
         <CameraModal
           visible={cameraVisible}
