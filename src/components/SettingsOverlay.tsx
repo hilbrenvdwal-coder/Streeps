@@ -818,7 +818,7 @@ export default function SettingsOverlay({
                 onChangeText={setGroupName}
                 placeholder="Groepsnaam"
                 placeholderTextColor="#848484"
-                maxLength={30}
+                maxLength={20}
               />
               <Ionicons name="create-outline" size={18} color="#848484" style={{ marginLeft: 8 }} />
             </View>

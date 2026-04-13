@@ -304,7 +304,7 @@ export default function ProfielScreen() {
                 autoFocus
                 placeholder="Naam"
                 placeholderTextColor="#848484"
-                maxLength={30}
+                maxLength={20}
               />
               <Pressable onPress={handleSaveName} disabled={saving} style={styles.editBtn}>
                 <Text style={styles.editBtnText}>{saving ? '...' : 'Opslaan'}</Text>

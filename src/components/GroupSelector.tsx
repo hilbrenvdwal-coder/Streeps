@@ -445,7 +445,7 @@ export default function GroupSelector({
                       editable={isActive}
                       focusable={isActive}
                       importantForAccessibility={isActive ? 'yes' : 'no-hide-descendants'}
-                      maxLength={isCreate ? 30 : undefined}
+                      maxLength={isCreate ? 20 : undefined}
                     />
                   </View>
                 </ReAnimated.View>
