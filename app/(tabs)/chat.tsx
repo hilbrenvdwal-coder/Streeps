@@ -2074,13 +2074,16 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
 }
 
 // ── Group profile overlay ──
-function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange }: {
+function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange, onTallyAnnouncementsChange, onSettlementAnnouncementsChange, onBotWelcomeChange }: {
   visible: boolean; groupId: string | null; onClose: () => void;
   onViewProfile: (userId: string) => void;
   cachedData?: { group: any; members: any[]; activeCategories?: any[] };
   onBotToggle?: (groupId: string, enabled: boolean) => void;
   onBotNameChange?: (groupId: string, newName: string) => void;
   onAdminOnlyChatChange?: (groupId: string, enabled: boolean) => void;
+  onTallyAnnouncementsChange?: (groupId: string, enabled: boolean) => void;
+  onSettlementAnnouncementsChange?: (groupId: string, enabled: boolean) => void;
+  onBotWelcomeChange?: (groupId: string, enabled: boolean) => void;
 }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -2193,6 +2196,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
       return;
     }
     setGroup((g: any) => (g ? { ...g, tally_announcements_enabled: value } : g));
+    onTallyAnnouncementsChange?.(groupId, value);
   };
 
   const handleToggleSettlementAnnouncements = async (value: boolean) => {
@@ -2205,6 +2209,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
       return;
     }
     setGroup((g: any) => (g ? { ...g, settlement_announcements_enabled: value } : g));
+    onSettlementAnnouncementsChange?.(groupId, value);
   };
 
   const handleToggleBotWelcome = async (value: boolean) => {
@@ -2217,6 +2222,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
       return;
     }
     setGroup((g: any) => (g ? { ...g, bot_welcome_enabled: value } : g));
+    onBotWelcomeChange?.(groupId, value);
   };
 
   const handleToggleAdminOnly = async (value: boolean) => {
@@ -3885,7 +3891,7 @@ export default function ChatScreen() {
       <ProfileOverlay visible={showProfile} onClose={() => setShowProfile(false)} />
       <AddPeopleOverlay visible={showAddPeople} onClose={closeAddPeople} onFriendshipChange={refreshContacts} onViewProfile={(id) => setViewProfileUserId(id)} refreshKey={friendshipRefreshKey} />
       <UserProfileOverlay visible={!!viewProfileUserId} userId={viewProfileUserId} onClose={() => setViewProfileUserId(null)} cachedData={viewProfileUserId ? profileCache[viewProfileUserId] : undefined} onFriendshipChange={() => { refreshContacts(); setFriendshipRefreshKey((k) => k + 1); }} />
-      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} onAdminOnlyChatChange={(gid, enabled) => { setAdminOnlyChatMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, admin_only_chat: enabled }; }} />
+      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} onAdminOnlyChatChange={(gid, enabled) => { setAdminOnlyChatMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, admin_only_chat: enabled }; }} onTallyAnnouncementsChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, tally_announcements_enabled: enabled }; }} onSettlementAnnouncementsChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, settlement_announcements_enabled: enabled }; }} onBotWelcomeChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_welcome_enabled: enabled }; }} />
       {showGiftOverlay && currentConv && (
         <GiftOverlay
           conversationId={currentConv.id}
