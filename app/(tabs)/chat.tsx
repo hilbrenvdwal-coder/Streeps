@@ -2558,7 +2558,7 @@ const gp = StyleSheet.create({
   displayName: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF', textAlign: 'center', marginTop: 8 },
   memberCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', textAlign: 'center', marginTop: 4 },
   sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
-  card: { backgroundColor: 'rgba(78,78,78,0.2)', borderRadius: 25, overflow: 'hidden' },
+  card: { borderRadius: 25, overflow: 'hidden' },
   divider: { height: 1, backgroundColor: 'rgba(78,78,78,0.3)', marginLeft: 64 },
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   memberAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12 },
