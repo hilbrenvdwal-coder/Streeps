@@ -376,11 +376,16 @@ export default function GroupSetupWizard({
 
   // ── Step 3: Drinks ──
   const renderStep3 = () => (
-    <View style={ws.stepContent}>
+    <View style={[ws.stepContent, { paddingBottom: 104 + insets.bottom }]}>
       <Text style={ws.stepTitle}>Drankjes</Text>
       <Text style={ws.stepSubtitle}>Beheer de drankjes in je groep</Text>
 
-      <ScrollView style={ws.drinksList} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={ws.drinksList}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
         {drinks.map((drink, i) => (
           <React.Fragment key={drink.id}>
             {i > 0 && <View style={ws.divider} />}
@@ -398,59 +403,58 @@ export default function GroupSetupWizard({
             </View>
           </React.Fragment>
         ))}
-
-        <View style={ws.divider} />
-        <View style={ws.addDrinkRow}>
-          <View style={ws.addDrinkInputRow}>
-            <TextInput
-              style={ws.addDrinkEmoji}
-              placeholder="🍺"
-              placeholderTextColor="#848484"
-              value={newDrinkEmoji}
-              onChangeText={setNewDrinkEmoji}
-            />
-            <TextInput
-              style={ws.addDrinkInput}
-              placeholder="Naam"
-              placeholderTextColor="#848484"
-              value={newDrinkName}
-              onChangeText={setNewDrinkName}
-              returnKeyType="done"
-              onSubmitEditing={handleAddDrink}
-            />
-          </View>
-          <View style={ws.addDrinkCatRow}>
-            <View style={ws.catSelectorRow}>
-              {[1, 2, 3, 4]
-                .filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled))
-                .map((c) => {
-                  const isSelected = newDrinkCat === c;
-                  const color = categoryColors[(c - 1) % 4];
-                  const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Cat ${c}`;
-                  return (
-                    <Pressable
-                      key={c}
-                      onPress={() => setNewDrinkCat(c)}
-                      style={[
-                        ws.catSelectorPill,
-                        { backgroundColor: isSelected ? color : color + '30' },
-                      ]}
-                    >
-                      <Text style={[ws.catSelectorPillText, { color: isSelected ? '#0F0F1E' : color }]}>
-                        {label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-            </View>
-            <Reanimated.View style={addBtnAnimStyle}>
-              <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
-                <Ionicons name="add" size={20} color="#FFFFFF" />
-              </Pressable>
-            </Reanimated.View>
-          </View>
-        </View>
       </ScrollView>
+      <View style={ws.divider} />
+      <View style={ws.addDrinkRow}>
+        <View style={ws.addDrinkInputRow}>
+          <TextInput
+            style={ws.addDrinkEmoji}
+            placeholder="🍺"
+            placeholderTextColor="#848484"
+            value={newDrinkEmoji}
+            onChangeText={setNewDrinkEmoji}
+          />
+          <TextInput
+            style={ws.addDrinkInput}
+            placeholder="Naam"
+            placeholderTextColor="#848484"
+            value={newDrinkName}
+            onChangeText={setNewDrinkName}
+            returnKeyType="done"
+            onSubmitEditing={handleAddDrink}
+          />
+        </View>
+        <View style={ws.addDrinkCatRow}>
+          <View style={ws.catSelectorRow}>
+            {[1, 2, 3, 4]
+              .filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled))
+              .map((c) => {
+                const isSelected = newDrinkCat === c;
+                const color = categoryColors[(c - 1) % 4];
+                const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Cat ${c}`;
+                return (
+                  <Pressable
+                    key={c}
+                    onPress={() => setNewDrinkCat(c)}
+                    style={[
+                      ws.catSelectorPill,
+                      { backgroundColor: isSelected ? color : color + '30' },
+                    ]}
+                  >
+                    <Text style={[ws.catSelectorPillText, { color: isSelected ? '#0F0F1E' : color }]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+          </View>
+          <Reanimated.View style={addBtnAnimStyle}>
+            <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+            </Pressable>
+          </Reanimated.View>
+        </View>
+      </View>
     </View>
   );
 
