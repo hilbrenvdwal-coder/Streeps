@@ -362,7 +362,7 @@ export default function GroupSetupWizard({
                   onValueChange={cat.setEnabled}
                   trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
                   thumbColor="#FFFFFF"
-                  style={{ marginLeft: 8 }}
+                  style={{ marginLeft: 8, alignSelf: 'center' }}
                 />
               ) : (
                 <View style={{ width: 59 }} />
