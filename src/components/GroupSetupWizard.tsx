@@ -407,13 +407,16 @@ export default function GroupSetupWizard({
       <View style={ws.divider} />
       <View style={ws.addDrinkRow}>
         <View style={ws.addDrinkInputRow}>
-          <TextInput
-            style={ws.addDrinkEmoji}
-            placeholder="🍺"
-            placeholderTextColor="#848484"
-            value={newDrinkEmoji}
-            onChangeText={setNewDrinkEmoji}
-          />
+          <View style={[ws.addDrinkEmojiWrap, newDrinkEmoji === '' ? ws.addDrinkEmojiEmpty : ws.addDrinkEmojiFilled]}>
+            {newDrinkEmoji === '' && (
+              <Text style={ws.addDrinkEmojiPlaceholder} pointerEvents="none">🍺</Text>
+            )}
+            <TextInput
+              style={ws.addDrinkEmoji}
+              value={newDrinkEmoji}
+              onChangeText={setNewDrinkEmoji}
+            />
+          </View>
           <TextInput
             style={ws.addDrinkInput}
             placeholder="Naam"
@@ -779,15 +782,37 @@ const ws = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
+  addDrinkEmojiWrap: {
+    width: 40,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addDrinkEmojiEmpty: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  addDrinkEmojiFilled: {
+    borderWidth: 1.5,
+    borderStyle: 'solid',
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  addDrinkEmojiPlaceholder: {
+    position: 'absolute',
+    fontSize: 18,
+    opacity: 0.35,
+    textAlign: 'center',
+  },
   addDrinkEmoji: {
     fontFamily: 'Unbounded',
-    width: 40,
     fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
+    width: 40,
     height: 44,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
   },
   addDrinkInput: {
     fontFamily: 'Unbounded',
