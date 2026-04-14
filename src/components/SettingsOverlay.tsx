@@ -561,7 +561,7 @@ export default function SettingsOverlay({
       price3 !== iv.price3 || price4 !== iv.price4 ||
       catName1 !== iv.catName1 || catName2 !== iv.catName2 ||
       catName3 !== iv.catName3 || catName4 !== iv.catName4 ||
-      !setsEqual(enabledCats, iv.enabledCats) ||
+      !setsEqual(enabledCats, iv.enabledCats)
     );
   };
 
