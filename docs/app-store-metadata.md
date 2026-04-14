@@ -18,7 +18,7 @@
 - **Prijs**: Gratis
 - **In-app purchases**: Geen
 - **Talen**: Nederlands (primair). Engels volgt in een latere release.
-- **Support email**: hallo@streeps.app
+- **Support email**: contact@streeps.app
 - **Marketing/Support URL**: https://streeps.app
 - **Privacy Policy URL**: https://streeps.app/privacy (TODO — nog te hosten)
 - **Terms of Service URL**: https://streeps.app/terms (TODO — nog te hosten)
@@ -111,7 +111,7 @@ Klaar voor de eerste ronde? Download Streeps en haal je groep erbij.
 ### What's New (versie 1.0, 4000 tekens max)
 
 ```
-Hallo wereld! Dit is de allereerste versie van Streeps. Maak je groep aan, nodig je vrienden uit, zet je eerste streepje en laat de Streeps-bot de rest doen. Laat ons weten wat je ervan vindt via hallo@streeps.app — we bouwen Streeps samen met de eerste groepen.
+Hallo wereld! Dit is de allereerste versie van Streeps. Maak je groep aan, nodig je vrienden uit, zet je eerste streepje en laat de Streeps-bot de rest doen. Laat ons weten wat je ervan vindt via contact@streeps.app — we bouwen Streeps samen met de eerste groepen.
 ```
 (265/4000)
 
@@ -186,14 +186,14 @@ Klaar voor de eerste ronde? Download Streeps en haal je groep erbij.
 ### What's new (500 tekens max)
 
 ```
-Hallo wereld! Dit is de allereerste versie van Streeps. Maak je groep aan, nodig je vrienden uit, zet je eerste streepje en laat de Streeps-bot de rest doen. Laat ons weten wat je ervan vindt via hallo@streeps.app.
+Hallo wereld! Dit is de allereerste versie van Streeps. Maak je groep aan, nodig je vrienden uit, zet je eerste streepje en laat de Streeps-bot de rest doen. Laat ons weten wat je ervan vindt via contact@streeps.app.
 ```
 (218/500)
 
 ---
 
 ### Contact email
-`hallo@streeps.app`
+`contact@streeps.app`
 
 ### Website
 `https://streeps.app`
@@ -357,7 +357,7 @@ streepjes,kroeg,rondjes,bier,drank,vrienden,tikkie,afrekenen,groep,tally,borrel,
 - [ ] Feature Graphic uploaden (1024×500 px)
 - [ ] Content rating questionnaire invullen (verwacht: Volwassenen 18+)
 - [ ] Data safety formulier invullen (welke data verzamel je, waarom, of je het deelt)
-- [ ] Contact email instellen: hallo@streeps.app
+- [ ] Contact email instellen: contact@streeps.app
 
 ### Technisch (pre-launch)
 - [ ] Deep linking testen: `streeps://` en `https://streeps.app/join/` op iOS + Android
@@ -377,5 +377,5 @@ streepjes,kroeg,rondjes,bier,drank,vrienden,tikkie,afrekenen,groep,tally,borrel,
 
 ---
 
-*Contactpersoon: hallo@streeps.app*
+*Contactpersoon: contact@streeps.app*
 *Website: https://streeps.app*
