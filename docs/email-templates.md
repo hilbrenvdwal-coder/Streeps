@@ -28,8 +28,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="x-apple-disable-message-reformatting" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="supported-color-schemes" content="light dark" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
     <title>Bevestig je Streeps account</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -68,7 +68,7 @@
       Welkom bij Streeps. Bevestig je account en begin met streepjes zetten.
     </div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" bgcolor="#141414" style="background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);">
       <tr>
         <td align="center" style="padding:32px 16px;">
 
@@ -77,7 +77,7 @@
 
             <!-- ─── Dark branded header ─── -->
             <tr>
-              <td style="background-color:#0E0D1C;border-radius:24px 24px 0 0;padding:0;" align="center">
+              <td bgcolor="#0E0D1C" style="background-color:#0E0D1C;border-radius:24px 24px 0 0;padding:0;" align="center">
                 <!-- Logo + wordmark -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
@@ -95,7 +95,7 @@
 
             <!-- ─── Light card body ─── -->
             <tr>
-              <td class="card px-lg py-lg" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
+              <td class="card px-lg py-lg" bgcolor="#1A1A2E" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
                 <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#FFFFFF;">
                   Welkom bij Streeps
                 </h1>
@@ -144,7 +144,7 @@
 
             <!-- ─── Footer ─── -->
             <tr>
-              <td style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
+              <td bgcolor="#1A1A2E" style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
                 <p class="footer-text" style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:12px;line-height:1.6;color:#A0A0B8;">
                   Streeps &middot; <a href="https://streeps.app" style="color:#A0A0B8;text-decoration:underline;">streeps.app</a>
                 </p>
@@ -181,8 +181,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="x-apple-disable-message-reformatting" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="supported-color-schemes" content="light dark" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
     <title>Stel je Streeps wachtwoord opnieuw in</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -222,7 +222,7 @@
       Je hebt een wachtwoord reset aangevraagd voor Streeps.
     </div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" bgcolor="#141414" style="background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);">
       <tr>
         <td align="center" style="padding:32px 16px;">
 
@@ -231,7 +231,7 @@
 
             <!-- ─── Dark branded header ─── -->
             <tr>
-              <td style="background-color:#0E0D1C;border-radius:24px 24px 0 0;padding:0;" align="center">
+              <td bgcolor="#0E0D1C" style="background-color:#0E0D1C;border-radius:24px 24px 0 0;padding:0;" align="center">
                 <!-- Logo + wordmark -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
@@ -249,7 +249,7 @@
 
             <!-- ─── Light card body ─── -->
             <tr>
-              <td class="card px-lg py-lg" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
+              <td class="card px-lg py-lg" bgcolor="#1A1A2E" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
                 <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#FFFFFF;">
                   Nieuw wachtwoord instellen
                 </h1>
@@ -298,7 +298,7 @@
 
             <!-- ─── Footer ─── -->
             <tr>
-              <td style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
+              <td bgcolor="#1A1A2E" style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
                 <p class="footer-text" style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:12px;line-height:1.6;color:#A0A0B8;">
                   Streeps &middot; <a href="https://streeps.app" style="color:#A0A0B8;text-decoration:underline;">streeps.app</a>
                 </p>
