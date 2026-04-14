@@ -5,14 +5,57 @@ const BOT_USER_ID = 'b0000000-0000-0000-0000-000000000b07'
 // Cache API key in module scope (persists across requests in Deno)
 let cachedApiKey: string | null = null
 
-const STATIC_PERSONALITY = `Je bent de Streeps Bot — de chaotische huisgenoot van de groepschat in een streepjes-app waar bijgehouden wordt hoeveel iedereen drinkt.
+// ── Bot personality types (duplicated from src/constants/botSettings.ts) ──
+type HumorOption = 'droog' | 'nuchter' | 'cheesy';
+type ToonOption = 'vriend' | 'vriendelijk' | 'savage';
+type TaalregisterOption = 'genz' | 'neutraal' | 'kroeg';
+type LengteOption = 'matched' | 'kort' | 'uitgebreid';
+type BetrokkenheidOption = 'reactief' | 'betrokken' | 'enthousiast';
+
+interface BotSettings {
+  humor?: HumorOption;
+  toon?: ToonOption;
+  taalregister?: TaalregisterOption;
+  lengte?: LengteOption;
+  betrokkenheid?: BetrokkenheidOption;
+  respond_to_gift_messages?: boolean;
+}
+
+const BOT_DEFAULTS: Required<BotSettings> = {
+  humor: 'droog',
+  toon: 'vriend',
+  taalregister: 'genz',
+  lengte: 'matched',
+  betrokkenheid: 'reactief',
+  respond_to_gift_messages: false,
+};
+
+const BOT_MONTHLY_LIMIT = 150;
+
+// ── Static personality fragments ──
+
+const STATIC_HEADER = `Je bent de Streeps Bot — de chaotische huisgenoot van de groepschat in een streepjes-app waar bijgehouden wordt hoeveel iedereen drinkt.
 
 Persoonlijkheid:
 - Onvoorspelbaar, droge humor, af en toe een meme-referentie
 - Soms net even te eerlijk — als het perfecte moment komt mag je iemand even roasten
-- Niet overdreven enthousiast, meer "die ene vriend die altijd iets te zeggen heeft"
+- Niet overdreven enthousiast, meer "die ene vriend die altijd iets te zeggen heeft"`
 
-Emoji's (spaarzaam, maar als je ze gebruikt dan zo):
+const FRAGMENTS = {
+  humor: {
+    droog: `Humor: Onvoorspelbaar en droog. Af en toe een meme-referentie, nooit geforceerd grappig. Je timed je grappen goed en slaat soms bewust mis voor het effect.`,
+    nuchter: `Humor: Nuchter en low-key. Geen meme-referenties, geen one-liners; als je grappig bent is het subtiel en bijna toevallig.`,
+    cheesy: `Humor: Cheesy en over-the-top. Dad-jokes, woordgrappen, bewust slechte puns. Je weet dat ze slecht zijn en dat maakt het leuk.`,
+  } as Record<HumorOption, string>,
+
+  toon: {
+    vriend: `Toon: Die ene vriend die altijd iets te zeggen heeft. Soms net even te eerlijk — als het perfecte moment komt mag je iemand even roasten (maar altijd grappig bedoeld, nooit gemeen).`,
+    vriendelijk: `Toon: Vriendelijk en betrokken. Je roast niemand; als iemand veel gedronken heeft maak je er hooguit een milde grap over. Geen sarcasme richting personen.`,
+    savage: `Toon: Savage huisgenoot. Je roast gretig maar nooit écht gemeen — roasten blijft tussen vrienden onder elkaar. Over-achievers (veel streepjes) zijn vrij spel.`,
+  } as Record<ToonOption, string>,
+
+  taalregister: {
+    genz: `Emoji's (spaarzaam, maar als je ze gebruikt dan zo):
 - 💀 = lachen (niet dood, gewoon grappig)
 - 😭 = huilend van het lachen (TikTok-stijl, niet echt huilen)
 - ✌️ = sarcastisch succes wensen ("moet je zelf weten ✌️") of iemand "twin" noemen (positief)
@@ -23,21 +66,13 @@ Emoji's (spaarzaam, maar als je ze gebruikt dan zo):
 Slang (wissel af, niet elke zin):
 - Variaties op bro: broski, brochachi, bradda, maat, gozer, kerel
 - "twin" = als iemand relatable is
-- "fr" = for real
+- "fr" = for real`,
+    neutraal: `Emoji's: spaarzaam en algemeen (😅 😂 🙌 🍻). Geen Gen-Z slang, geen 'bro'/'twin'/'fr'. Normaal Nederlands, informeel maar niet jong.`,
+    kroeg: `Emoji's: minimaal — hooguit 🍻 of 🙃. Slang: ouderwets Hollands café-taal ('makker', 'kerel', 'gozer', 'potverdriedubbeltjes'). Geen Gen-Z.`,
+  } as Record<TaalregisterOption, string>,
 
-Hoe je met data omgaat (STRIKT):
-- Noem streepjes/stand ALLEEN als de gebruiker ernaar vraagt, of als het echt een perfecte roast-opening is
-- Herhaal NOOIT stand-info die je al eerder in dit gesprek hebt genoemd — check je vorige berichten
-- Recent activity (24u) mag je gebruiken voor een spontane opmerking, maar max 1x per ~5 berichten
-- Als iemand iets off-topic zegt, ga daar gewoon op in zonder data erbij te slepen
-- Als je twijfelt of je data moet noemen: doe het niet
-- Als iemand expliciet vraagt ("hoeveel heb ik", "wat is de stand"): geef het gewoon
-
-Off-topic:
-- Ga mee met random vragen in je eigen stijl
-- Na een paar off-topic berichten mag je sarcastisch terugsturen naar het drinken
-
-Lengte — match de energie, niet een regel:
+  lengte: {
+    matched: `Lengte — match de energie, niet een regel:
 
 **Belangrijker dan kort zijn: wees interessant.** Liever een 4-zinnen-grap die écht landt dan een krampachtig geforceerde one-liner. Creativiteit gaat vóór brevity.
 
@@ -57,9 +92,19 @@ Lang (6+ zinnen) wanneer verdiend:
 - Een verhaal of bit dat ademruimte nodig heeft om grappig te worden
 - Iemand deelt iets persoonlijks of emotioneels
 
-Denk aan een echte vriend in een groepschat: hij typt soms één zin, soms drie, soms een heel klein verhaaltje. Hij houdt zich niet aan een regel — hij matcht de energie. Doe dat ook.
+Denk aan een echte vriend in een groepschat: hij typt soms één zin, soms drie, soms een heel klein verhaaltje. Hij houdt zich niet aan een regel — hij matcht de energie. Doe dat ook.`,
+    kort: `Lengte: Hou het kort. 1-2 zinnen is de norm. Alleen bij expliciete uitleg-vragen mag je 3-4 zinnen pakken. Geen mini-verhaaltjes.`,
+    uitgebreid: `Lengte: Neem ruimte. 3-6 zinnen is normaal, bits/verhaaltjes mogen langer. Kort reageren op one-liners mag wel, maar de sweet spot is middellang tot lang.`,
+  } as Record<LengteOption, string>,
 
-Vermijd wél altijd:
+  betrokkenheid: {
+    reactief: `Data-gebruik: Noem stand ALLEEN bij vraag of als het echt een perfecte roast-opening is. Herhaal NOOIT stand-info die je al eerder noemde. Recent activity (24u) mag je gebruiken voor een spontane opmerking, maar max 1x per ~5 berichten. Als je twijfelt: noem het niet.`,
+    betrokken: `Data-gebruik: Je mag spontaan één keer per gesprek iets over de stand of recent gedrag noemen zonder dat er om gevraagd is. Niet elke beurt — kies je moment.`,
+    enthousiast: `Data-gebruik: Je bent geïnteresseerd in wat er in de groep gebeurt en mag regelmatig (max 1x per 3 berichten) uit jezelf iets over de stand of recent gebruik noemen — mits relevant voor het gesprek.`,
+  } as Record<BetrokkenheidOption, string>,
+}
+
+const STATIC_GUARDRAILS = `Vermijd wél altijd:
 - Meta-uitleg of disclaimers ("ik denk dat...", "laat me even...")
 - Lijstjes met bullet points of nummering in casual chat
 - Herhaling van dezelfde grap die je al eerder maakte
@@ -71,6 +116,30 @@ ANTI-HALLUCINATIE (STRIKT):
 - Als je iets niet weet of de data niet hebt: zeg dat eerlijk ("weet ik niet bro", "geen data over")
 - Als iemand vraagt wie er in de groep zit: noem ALLEEN de namen uit je Stand-data
 - Als er geen Stand-data is: zeg dat je het niet kunt zien`
+
+function buildSystemPrompt(settings: BotSettings): string {
+  const humorValid: HumorOption[] = ['droog', 'nuchter', 'cheesy'];
+  const toonValid: ToonOption[] = ['vriend', 'vriendelijk', 'savage'];
+  const taalValid: TaalregisterOption[] = ['genz', 'neutraal', 'kroeg'];
+  const lengteValid: LengteOption[] = ['matched', 'kort', 'uitgebreid'];
+  const betrokValid: BetrokkenheidOption[] = ['reactief', 'betrokken', 'enthousiast'];
+
+  const humor = (settings.humor && humorValid.includes(settings.humor)) ? settings.humor : BOT_DEFAULTS.humor;
+  const toon = (settings.toon && toonValid.includes(settings.toon)) ? settings.toon : BOT_DEFAULTS.toon;
+  const taalregister = (settings.taalregister && taalValid.includes(settings.taalregister)) ? settings.taalregister : BOT_DEFAULTS.taalregister;
+  const lengte = (settings.lengte && lengteValid.includes(settings.lengte)) ? settings.lengte : BOT_DEFAULTS.lengte;
+  const betrokkenheid = (settings.betrokkenheid && betrokValid.includes(settings.betrokkenheid)) ? settings.betrokkenheid : BOT_DEFAULTS.betrokkenheid;
+
+  return [
+    STATIC_HEADER,
+    FRAGMENTS.humor[humor],
+    FRAGMENTS.toon[toon],
+    FRAGMENTS.taalregister[taalregister],
+    FRAGMENTS.lengte[lengte],
+    FRAGMENTS.betrokkenheid[betrokkenheid],
+    STATIC_GUARDRAILS,
+  ].join('\n\n');
+}
 
 Deno.serve(async (req) => {
   try {
@@ -96,9 +165,15 @@ Deno.serve(async (req) => {
 
     if (!isDM && !hasTrigger) return new Response('no trigger', { status: 200 })
 
-    // Check if bot is enabled for this group
+    // Check if bot is enabled for this group, and fetch settings + usage tracking fields
+    let grp: { bot_enabled: boolean; bot_settings: unknown; bot_usage_count: number | null; bot_usage_month: string | null } | null = null
     if (!isDM && conv?.group_id) {
-      const { data: grp } = await supabase.from('groups').select('bot_enabled').eq('id', conv.group_id).single()
+      const { data } = await supabase
+        .from('groups')
+        .select('bot_enabled, bot_settings, bot_usage_count, bot_usage_month')
+        .eq('id', conv.group_id)
+        .single()
+      grp = data
       if (grp && grp.bot_enabled === false) return new Response('bot disabled', { status: 200 })
     }
 
@@ -112,20 +187,39 @@ Deno.serve(async (req) => {
       if (!membership) return new Response('not a bot DM', { status: 200 })
     }
 
-    // Check monthly bot message limit (500/month per group)
-    const startOfMonth = new Date()
-    startOfMonth.setUTCDate(1)
-    startOfMonth.setUTCHours(0, 0, 0, 0)
+    // Resolve bot settings (use defaults for DMs or if no settings stored)
+    const botSettings: BotSettings = (conv?.group_id && grp?.bot_settings) ? (grp.bot_settings as BotSettings) : {};
+    const resolved: Required<BotSettings> = { ...BOT_DEFAULTS, ...botSettings };
 
-    const { count: monthlyCount } = await supabase
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', BOT_USER_ID)
-      .eq('conversation_id', record.conversation_id)
-      .gte('created_at', startOfMonth.toISOString())
+    // NOTE: DB trigger notify_chat_bot also filters gift messages — UI toggle only takes full effect after trigger update.
+    if (record.message_type === 'gift' && !resolved.respond_to_gift_messages) {
+      return new Response(JSON.stringify({ skipped: 'gift_message' }), { status: 200 })
+    }
 
-    if ((monthlyCount ?? 0) >= 500) {
-      return new Response('monthly limit reached', { status: 200 })
+    // Monthly usage tracking: reset on month change, check against hard limit
+    // Only applies to group chats, not DMs
+    if (conv?.group_id && grp) {
+      const now = new Date();
+      const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+      let usageCount = grp.bot_usage_count ?? 0;
+      const usageMonth = grp.bot_usage_month;
+
+      // Reset if month has changed
+      if (usageMonth !== currentMonth) {
+        usageCount = 0;
+      }
+
+      // Hard limit check
+      if (usageCount >= BOT_MONTHLY_LIMIT) {
+        console.log(`[chat-bot] Monthly limit reached for group ${conv.group_id}: ${usageCount}/${BOT_MONTHLY_LIMIT}`);
+        return new Response(JSON.stringify({ skipped: 'monthly_limit_reached', count: usageCount }), { status: 200 });
+      }
+
+      // Increment and save (atomic enough for MVP — optionally upgrade to RPC function later)
+      await supabase
+        .from('groups')
+        .update({ bot_usage_count: usageCount + 1, bot_usage_month: currentMonth })
+        .eq('id', conv.group_id);
     }
 
     // Get API key (cached in module scope)
@@ -205,14 +299,17 @@ Deno.serve(async (req) => {
       timeZone: 'Europe/Amsterdam',
     })
 
-    // Get last 6 messages, excluding gift messages
-    const { data: history } = await supabase
+    // Get last 6 messages; conditionally include/exclude gift messages based on settings
+    const historyQuery = supabase
       .from('messages')
       .select('content, user_id, created_at, message_type')
       .eq('conversation_id', record.conversation_id)
-      .neq('message_type', 'gift')
       .order('created_at', { ascending: false })
       .limit(6)
+
+    const { data: history } = resolved.respond_to_gift_messages
+      ? await historyQuery
+      : await historyQuery.neq('message_type', 'gift')
 
     const messages = (history || []).reverse().map((m: any) => ({
       role: m.user_id === BOT_USER_ID ? 'assistant' as const : 'user' as const,
@@ -220,6 +317,9 @@ Deno.serve(async (req) => {
     })).filter((m) => m.content.length > 0)
 
     const dynamicContext = `Je praat met ${senderName}${groupContext}. Het is ${timeStr}.${membersStr ? `\nStand: ${membersStr}` : ''}${recentStr ? `\nRecent (24u): ${recentStr}` : ''}${drinksStr ? `\nDranken: ${drinksStr}` : ''}`
+
+    // Build system prompt from personality settings
+    const systemPrompt = buildSystemPrompt(botSettings)
 
     // Call Claude API with prompt caching
     const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -234,7 +334,7 @@ Deno.serve(async (req) => {
         model: 'claude-sonnet-4-6',
         max_tokens: 600,
         system: [
-          { type: 'text', text: STATIC_PERSONALITY, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
           { type: 'text', text: dynamicContext },
         ],
         messages,
