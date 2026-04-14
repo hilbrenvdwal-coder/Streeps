@@ -28,6 +28,7 @@ import ImageLightbox, { type ImageLayout } from '@/src/components/ImageLightbox'
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
 import { BOT_UUID, BOT_DEFAULT_NAME, MAX_BOT_NAME_LENGTH } from '@/src/constants/bot';
+import FeedbackOverlay from '@/src/components/FeedbackOverlay';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
@@ -1545,6 +1546,8 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
     setSaving(false);
   };
 
+  const [feedbackOverlayVisible, setFeedbackOverlayVisible] = useState(false);
+
   const [cameraVisible, setCameraVisible] = useState(false);
   const handleOpenCamera = () => setCameraVisible(true);
   const handleImageCaptured = async (uri: string, mimeType?: string) => {
@@ -1670,6 +1673,16 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
             </Pressable>
           </Modal>
 
+          {/* FEEDBACK */}
+          <Text style={po.sectionHeader}>FEEDBACK</Text>
+          <View style={po.card}>
+            <Pressable style={po.row} onPress={() => setFeedbackOverlayVisible(true)}>
+              <Ionicons name="chatbox-ellipses-outline" size={20} color="#FFFFFF" style={po.rowIcon} />
+              <Text style={po.rowLabel}>Ik heb een idee of probleem</Text>
+              <Ionicons name="chevron-forward" size={16} color="#848484" style={{ marginLeft: 4 }} />
+            </Pressable>
+          </View>
+
           {/* Uitloggen */}
           <Pressable style={po.logoutBtn} onPress={() => {
             Alert.alert('Uitloggen', 'Weet je het zeker?', [
@@ -1687,6 +1700,12 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
         visible={cameraVisible}
         onClose={() => setCameraVisible(false)}
         onImageCaptured={handleImageCaptured}
+      />
+
+      <FeedbackOverlay
+        visible={feedbackOverlayVisible}
+        onClose={() => setFeedbackOverlayVisible(false)}
+        userId={user?.id ?? null}
       />
     </View>
   );
