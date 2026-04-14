@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme, streepsMagenta, brand } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import { useConversations, useChatMessages, useContacts, startDM, sendGiftMessage, type ConversationPreview } from '@/src/hooks/useChat';
@@ -1454,7 +1453,6 @@ const dt = StyleSheet.create({
 // ── Profiel overlay (full features from profiel.tsx) ──
 function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { user, signOut } = useAuth();
-  const { preference, setPreference } = useTheme();
   const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
@@ -1482,38 +1480,6 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
     setGenderModalVisible(false);
     await supabase.from('profiles').update({ gender: value }).eq('id', user.id);
   };
-
-  // Animated theme indicator
-  const segLayouts = useRef<{ x: number; w: number }[]>([]).current;
-  const segX = useRef(new Animated.Value(0)).current;
-  const segW = useRef(new Animated.Value(0)).current;
-  const segReady = useRef(false);
-
-  const themeOptions = [
-    { key: 'system' as const, label: 'Systeem' },
-    { key: 'light' as const, label: 'Licht' },
-    { key: 'dark' as const, label: 'Donker' },
-  ];
-  const activeSegIndex = themeOptions.findIndex((o) => o.key === preference);
-
-  const onSegLayout = useCallback((index: number, x: number, w: number) => {
-    segLayouts[index] = { x, w };
-    if (segLayouts.filter(Boolean).length === themeOptions.length && !segReady.current) {
-      segReady.current = true;
-      const cur = segLayouts[activeSegIndex] ?? segLayouts[0];
-      segX.setValue(cur.x);
-      segW.setValue(cur.w);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!segReady.current) return;
-    const target = segLayouts[activeSegIndex];
-    if (!target) return;
-    const ease = { duration: 250, easing: Easing.inOut(Easing.ease), useNativeDriver: false };
-    Animated.timing(segX, { toValue: target.x, ...ease }).start();
-    Animated.timing(segW, { toValue: target.w, ...ease }).start();
-  }, [activeSegIndex]);
 
   useEffect(() => {
     if (!user) return;
@@ -1704,30 +1670,6 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
             </Pressable>
           </Modal>
 
-          {/* WEERGAVE section */}
-          <Text style={po.sectionHeader}>WEERGAVE</Text>
-          <View style={po.card}>
-            <View style={po.row}>
-              <Ionicons name="color-palette-outline" size={20} color="#FFFFFF" style={po.rowIcon} />
-              <Text style={po.rowLabel}>Thema</Text>
-              <View style={po.segmented}>
-                <Animated.View style={[po.segIndicator, { left: segX, width: segW }]} />
-                {themeOptions.map((opt, i) => (
-                  <Pressable key={opt.key} style={po.segBtn} onPress={() => setPreference(opt.key)}
-                    onLayout={(e) => onSegLayout(i, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}>
-                    <Text style={[po.segText, preference === opt.key && po.segActiveText]}>{opt.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-            <View style={po.divider} />
-            <View style={po.row}>
-              <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" style={po.rowIcon} />
-              <Text style={po.rowLabel}>Versie</Text>
-              <Text style={po.rowValue}>1.0.0</Text>
-            </View>
-          </View>
-
           {/* Uitloggen */}
           <Pressable style={po.logoutBtn} onPress={() => {
             Alert.alert('Uitloggen', 'Weet je het zeker?', [
@@ -1779,13 +1721,6 @@ const po = StyleSheet.create({
   editBtnText: { fontFamily: 'Unbounded', color: '#00BEAE', fontSize: 12, fontWeight: '600' },
   editCancelText: { fontFamily: 'Unbounded', color: '#848484', fontSize: 12 },
   nameWarning: { fontFamily: 'Unbounded', color: '#848484', fontSize: 11, paddingHorizontal: 48, paddingBottom: 8 },
-
-  // Theme
-  segmented: { flexDirection: 'row', borderRadius: 8, backgroundColor: 'rgba(78,78,78,0.3)', padding: 2 },
-  segIndicator: { position: 'absolute', top: 2, bottom: 2, borderRadius: 6, backgroundColor: 'rgba(0,190,174,0.2)' },
-  segBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  segText: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484' },
-  segActiveText: { color: '#00BEAE', fontWeight: '600' },
 
   // Logout
   logoutBtn: { marginTop: 32, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' },
