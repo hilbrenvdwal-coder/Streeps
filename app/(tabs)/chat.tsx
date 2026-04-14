@@ -28,6 +28,7 @@ import ImageLightbox, { type ImageLayout } from '@/src/components/ImageLightbox'
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
 import { BOT_UUID, BOT_DEFAULT_NAME, MAX_BOT_NAME_LENGTH } from '@/src/constants/bot';
+import { BOT_DIMENSIONS, BOT_DEFAULTS, BOT_MONTHLY_LIMIT, type BotSettings } from '@/src/constants/botSettings';
 import FeedbackOverlay from '@/src/components/FeedbackOverlay';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -2119,6 +2120,44 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
 }
 
 // ── Group profile overlay ──
+function BotDimensionChooser({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { key: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <View style={gp.botDimRow}>
+      <Text style={gp.botDimLabel}>{label}</Text>
+      <View style={gp.botDimChips}>
+        {options.map((opt) => {
+          const active = opt.key === value;
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() => onChange(opt.key)}
+              style={({ pressed }) => [
+                gp.botDimChip,
+                active ? gp.botDimChipActive : gp.botDimChipInactive,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={[gp.botDimChipText, active && gp.botDimChipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange, onTallyAnnouncementsChange, onSettlementAnnouncementsChange, onBotWelcomeChange }: {
   visible: boolean; groupId: string | null; onClose: () => void;
   onViewProfile: (userId: string) => void;
@@ -2144,6 +2183,8 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const [tallyAnnouncementsEnabled, setTallyAnnouncementsEnabled] = useState(false);
   const [settlementAnnouncementsEnabled, setSettlementAnnouncementsEnabled] = useState(false);
   const [botWelcomeEnabled, setBotWelcomeEnabled] = useState(false);
+  const [botSettings, setBotSettings] = useState<BotSettings>({});
+  const [initialBotSettings, setInitialBotSettings] = useState<BotSettings>({});
   const [adminOnlyChat, setAdminOnlyChat] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -2152,6 +2193,20 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const nameInputRef = useRef<TextInput>(null);
 
   const isAdmin = members.some((m) => m.user_id === user?.id && m.is_admin);
+
+  // Debounced auto-save for bot personality settings
+  useEffect(() => {
+    if (!groupId) return;
+    if (JSON.stringify(botSettings) === JSON.stringify(initialBotSettings)) return;
+    const timeout = setTimeout(async () => {
+      const { error } = await supabase.from('groups').update({ bot_settings: botSettings }).eq('id', groupId);
+      if (!error) {
+        setInitialBotSettings(botSettings);
+        setGroup((g: any) => (g ? { ...g, bot_settings: botSettings } : g));
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [botSettings, initialBotSettings, groupId]);
 
   const handleSaveName = async () => {
     const trimmed = draftName.trim();
@@ -2301,6 +2356,9 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
         setSettlementAnnouncementsEnabled(cachedData.group?.settlement_announcements_enabled === true);
         setBotWelcomeEnabled(cachedData.group?.bot_welcome_enabled === true);
         setAdminOnlyChat(cachedData.group?.admin_only_chat === true);
+        const loadedBotSettings: BotSettings = ((cachedData.group as any)?.bot_settings ?? {}) as BotSettings;
+        setBotSettings(loadedBotSettings);
+        setInitialBotSettings(loadedBotSettings);
       } else {
         fetchGroup();
       }
@@ -2325,6 +2383,9 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
     setSettlementAnnouncementsEnabled(g?.settlement_announcements_enabled === true);
     setBotWelcomeEnabled(g?.bot_welcome_enabled === true);
     setAdminOnlyChat(g?.admin_only_chat === true);
+    const loadedBotSettings: BotSettings = ((g as any)?.bot_settings ?? {}) as BotSettings;
+    setBotSettings(loadedBotSettings);
+    setInitialBotSettings(loadedBotSettings);
     if (gm && gm.length > 0) {
       const userIds = gm.map((m: any) => m.user_id);
       const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
@@ -2562,6 +2623,75 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
             </>
           )}
 
+          {/* Chatbot */}
+          {(() => {
+            const now = new Date();
+            const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+            const botUsageCount = ((group as any)?.bot_usage_month === currentMonth) ? ((group as any)?.bot_usage_count ?? 0) : 0;
+            const limitReached = botUsageCount >= BOT_MONTHLY_LIMIT;
+            const usagePct = Math.min(100, (botUsageCount / BOT_MONTHLY_LIMIT) * 100);
+            return (
+              <>
+                <Text style={gp.sectionHeader}>CHATBOT</Text>
+
+                {/* Usage progress bar — zichtbaar voor alle leden */}
+                <View style={gp.card}>
+                  <View style={gp.botUsageRow}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={gp.botUsageLabel}>Gebruik deze maand</Text>
+                      <Text style={gp.botUsageCount}>{botUsageCount} / {BOT_MONTHLY_LIMIT}</Text>
+                    </View>
+                    <View style={gp.botUsageBarBg}>
+                      <View
+                        style={[
+                          gp.botUsageBarFill,
+                          { width: `${usagePct}%` },
+                          limitReached && gp.botUsageBarFillFull,
+                        ]}
+                      />
+                    </View>
+                    {limitReached && (
+                      <Text style={gp.botUsageWarning}>Limiet bereikt — bot reageert pas weer volgende maand</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Persoonlijkheid — alleen admins */}
+                {isAdmin && (
+                  <>
+                    <Text style={gp.botSubHeader}>PERSOONLIJKHEID</Text>
+                    <View style={gp.card}>
+                      {BOT_DIMENSIONS.map((dim, idx) => (
+                        <React.Fragment key={dim.key}>
+                          {idx > 0 && <View style={gp.divider} />}
+                          <BotDimensionChooser
+                            label={dim.label}
+                            value={(botSettings[dim.key] as string) ?? (BOT_DEFAULTS[dim.key] as string)}
+                            options={dim.options}
+                            onChange={(v) => setBotSettings((p) => ({ ...p, [dim.key]: v }))}
+                          />
+                        </React.Fragment>
+                      ))}
+                    </View>
+
+                    <Text style={gp.botSubHeader}>GEDRAG</Text>
+                    <View style={gp.card}>
+                      <View style={gp.botToggleRow}>
+                        <Text style={gp.botToggleLabel}>Reageren op cadeautjes</Text>
+                        <Switch
+                          value={botSettings.respond_to_gift_messages ?? false}
+                          onValueChange={(v) => setBotSettings((p) => ({ ...p, respond_to_gift_messages: v }))}
+                          trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
+                          thumbColor="#FFFFFF"
+                        />
+                      </View>
+                    </View>
+                  </>
+                )}
+              </>
+            );
+          })()}
+
           {/* Groep verlaten */}
           <View style={gp.section}>
             <Pressable
@@ -2674,6 +2804,26 @@ const gp = StyleSheet.create({
     fontWeight: '500',
     color: '#FF5A5A',
   },
+
+  // Chatbot
+  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginLeft: 20, marginTop: 12, marginBottom: 4, letterSpacing: 0.5 },
+  botDimRow: { paddingHorizontal: 16, paddingVertical: 12 },
+  botDimLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9', marginBottom: 10 },
+  botDimChips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  botDimChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1 },
+  botDimChipInactive: { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'transparent' },
+  botDimChipActive: { borderColor: '#00BEAE', backgroundColor: 'rgba(0,190,174,0.15)' },
+  botDimChipText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
+  botDimChipTextActive: { color: '#FFFFFF' },
+  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, minHeight: 52 },
+  botToggleLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
+  botUsageRow: { padding: 16 },
+  botUsageLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9' },
+  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
+  botUsageBarBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  botUsageBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#00BEAE' },
+  botUsageBarFillFull: { backgroundColor: '#FF3B30' },
+  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: 8 },
 });
 
 // ── Animated row wrapper for fade-out + collapse ──
