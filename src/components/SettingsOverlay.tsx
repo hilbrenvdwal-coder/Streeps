@@ -534,6 +534,22 @@ export default function SettingsOverlay({
     }
   }, [visible]);
 
+  // Debounced auto-save for bot_settings
+  useEffect(() => {
+    if (!visible || !group?.id) return;
+    if (JSON.stringify(botSettings) === JSON.stringify(initialBotSettings)) return;
+    const timeout = setTimeout(async () => {
+      const { error } = await supabase
+        .from('groups')
+        .update({ bot_settings: botSettings })
+        .eq('id', group.id);
+      if (!error) {
+        setInitialBotSettings(botSettings);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [botSettings, initialBotSettings, group?.id, visible]);
+
   const isDirty = (): boolean => {
     const iv = initialValues.current;
     if (!iv) return false;
@@ -546,11 +562,14 @@ export default function SettingsOverlay({
       catName1 !== iv.catName1 || catName2 !== iv.catName2 ||
       catName3 !== iv.catName3 || catName4 !== iv.catName4 ||
       !setsEqual(enabledCats, iv.enabledCats) ||
-      JSON.stringify(botSettings) !== JSON.stringify(initialBotSettings)
     );
   };
 
   const performClose = useCallback(() => {
+    // Flush pending bot_settings auto-save voordat we sluiten
+    if (group?.id && JSON.stringify(botSettings) !== JSON.stringify(initialBotSettings)) {
+      supabase.from('groups').update({ bot_settings: botSettings }).eq('id', group.id);
+    }
     Animated.parallel([
       Animated.timing(scrimOpacity, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
       Animated.timing(contentAnim, { toValue: 0, duration: 200, easing: Easing.in(Easing.ease), useNativeDriver: true }),
@@ -558,7 +577,7 @@ export default function SettingsOverlay({
       setShowOpen(false);
       onClose();
     });
-  }, [onClose]);
+  }, [onClose, botSettings, initialBotSettings, group?.id]);
 
   const handleClose = useCallback(() => {
     if (isDirty()) {
@@ -629,9 +648,7 @@ export default function SettingsOverlay({
       name_category_2: catName2.trim() || 'Categorie 2',
       name_category_3: catName3.trim() || 'Categorie 3',
       name_category_4: catName4.trim() || 'Categorie 4',
-      bot_settings: botSettings,
     });
-    setInitialBotSettings(botSettings);
     setSavedOk(true);
     setTimeout(() => {
       setIsSaving(false);

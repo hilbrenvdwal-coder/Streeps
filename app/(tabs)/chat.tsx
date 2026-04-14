@@ -2158,7 +2158,7 @@ function BotDimensionChooser({
   );
 }
 
-function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange, onTallyAnnouncementsChange, onSettlementAnnouncementsChange, onBotWelcomeChange }: {
+function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange, onTallyAnnouncementsChange, onSettlementAnnouncementsChange, onBotWelcomeChange, onBotSettingsChange }: {
   visible: boolean; groupId: string | null; onClose: () => void;
   onViewProfile: (userId: string) => void;
   cachedData?: { group: any; members: any[]; activeCategories?: any[] };
@@ -2168,6 +2168,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   onTallyAnnouncementsChange?: (groupId: string, enabled: boolean) => void;
   onSettlementAnnouncementsChange?: (groupId: string, enabled: boolean) => void;
   onBotWelcomeChange?: (groupId: string, enabled: boolean) => void;
+  onBotSettingsChange?: (groupId: string, settings: BotSettings) => void;
 }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -2191,22 +2192,41 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const [savingName, setSavingName] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const nameInputRef = useRef<TextInput>(null);
+  const pendingSaveRef = useRef<BotSettings | null>(null);
 
   const isAdmin = members.some((m) => m.user_id === user?.id && m.is_admin);
 
   // Debounced auto-save for bot personality settings
   useEffect(() => {
     if (!groupId) return;
-    if (JSON.stringify(botSettings) === JSON.stringify(initialBotSettings)) return;
+    if (JSON.stringify(botSettings) === JSON.stringify(initialBotSettings)) {
+      pendingSaveRef.current = null;
+      return;
+    }
+    pendingSaveRef.current = botSettings;
     const timeout = setTimeout(async () => {
       const { error } = await supabase.from('groups').update({ bot_settings: botSettings }).eq('id', groupId);
       if (!error) {
         setInitialBotSettings(botSettings);
         setGroup((g: any) => (g ? { ...g, bot_settings: botSettings } : g));
+        onBotSettingsChange?.(groupId, botSettings);
+        pendingSaveRef.current = null;
       }
     }, 300);
     return () => clearTimeout(timeout);
-  }, [botSettings, initialBotSettings, groupId]);
+  }, [botSettings, initialBotSettings, groupId, onBotSettingsChange]);
+
+  // Flush pending bot_settings save on unmount
+  useEffect(() => {
+    return () => {
+      const pending = pendingSaveRef.current;
+      if (pending && groupId) {
+        supabase.from('groups').update({ bot_settings: pending }).eq('id', groupId).then(() => {
+          onBotSettingsChange?.(groupId, pending);
+        });
+      }
+    };
+  }, [groupId, onBotSettingsChange]);
 
   const handleSaveName = async () => {
     const trimmed = draftName.trim();
@@ -4086,7 +4106,7 @@ export default function ChatScreen() {
       <ProfileOverlay visible={showProfile} onClose={() => setShowProfile(false)} />
       <AddPeopleOverlay visible={showAddPeople} onClose={closeAddPeople} onFriendshipChange={refreshContacts} onViewProfile={(id) => setViewProfileUserId(id)} refreshKey={friendshipRefreshKey} />
       <UserProfileOverlay visible={!!viewProfileUserId} userId={viewProfileUserId} onClose={() => setViewProfileUserId(null)} cachedData={viewProfileUserId ? profileCache[viewProfileUserId] : undefined} onFriendshipChange={() => { refreshContacts(); setFriendshipRefreshKey((k) => k + 1); }} />
-      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} onAdminOnlyChatChange={(gid, enabled) => { setAdminOnlyChatMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, admin_only_chat: enabled }; }} onTallyAnnouncementsChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, tally_announcements_enabled: enabled }; }} onSettlementAnnouncementsChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, settlement_announcements_enabled: enabled }; }} onBotWelcomeChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_welcome_enabled: enabled }; }} />
+      <GroupProfileOverlay visible={!!viewGroupId} groupId={viewGroupId} onClose={() => setViewGroupId(null)} onViewProfile={(id) => { setViewGroupId(null); setTimeout(() => setViewProfileUserId(id), 250); }} cachedData={viewGroupId ? groupProfileCache[viewGroupId] : undefined} onBotToggle={(gid, enabled) => { setBotEnabledMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_enabled: enabled }; }} onBotNameChange={(gid, newName) => { setBotNameMap((prev) => ({ ...prev, [gid]: newName })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_name: newName }; }} onAdminOnlyChatChange={(gid, enabled) => { setAdminOnlyChatMap((prev) => ({ ...prev, [gid]: enabled })); if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, admin_only_chat: enabled }; }} onTallyAnnouncementsChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, tally_announcements_enabled: enabled }; }} onSettlementAnnouncementsChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, settlement_announcements_enabled: enabled }; }} onBotWelcomeChange={(gid, enabled) => { if (groupProfileCache[gid]?.group) groupProfileCache[gid].group = { ...groupProfileCache[gid].group, bot_welcome_enabled: enabled }; }} onBotSettingsChange={(gid: string, settings: BotSettings) => { if (groupProfileCache[gid]) { groupProfileCache[gid] = { ...groupProfileCache[gid], group: { ...groupProfileCache[gid].group, bot_settings: settings } }; } }} />
       {showGiftOverlay && currentConv && (
         <GiftOverlay
           conversationId={currentConv.id}
