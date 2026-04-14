@@ -160,14 +160,12 @@
         letter-spacing: -0.02em;
         display: inline-flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
       }
-      .nav-brand::before {
-        content: "";
-        width: 14px; height: 14px;
-        border-radius: 50%;
-        background: var(--green);
-        box-shadow: 0 0 18px var(--green);
+      .nav-brand img {
+        width: 36px; height: 36px;
+        border-radius: 9px;
+        box-shadow: 0 0 24px rgba(255, 0, 133, 0.25), 0 4px 18px rgba(0, 0, 0, 0.4);
       }
       .nav-links {
         display: flex;
@@ -220,12 +218,27 @@
         line-height: 0.88;
         letter-spacing: -0.045em;
         margin: 0;
-        background: linear-gradient(130deg, #ffffff 0%, #ffffff 35%, var(--magenta) 60%, var(--violet) 82%, var(--cyan) 100%);
+        background: linear-gradient(
+          120deg,
+          var(--magenta) 0%,
+          var(--violet) 25%,
+          var(--cyan) 50%,
+          var(--green) 75%,
+          var(--magenta) 100%
+        );
+        background-size: 250% 100%;
+        background-position: 0% 50%;
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
         opacity: 0;
-        animation: rise 1.1s 0.22s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+        animation:
+          rise 1.1s 0.22s cubic-bezier(0.2, 0.9, 0.2, 1) forwards,
+          shimmer 9s 1.4s linear infinite;
+      }
+      @keyframes shimmer {
+        0%   { background-position: 0% 50%; }
+        100% { background-position: 250% 50%; }
       }
       .hero .tagline {
         font-family: var(--body);
@@ -314,9 +327,14 @@
         to   { transform: scaleX(1); }
       }
       @media (prefers-reduced-motion: reduce) {
-        .hero .eyebrow, .hero h1, .hero .tagline, .hero .ctas, .cat-strip {
+        .hero .eyebrow, .hero .tagline, .hero .ctas, .cat-strip {
           opacity: 1 !important;
           animation: none !important;
+        }
+        .hero h1 {
+          opacity: 1 !important;
+          animation: none !important;
+          background-position: 0% 50%;
         }
         .cat-strip .pill { transform: scaleX(1) !important; animation: none !important; }
       }
@@ -555,8 +573,16 @@
         line-height: 0.95;
         letter-spacing: -0.035em;
         margin: 0 0 24px;
-        background: linear-gradient(120deg, var(--fg), var(--magenta) 70%, var(--cyan));
+        background: linear-gradient(
+          120deg,
+          var(--magenta) 0%,
+          var(--violet) 35%,
+          var(--cyan) 65%,
+          var(--green) 100%
+        );
+        background-size: 200% 100%;
         -webkit-background-clip: text; background-clip: text; color: transparent;
+        animation: shimmer 12s linear infinite;
       }
       .final-cta p {
         font-family: var(--body);
@@ -584,10 +610,17 @@
         font-size: 13px;
       }
       .footer-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
         font-family: var(--display);
         font-weight: 700;
         font-size: 14px;
         color: var(--fg);
+      }
+      .footer-brand img {
+        width: 22px; height: 22px;
+        border-radius: 6px;
       }
       .footer-grid a { transition: color 0.2s ease; }
       .footer-grid a:hover { color: var(--fg); }
@@ -604,7 +637,10 @@
     </div>
 
     <header class="nav">
-      <a href="#" class="nav-brand">Streeps</a>
+      <a href="#" class="nav-brand">
+        <img src="/logo.png" alt="" width="36" height="36" />
+        Streeps
+      </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="#idee">Het idee</a>
         <a href="#features">Wat het doet</a>
@@ -731,7 +767,10 @@
 
     <footer class="shell">
       <div class="footer-grid">
-        <div class="footer-brand">Streeps © 2026</div>
+        <div class="footer-brand">
+          <img src="/logo.png" alt="" width="22" height="22" />
+          Streeps © 2026
+        </div>
         <div>
           <a href="mailto:hallo@streeps.app">hallo@streeps.app</a>
         </div>
