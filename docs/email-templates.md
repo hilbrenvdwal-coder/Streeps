@@ -86,7 +86,7 @@
                       <div style="height:18px;line-height:18px;font-size:18px;">&nbsp;</div>
                       <div style="font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:26px;letter-spacing:-0.02em;color:#FFFFFF;">Streeps</div>
                       <div style="height:6px;line-height:6px;font-size:6px;">&nbsp;</div>
-                      <div style="font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#A0A0B8;">streepjes voor je vrienden</div>
+                      <div style="font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#A0A0B8;">nog eentje dan.</div>
                     </td>
                   </tr>
                 </table>
