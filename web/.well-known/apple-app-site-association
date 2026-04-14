@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID.app.streeps",
+        "appID": "D4BZS2J2Q3.app.streeps",
         "paths": ["/join/*", "/g/*", "/invite/*"]
       }
     ]
