@@ -293,8 +293,10 @@ function CategoryBadgeSelector({
 
                 return (
                   <View key={cat}>
-                    <Animated.View style={[cbs.chip, { backgroundColor: catColor + '20', opacity, transform: [{ scale }] }, isCenter && cbs.chipCenter]}>
-                      <Text style={[cbs.chipLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                    <Animated.View style={{ height: ITEM_HEIGHT, marginBottom: ITEM_GAP, alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }] }}>
+                      <View style={[cbs.badge, { backgroundColor: catColor + '20' }, isCenter && cbs.badgeCenter]}>
+                        <Text style={[cbs.badgeLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                      </View>
                     </Animated.View>
                   </View>
                 );
@@ -302,9 +304,6 @@ function CategoryBadgeSelector({
             </Animated.View>
           </View>
 
-          <View style={cbs.hintContainer}>
-            <Text style={cbs.hintText}>Sleep om te kiezen, laat los om te bevestigen</Text>
-          </View>
         </View>
       </Modal>
     </>
@@ -314,28 +313,13 @@ function CategoryBadgeSelector({
 const cbs = StyleSheet.create({
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
   badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400' },
+  badgeCenter: { borderWidth: 1, borderColor: '#FFFFFF' },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   wheelContainer: {
     position: 'absolute',
     alignItems: 'center',
   },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    height: ITEM_HEIGHT,
-    borderRadius: 22,
-    marginBottom: ITEM_GAP,
-    alignSelf: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  chipCenter: { borderColor: '#FFFFFF' },
-  chipLabel: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '400' },
-  hintContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center' },
-  hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'Unbounded' },
 });
 
 function FadeMask({ children }: { children: React.ReactNode }) {
@@ -912,6 +896,7 @@ export default function SettingsOverlay({
                 onScrollEnable={setScrollEnabled}
               />
             </View>
+            <Text style={s.catSelectorHint}>Houd ingedrukt en sleep om te kiezen</Text>
           </View>
 
           {/* Members */}
@@ -1170,6 +1155,7 @@ const s = StyleSheet.create({
   addDrinkBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
   drinkCatBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
   drinkCatBadgeText: { fontFamily: 'Unbounded', fontSize: 11 },
+  catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', textAlign: 'center', paddingBottom: 8, paddingHorizontal: 16 },
 
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 56 },
