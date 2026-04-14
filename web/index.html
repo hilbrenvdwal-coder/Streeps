@@ -341,6 +341,65 @@
         .cat-strip .pill { transform: scaleX(1) !important; animation: none !important; }
       }
 
+      /* ─── Scroll reveal system ───────────── */
+      .reveal {
+        opacity: 0;
+        transform: translateY(40px);
+        transition:
+          opacity 0.9s cubic-bezier(0.2, 0.9, 0.2, 1),
+          transform 0.9s cubic-bezier(0.2, 0.9, 0.2, 1);
+        transition-delay: var(--reveal-delay, 0s);
+        will-change: opacity, transform;
+      }
+      .reveal-left  { transform: translateX(-40px); }
+      .reveal-right { transform: translateX(40px); }
+      .reveal-scale { transform: scale(0.92); }
+      .reveal.in-view {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .reveal {
+          opacity: 1 !important;
+          transform: none !important;
+          transition: none !important;
+        }
+      }
+
+      /* ─── Scroll progress bar ────────────── */
+      .scroll-progress {
+        position: fixed;
+        top: 0; left: 0;
+        height: 2px;
+        width: 0%;
+        background: linear-gradient(90deg, var(--magenta), var(--violet), var(--cyan), var(--green));
+        z-index: 50;
+        pointer-events: none;
+        transition: width 80ms linear;
+      }
+
+      /* ─── Active nav link ────────────────── */
+      .nav-links a {
+        position: relative;
+        transition: color 0.25s ease;
+      }
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        left: 0; right: 0; bottom: -6px;
+        height: 1px;
+        background: var(--fg);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1);
+      }
+      .nav-links a.active {
+        color: var(--fg);
+      }
+      .nav-links a.active::after {
+        transform: scaleX(1);
+      }
+
       /* ─── Section shell ─────────────────────── */
       section { padding: 100px 0; position: relative; }
       .section-label {
@@ -632,6 +691,8 @@
     </style>
   </head>
   <body>
+    <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
     <div class="aurora" aria-hidden="true">
       <span class="a1"></span>
       <span class="a2"></span>
@@ -676,16 +737,16 @@
 
       <section id="idee" class="idea">
         <div>
-          <div class="section-label">Het idee</div>
-          <h2 class="section-title">Geen geklus met Excel of losse briefjes meer.</h2>
-          <p class="section-lead">
+          <div class="section-label reveal reveal-left">Het idee</div>
+          <h2 class="section-title reveal" style="--reveal-delay: 0.1s;">Geen geklus met Excel of losse briefjes meer.</h2>
+          <p class="section-lead reveal" style="--reveal-delay: 0.2s;">
             Als je met een vaste groep vrienden wekelijks op stap gaat, loopt de administratie
             sneller uit de hand dan de rekening zelf. Streeps houdt álles bij — wie wat dronk,
             hoeveel het kost, wie wie nog wat schuldig is — zodat jullie je kunnen focussen op
             het belangrijkste: het volgende rondje.
           </p>
         </div>
-        <div class="idea-visual" aria-hidden="true">
+        <div class="idea-visual reveal reveal-right" style="--reveal-delay: 0.2s;" aria-hidden="true">
           <div class="row r1">
             <span class="name"><span class="avatar">R</span>Riemer</span>
             <span class="tally">lll / lll</span>
@@ -702,28 +763,28 @@
       </section>
 
       <section id="features" class="features-wrap">
-        <div class="section-label">Wat het doet</div>
-        <h2 class="section-title">Snel, eerlijk, en een tikje eigenwijs.</h2>
+        <div class="section-label reveal reveal-left">Wat het doet</div>
+        <h2 class="section-title reveal" style="--reveal-delay: 0.1s;">Snel, eerlijk, en een tikje eigenwijs.</h2>
         <div class="features">
-          <article class="feature f1">
+          <article class="feature f1 reveal" style="--reveal-delay: 0s;">
             <div class="num">01</div>
             <h3>Streepjes in één tik.</h3>
             <p>Ieder groepslid zet zijn eigen streepjes. Eén tap, meteen zichtbaar voor de hele groep. Admins kunnen bijschaven waar nodig — niets verdwijnt stiekem.</p>
             <span class="tag">Categorie 1</span>
           </article>
-          <article class="feature f2">
+          <article class="feature f2 reveal" style="--reveal-delay: 0.1s;">
             <div class="num">02</div>
             <h3>Jouw eigen kaart.</h3>
             <p>Normale en speciale drankjes met jullie eigen prijzen. Bier, 0.0, wijn, shotjes — maak je eigen categorieën precies zoals jullie het willen.</p>
             <span class="tag">Categorie 2</span>
           </article>
-          <article class="feature f3">
+          <article class="feature f3 reveal" style="--reveal-delay: 0.2s;">
             <div class="num">03</div>
             <h3>Tikkie-klaar afrekenen.</h3>
             <p>Aan het einde van de avond rondt Streeps alles af, deelt het netjes per persoon, en stuurt de Tikkie-links rechtstreeks door. Niemand vergeet nog te betalen.</p>
             <span class="tag">Categorie 3</span>
           </article>
-          <article class="feature f4">
+          <article class="feature f4 reveal" style="--reveal-delay: 0.3s;">
             <div class="num">04</div>
             <h3>Chatbot met meningen.</h3>
             <p>Een ingebouwde huisgenoot in jullie groepschat. Houdt de stand in de gaten, dropt memes, roast af en toe een over-achiever — aanpasbaar per groep in vijf persoonlijkheidsdimensies.</p>
@@ -733,27 +794,27 @@
       </section>
 
       <section id="voor-wie" class="for-whom">
-        <div class="section-label" style="justify-content:center;">Voor wie</div>
-        <h2 class="section-title" style="margin-left:auto;margin-right:auto;text-align:center;max-width:20ch;">
+        <div class="section-label reveal" style="justify-content:center;">Voor wie</div>
+        <h2 class="section-title reveal" style="margin-left:auto;margin-right:auto;text-align:center;max-width:20ch;--reveal-delay:0.1s;">
           Voor de groep die elke week weer samenkomt.
         </h2>
-        <p class="section-lead" style="margin:0 auto;text-align:center;">
+        <p class="section-lead reveal" style="margin:0 auto;text-align:center;--reveal-delay:0.2s;">
           Huisgenoten, stamkroeg-vrienden, zaalvoetbalploegen, vrijdagmiddag-collega's,
           studentenverenigingen — iedereen die genoeg heeft van losse briefjes en
           vage Tikkie-ruzies.
         </p>
         <div class="tags">
-          <span class="tag">Huisgenoten</span>
-          <span class="tag">Stamkroeg</span>
-          <span class="tag">Voetbalploeg</span>
-          <span class="tag">Vrijdagmiddagborrel</span>
-          <span class="tag">Studentenvereniging</span>
-          <span class="tag">Festival-groep</span>
+          <span class="tag reveal" style="--reveal-delay: 0.3s;">Huisgenoten</span>
+          <span class="tag reveal" style="--reveal-delay: 0.36s;">Stamkroeg</span>
+          <span class="tag reveal" style="--reveal-delay: 0.42s;">Voetbalploeg</span>
+          <span class="tag reveal" style="--reveal-delay: 0.48s;">Vrijdagmiddagborrel</span>
+          <span class="tag reveal" style="--reveal-delay: 0.54s;">Studentenvereniging</span>
+          <span class="tag reveal" style="--reveal-delay: 0.60s;">Festival-groep</span>
         </div>
       </section>
 
       <section class="final-cta">
-        <div class="final-cta-inner">
+        <div class="final-cta-inner reveal reveal-scale">
           <h2>Klaar voor de eerste ronde?</h2>
           <p>
             Streeps komt binnenkort naar de App Store. Laat iets weten als je wil weten
@@ -778,5 +839,94 @@
         </div>
       </div>
     </footer>
+
+    <script>
+      (function () {
+        // ── Scroll reveal via IntersectionObserver ──
+        var revealEls = document.querySelectorAll('.reveal');
+        if ('IntersectionObserver' in window) {
+          var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('in-view');
+                observer.unobserve(entry.target);
+              }
+            });
+          }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+          revealEls.forEach(function (el) { observer.observe(el); });
+        } else {
+          // Fallback: just show everything
+          revealEls.forEach(function (el) { el.classList.add('in-view'); });
+        }
+
+        // ── Scroll progress bar ──
+        var progressBar = document.getElementById('scroll-progress');
+        var ticking = false;
+        function updateProgress() {
+          var doc = document.documentElement;
+          var scrollTop = window.scrollY || doc.scrollTop;
+          var height = doc.scrollHeight - doc.clientHeight;
+          var pct = height > 0 ? Math.min(100, Math.max(0, (scrollTop / height) * 100)) : 0;
+          progressBar.style.width = pct + '%';
+          ticking = false;
+        }
+        function onScroll() {
+          if (!ticking) {
+            requestAnimationFrame(updateProgress);
+            ticking = true;
+          }
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        updateProgress();
+
+        // ── Active nav link based on scroll position ──
+        var sections = ['idee', 'features', 'voor-wie'].map(function (id) {
+          var el = document.getElementById(id);
+          var link = document.querySelector('.nav-links a[href="#' + id + '"]');
+          return el && link ? { el: el, link: link } : null;
+        }).filter(Boolean);
+
+        function updateActiveNav() {
+          var scrollPos = window.scrollY + window.innerHeight * 0.35;
+          var current = null;
+          sections.forEach(function (s) {
+            var top = s.el.offsetTop;
+            if (scrollPos >= top) current = s;
+          });
+          sections.forEach(function (s) {
+            s.link.classList.toggle('active', s === current);
+          });
+        }
+        var navTicking = false;
+        window.addEventListener('scroll', function () {
+          if (!navTicking) {
+            requestAnimationFrame(function () {
+              updateActiveNav();
+              navTicking = false;
+            });
+            navTicking = true;
+          }
+        }, { passive: true });
+        updateActiveNav();
+
+        // ── Subtle scroll parallax on aurora blobs ──
+        var blobs = document.querySelectorAll('.aurora span');
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && blobs.length > 0) {
+          var parallaxTicking = false;
+          window.addEventListener('scroll', function () {
+            if (!parallaxTicking) {
+              requestAnimationFrame(function () {
+                var y = window.scrollY;
+                blobs[0] && (blobs[0].style.translate = '0 ' + (y * 0.08) + 'px');
+                blobs[1] && (blobs[1].style.translate = '0 ' + (y * -0.05) + 'px');
+                blobs[2] && (blobs[2].style.translate = '0 ' + (y * 0.12) + 'px');
+                parallaxTicking = false;
+              });
+              parallaxTicking = true;
+            }
+          }, { passive: true });
+        }
+      })();
+    </script>
   </body>
 </html>
