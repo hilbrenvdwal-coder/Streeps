@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0E0D1C" />
+    <title>Uitnodiging · Streeps</title>
+    <meta name="description" content="Je bent uitgenodigd voor een Streeps groep. Open de app om deel te nemen." />
+    <meta name="robots" content="noindex" />
+    <meta property="og:title" content="Je bent uitgenodigd voor een Streeps groep" />
+    <meta property="og:description" content="Open de Streeps app om deel te nemen." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;700;800&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-0: #0e0d1c;
+        --fg: #ffffff;
+        --fg-2: #c8c8d4;
+        --fg-3: #848494;
+        --green: #00fe96;
+        --magenta: #ff0085;
+        --cyan: #00beae;
+        --red: #ff004d;
+        --violet: #8b5cf6;
+        --aurora-pink: rgba(233, 30, 140, 0.35);
+        --aurora-green: rgba(0, 217, 163, 0.30);
+        --aurora-violet: rgba(139, 92, 246, 0.28);
+        --stroke: rgba(255, 255, 255, 0.08);
+        --stroke-strong: rgba(255, 255, 255, 0.14);
+        --bg-card: rgba(255, 255, 255, 0.03);
+        --display: "Unbounded", system-ui, sans-serif;
+        --body: "Manrope", system-ui, sans-serif;
+        --radius: 20px;
+        --radius-lg: 32px;
+        --radius-pill: 999px;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: radial-gradient(ellipse at top, #141228 0%, var(--bg-0) 45%, #0a0914 100%);
+        color: var(--fg);
+        font-family: var(--body);
+        font-size: 17px;
+        line-height: 1.6;
+        min-height: 100svh;
+        -webkit-font-smoothing: antialiased;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed; inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.035;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+      .aurora {
+        position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+      }
+      .aurora span {
+        position: absolute; border-radius: 50%; filter: blur(120px);
+      }
+      .aurora .a1 {
+        width: 520px; height: 520px;
+        top: -120px; left: -100px;
+        background: var(--aurora-pink);
+        animation: drift1 22s ease-in-out infinite alternate;
+      }
+      .aurora .a2 {
+        width: 480px; height: 480px;
+        bottom: -140px; right: -100px;
+        background: var(--aurora-violet);
+        animation: drift2 28s ease-in-out infinite alternate;
+      }
+      @keyframes drift1 {
+        from { transform: translate3d(0,0,0) scale(1); }
+        to   { transform: translate3d(60px, 40px, 0) scale(1.08); }
+      }
+      @keyframes drift2 {
+        from { transform: translate3d(0,0,0) scale(1); }
+        to   { transform: translate3d(-80px, -40px, 0) scale(0.94); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .aurora span { animation: none !important; }
+      }
+      main {
+        position: relative;
+        z-index: 2;
+        max-width: 480px;
+        width: 100%;
+        padding: 56px 40px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--stroke-strong);
+        background:
+          radial-gradient(circle at 20% 10%, rgba(255,0,133,0.12), transparent 55%),
+          radial-gradient(circle at 80% 90%, rgba(0,190,174,0.12), transparent 55%),
+          var(--bg-card);
+        backdrop-filter: blur(16px);
+        text-align: center;
+        opacity: 0;
+        transform: translateY(16px);
+        animation: rise 0.8s 0.1s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+      @keyframes rise {
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        main { opacity: 1; transform: none; animation: none; }
+      }
+      @media (max-width: 480px) {
+        main { padding: 40px 28px; }
+      }
+      .logo {
+        width: 72px; height: 72px;
+        border-radius: 18px;
+        box-shadow: 0 0 40px rgba(255, 0, 133, 0.3), 0 8px 32px rgba(0, 0, 0, 0.5);
+        margin: 0 auto 28px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+        padding: 8px 14px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--stroke-strong);
+        background: var(--bg-card);
+        margin-bottom: 20px;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 10px var(--green);
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(28px, 6vw, 36px);
+        line-height: 1.05;
+        letter-spacing: -0.025em;
+        margin: 0 0 16px;
+        background: linear-gradient(120deg, var(--magenta), var(--violet) 45%, var(--cyan));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .sub {
+        color: var(--fg-2);
+        font-size: 16px;
+        margin: 0 0 28px;
+      }
+      .code-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-radius: var(--radius);
+        background: rgba(255,255,255,0.06);
+        border: 1px dashed var(--stroke-strong);
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: 0.1em;
+        color: var(--fg);
+        margin-bottom: 32px;
+      }
+      .code-box .tag {
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        padding: 18px 24px;
+        border-radius: var(--radius-pill);
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 15px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      }
+      .btn-primary {
+        background: var(--fg);
+        color: var(--bg-0);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 10px 36px rgba(255, 0, 133, 0.28);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 14px 44px rgba(255, 0, 133, 0.38);
+      }
+      .btn-ghost {
+        margin-top: 10px;
+        background: transparent;
+        color: var(--fg);
+        border-color: var(--stroke-strong);
+      }
+      .btn-ghost:hover {
+        background: var(--bg-card);
+        border-color: rgba(255,255,255,0.22);
+      }
+      .hint {
+        margin-top: 24px;
+        font-size: 13px;
+        color: var(--fg-3);
+      }
+      .hint a { color: var(--fg-2); text-decoration: underline; }
+      .stores {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .stores.visible { display: flex; }
+      footer {
+        position: fixed;
+        bottom: 18px; left: 0; right: 0;
+        text-align: center;
+        font-family: var(--body);
+        font-size: 12px;
+        color: var(--fg-3);
+        z-index: 2;
+      }
+      footer a { color: var(--fg-2); }
+      footer a:hover { color: var(--fg); }
+    </style>
+  </head>
+  <body>
+    <div class="aurora" aria-hidden="true">
+      <span class="a1"></span>
+      <span class="a2"></span>
+    </div>
+
+    <main>
+      <img class="logo" src="/logo.png" alt="Streeps" width="72" height="72" />
+      <div class="eyebrow">Uitnodiging</div>
+      <h1>Je bent uitgenodigd voor een Streeps groep.</h1>
+      <p class="sub">Open de app om de uitnodiging te accepteren en deel te nemen.</p>
+
+      <div class="code-box" id="code-box">
+        <span class="tag">Code</span>
+        <span id="code-value">—</span>
+      </div>
+
+      <a href="#" class="btn btn-primary" id="open-app">
+        Open in Streeps
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+
+      <div class="stores" id="stores">
+        <a class="btn btn-ghost" href="#" id="app-store">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          Binnenkort — App Store
+        </a>
+        <a class="btn btn-ghost" href="#" id="play-store">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.495 12l2.203-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z"/></svg>
+          Binnenkort — Play Store
+        </a>
+      </div>
+
+      <p class="hint" id="no-app-hint">
+        App nog niet geïnstalleerd?
+        <a href="#" id="show-stores">Bekijk download opties</a>
+      </p>
+    </main>
+
+    <footer>
+      <a href="/">streeps.app</a>
+    </footer>
+
+    <script>
+      (function () {
+        // Extract code from URL path (e.g. /join/ABC123)
+        var pathParts = window.location.pathname.split('/').filter(Boolean);
+        var code = pathParts.length >= 2 ? pathParts[1] : '';
+        code = code.replace(/[^A-Za-z0-9\-_]/g, '').toUpperCase();
+
+        var codeBox = document.getElementById('code-box');
+        var codeValue = document.getElementById('code-value');
+        if (!code) {
+          codeBox.style.display = 'none';
+        } else {
+          codeValue.textContent = code;
+        }
+
+        var deepLink = code ? 'streeps://join/' + code : 'streeps://';
+        var openBtn = document.getElementById('open-app');
+        openBtn.setAttribute('href', deepLink);
+
+        // Auto-attempt to open the app on mobile devices (only when code is present)
+        var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (code && isMobile) {
+          // Try to open the app; if it fails (app not installed), user still sees the page
+          setTimeout(function () {
+            window.location.href = deepLink;
+          }, 800);
+        }
+
+        // Show stores toggle
+        var showStoresBtn = document.getElementById('show-stores');
+        var stores = document.getElementById('stores');
+        var hint = document.getElementById('no-app-hint');
+        showStoresBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          stores.classList.add('visible');
+          hint.style.display = 'none';
+        });
+      })();
+    </script>
+  </body>
+</html>
