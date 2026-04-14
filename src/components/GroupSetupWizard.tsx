@@ -14,7 +14,6 @@ import {
   Platform,
   Switch,
   Keyboard,
-  KeyboardAvoidingView,
 } from 'react-native';
 import Reanimated, {
   useSharedValue,
@@ -384,6 +383,7 @@ export default function GroupSetupWizard({
         style={ws.drinksList}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
         {drinks.map((drink, i) => (
@@ -575,11 +575,7 @@ export default function GroupSetupWizard({
         </Animated.View>
 
         {/* Content */}
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
+        <View style={{ flex: 1 }}>
           <Animated.View style={[ws.container, { paddingTop: insets.top + 20 }, contentStyle]} pointerEvents="auto">
             {renderProgress()}
 
@@ -592,7 +588,7 @@ export default function GroupSetupWizard({
               </View>
             </Animated.View>
           </Animated.View>
-        </KeyboardAvoidingView>
+        </View>
 
         {renderBottomBar()}
 
