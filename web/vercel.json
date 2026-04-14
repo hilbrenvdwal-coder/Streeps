@@ -1,9 +1,9 @@
 {
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/join/:code", "destination": "/join.html" },
-    { "source": "/g/:code", "destination": "/join.html" },
-    { "source": "/invite/:code", "destination": "/join.html" }
+    { "source": "/join/:code", "destination": "/join" },
+    { "source": "/g/:code", "destination": "/join" },
+    { "source": "/invite/:code", "destination": "/join" }
   ],
   "headers": [
     {
