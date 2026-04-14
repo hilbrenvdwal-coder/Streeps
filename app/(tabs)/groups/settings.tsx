@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme, type Theme } from '@/src/theme';
+import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
@@ -209,9 +210,7 @@ export default function GroupSettingsScreen() {
             {groupAvatarUrl ? (
               <Image source={{ uri: groupAvatarUrl }} style={s.avatar} />
             ) : (
-              <View style={[s.avatar, s.avatarFallback]}>
-                <Text style={s.avatarLetter}>{group?.name?.[0]?.toUpperCase() ?? '?'}</Text>
-              </View>
+              <AvatarPlaceholder size={80} label={group?.name?.[0]?.toUpperCase() ?? '?'} borderRadius={9999} fontSize={28} />
             )}
             <Text style={s.avatarAction}>
               {uploadingGroupAvatar ? 'Uploaden...' : 'Groepsfoto wijzigen'}

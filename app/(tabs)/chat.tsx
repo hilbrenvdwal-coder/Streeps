@@ -16,6 +16,7 @@ import { getTheme, streepsMagenta, brand } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
+import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { useConversations, useChatMessages, useContacts, startDM, sendGiftMessage, type ConversationPreview } from '@/src/hooks/useChat';
 import { useNavBarAnim } from './_layout';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -457,9 +458,7 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
                           {m.avatar_url ? (
                             <Image source={{ uri: m.avatar_url }} style={go.recipientAvatar} transition={200} cachePolicy="memory-disk" />
                           ) : (
-                            <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
-                              <Text style={go.recipientAvatarText}>{m.full_name?.[0]?.toUpperCase()}</Text>
-                            </View>
+                            <AvatarPlaceholder size={44} label={m.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={22} fontSize={16} />
                           )}
                           {selected && (
                             <View style={go.checkBadge}>
@@ -480,9 +479,7 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
               <Text style={go.sectionHeader}>AAN</Text>
               <View style={go.card}>
                 <View style={go.dmRow}>
-                  <View style={[go.recipientAvatar, go.recipientAvatarFallback]}>
-                    <Text style={go.recipientAvatarText}>{otherUserName?.[0]?.toUpperCase()}</Text>
-                  </View>
+                  <AvatarPlaceholder size={44} label={otherUserName?.[0]?.toUpperCase() ?? '?'} borderRadius={22} fontSize={16} />
                   <Text style={go.dmName}>{otherUserName}</Text>
                 </View>
               </View>
@@ -788,9 +785,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               item.profile?.avatar_url ? (
                 <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
               ) : (
-                <View style={[dt.bubbleAvatar, dt.bubbleAvatarFallback]}>
-                  <Text style={dt.bubbleAvatarText}>{(item.profile?.full_name || '?')[0]?.toUpperCase()}</Text>
-                </View>
+                <AvatarPlaceholder size={20} label={(item.profile?.full_name || '?')[0]?.toUpperCase() ?? '?'} borderRadius={10} fontSize={9} />
               )
             )}
             <Pressable onPress={handleImageTap} delayLongPress={400}>
@@ -842,9 +837,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             ) : item.profile?.avatar_url ? (
               <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <View style={[dt.bubbleAvatar, dt.bubbleAvatarFallback]}>
-                <Text style={dt.bubbleAvatarText}>{senderName[0]?.toUpperCase()}</Text>
-              </View>
+              <AvatarPlaceholder size={20} label={senderName[0]?.toUpperCase() ?? '?'} borderRadius={10} fontSize={9} />
             )}
             <Pressable onPress={handlePress}>
               <View style={[dt.bubble, dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
@@ -1359,9 +1352,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={dt.headerAvatar} transition={200} cachePolicy="memory-disk" />
           ) : (
-            <View style={[dt.headerAvatar, dt.headerAvatarFallback]}>
-              <Text style={dt.headerAvatarText}>{name[0]?.toUpperCase()}</Text>
-            </View>
+            <AvatarPlaceholder size={36} label={name[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} />
           )}
           <Text style={dt.headerName} numberOfLines={1}>{name}</Text>
           {isLive && (
@@ -1590,9 +1581,7 @@ function ProfileOverlay({ visible, onClose }: { visible: boolean; onClose: () =>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={po.avatar} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <View style={[po.avatar, po.avatarFallback]}>
-                <Text style={po.avatarInitial}>{(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase()}</Text>
-              </View>
+              <AvatarPlaceholder size={105} label={(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase() ?? '?'} borderRadius={9999} fontSize={36} />
             )}
             <Text style={po.fotoWijzigen}>{uploadingAvatar ? 'Uploaden...' : 'Foto Wijzigen'}</Text>
           </Pressable>
@@ -1907,10 +1896,8 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
               {profile?.avatar_url ? (
                 <Image source={{ uri: profile.avatar_url }} style={up.avatar} transition={200} cachePolicy="memory-disk" />
               ) : (
-                <View style={[up.avatar, up.avatarFallback]}>
-                  <Text style={up.avatarInitial}>{profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
-              </View>
-            )}
+                <AvatarPlaceholder size={105} label={profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={9999} fontSize={36} />
+              )}
             </Pressable>
           </View>
           <Text style={up.displayName}>{profile?.full_name || 'Onbekend'}</Text>
@@ -2458,9 +2445,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
             {group?.avatar_url ? (
               <Image source={{ uri: group.avatar_url }} style={gp.avatar} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <View style={[gp.avatar, gp.avatarFallback]}>
-                <Text style={gp.avatarInitial}>{group?.name?.[0]?.toUpperCase() || '?'}</Text>
-              </View>
+              <AvatarPlaceholder size={105} label={group?.name?.[0]?.toUpperCase() ?? '?'} borderRadius={9999} fontSize={36} />
             )}
           </View>
           {editingName && isAdmin ? (
@@ -2511,9 +2496,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                   {m.profile?.avatar_url ? (
                     <Image source={{ uri: m.profile.avatar_url }} style={gp.memberAvatar} transition={200} cachePolicy="memory-disk" />
                   ) : (
-                    <View style={[gp.memberAvatar, gp.memberAvatarFallback]}>
-                      <Text style={gp.memberAvatarText}>{m.profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
-                    </View>
+                    <AvatarPlaceholder size={36} label={m.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} />
                   )}
                   <Text style={gp.memberName} numberOfLines={1}>{m.profile?.full_name || 'Onbekend'}</Text>
                   {m.user_id === user?.id && <Text style={gp.youBadge}>Jij</Text>}
@@ -3399,9 +3382,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                       {person.avatar_url ? (
                         <Image source={{ uri: person.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                       ) : (
-                        <View style={[ap.personAvatar, ap.personAvatarFallback]}>
-                          <Text style={ap.personAvatarText}>{person.full_name?.[0]?.toUpperCase()}</Text>
-                        </View>
+                        <AvatarPlaceholder size={52} label={person.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} />
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={ap.personName}>{person.full_name}</Text>
@@ -3435,9 +3416,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                             {req.profile?.avatar_url ? (
                               <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
-                              <View style={[ap.personAvatar, ap.personAvatarFallback]}>
-                                <Text style={ap.personAvatarText}>{req.profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
-                              </View>
+                              <AvatarPlaceholder size={52} label={req.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} />
                             )}
                             <View style={{ flex: 1 }}>
                               <Text style={ap.personName}>{req.profile?.full_name || 'Onbekend'}</Text>
@@ -3465,9 +3444,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                             {req.profile?.avatar_url ? (
                               <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
-                              <View style={[ap.personAvatar, ap.personAvatarFallback]}>
-                                <Text style={ap.personAvatarText}>{req.profile?.full_name?.[0]?.toUpperCase() || '?'}</Text>
-                              </View>
+                              <AvatarPlaceholder size={52} label={req.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} />
                             )}
                             <View style={{ flex: 1 }}>
                               <Text style={ap.personName}>{req.profile?.full_name || 'Onbekend'}</Text>
@@ -3939,9 +3916,7 @@ export default function ChatScreen() {
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={cs.myAvatar} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <View style={[cs.myAvatar, cs.myAvatarFallback]}>
-                <Text style={cs.myAvatarText}>{(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase()}</Text>
-              </View>
+              <AvatarPlaceholder size={40} label={(user?.user_metadata?.full_name ?? '?')[0]?.toUpperCase() ?? '?'} borderRadius={20} fontSize={16} />
             )}
           </Pressable>
           <Text style={cs.title}>Berichten</Text>
@@ -3991,9 +3966,7 @@ export default function ChatScreen() {
                   {item.avatar_url ? (
                     <Image source={{ uri: item.avatar_url }} style={cs.contactAvatar} transition={200} cachePolicy="memory-disk" />
                   ) : (
-                    <View style={[cs.contactAvatar, cs.contactAvatarFallback]}>
-                      <Text style={cs.contactAvatarText}>{item.full_name[0]?.toUpperCase()}</Text>
-                    </View>
+                    <AvatarPlaceholder size={52} label={item.full_name[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={18} />
                   )}
                   <Text style={cs.contactName} numberOfLines={1}>{item.full_name.split(' ')[0]}</Text>
                 </Pressable>
@@ -4032,9 +4005,7 @@ export default function ChatScreen() {
                 {item.avatar_url ? (
                   <Image source={{ uri: item.avatar_url }} style={cs.convAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
-                  <View style={[cs.convAvatar, cs.convAvatarFallback]}>
-                    <Text style={cs.convAvatarText}>{item.name[0]?.toUpperCase()}</Text>
-                  </View>
+                  <AvatarPlaceholder size={54} label={item.name[0]?.toUpperCase() ?? '?'} borderRadius={27} fontSize={18} />
                 )}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

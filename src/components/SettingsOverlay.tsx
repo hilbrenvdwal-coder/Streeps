@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import CameraModal from '@/src/components/CameraModal';
+import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
@@ -816,9 +817,7 @@ export default function SettingsOverlay({
             {groupAvatarUrl ? (
               <Image source={{ uri: groupAvatarUrl }} style={s.avatar} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <View style={[s.avatar, s.avatarFallback]}>
-                <Text style={s.avatarText}>{group?.name?.[0]?.toUpperCase() ?? '?'}</Text>
-              </View>
+              <AvatarPlaceholder size={80} label={group?.name?.[0]?.toUpperCase() ?? '?'} borderRadius={40} fontSize={28} />
             )}
             <Text style={s.avatarAction}>{uploadingAvatar ? 'Uploaden...' : 'Groepsfoto wijzigen'}</Text>
           </Pressable>
@@ -980,9 +979,7 @@ export default function SettingsOverlay({
                     {member.profile?.avatar_url ? (
                       <Image source={{ uri: member.profile.avatar_url }} style={s.memberAvatar} transition={200} cachePolicy="memory-disk" />
                     ) : (
-                      <View style={[s.memberAvatar, s.memberAvatarFallback]}>
-                        <Text style={s.memberAvatarText}>{name[0]?.toUpperCase()}</Text>
-                      </View>
+                      <AvatarPlaceholder size={36} label={name[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} />
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={s.memberName}>{name}</Text>

@@ -32,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import type { Theme } from '@/src/theme';
+import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 
 interface Group {
   id: string;
@@ -350,9 +351,7 @@ export default function GroupSelector({
                 {currentGroup?.avatar_url ? (
                   <Image source={{ uri: currentGroup.avatar_url }} style={st.headerAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
-                  <View style={[st.headerAvatar, st.headerAvatarFallback]}>
-                    <Text style={st.headerAvatarText}>{currentGroup?.name?.[0]?.toUpperCase() ?? '?'}</Text>
-                  </View>
+                  <AvatarPlaceholder size={66} label={currentGroup?.name?.[0]?.toUpperCase() ?? '?'} borderRadius={33} />
                 )}
                 <Text style={st.headerName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{currentGroup?.name ?? ''}</Text>
                 <Ionicons name="chevron-up" size={20} color="#848484" style={{ marginLeft: 8 }} />
@@ -377,9 +376,7 @@ export default function GroupSelector({
                       {group.avatar_url ? (
                         <Image source={{ uri: group.avatar_url }} style={st.groupAvatar} transition={200} cachePolicy="memory-disk" />
                       ) : (
-                        <View style={[st.groupAvatar, st.groupAvatarFallback]}>
-                          <Text style={st.groupAvatarText}>{group.name[0]?.toUpperCase()}</Text>
-                        </View>
+                        <AvatarPlaceholder size={48} label={group.name[0]?.toUpperCase() ?? '?'} borderRadius={24} fontSize={18} />
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={st.groupName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{group.name}</Text>

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme, type Theme } from '@/src/theme';
+import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { useGroups } from '@/src/hooks/useGroups';
 import { useNavigation } from '@react-navigation/native';
 
@@ -79,9 +80,7 @@ export default function GroupsScreen() {
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={s.avatar} />
         ) : (
-          <View style={[s.avatar, s.avatarFallback]}>
-            <Text style={s.avatarLetter}>{item.name[0]?.toUpperCase()}</Text>
-          </View>
+          <AvatarPlaceholder size={44} label={item.name[0]?.toUpperCase() ?? '?'} borderRadius={22} />
         )}
         {item.is_active && (
           <View style={s.statusBadge}>

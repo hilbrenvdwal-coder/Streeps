@@ -1,5 +1,6 @@
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuroraPresetView, AURORA_COLORS } from '@/src/components/AuroraBackground';
+import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import CategoryRow from '@/src/components/CategoryRow';
 import CounterControl from '@/src/components/CounterControl';
 import GroupSelector from '@/src/components/GroupSelector';
@@ -652,9 +653,7 @@ export default function HomeScreen() {
                     {(group as any)?.avatar_url ? (
                       <Image source={{ uri: (group as any).avatar_url }} style={s.avatar} transition={200} cachePolicy="memory-disk" />
                     ) : (
-                      <View style={[s.avatar, s.avatarFallback]}>
-                        <Text style={s.avatarText}>{group.name?.[0]?.toUpperCase() ?? '?'}</Text>
-                      </View>
+                      <AvatarPlaceholder size={66} label={group.name?.[0]?.toUpperCase() ?? '?'} borderRadius={33} />
                     )}
                   </View>
                 </Pressable>
@@ -776,9 +775,7 @@ export default function HomeScreen() {
                         {member.profile?.avatar_url ? (
                           <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} transition={200} cachePolicy="memory-disk" />
                         ) : (
-                          <View style={[s.lidAvatar, s.lidAvatarFallback]}>
-                            <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
-                          </View>
+                          <AvatarPlaceholder size={45} label={mName[0]?.toUpperCase() ?? '?'} borderRadius={22} />
                         )}
                         {member.is_active && (
                           <View style={s.onlineBadge}>
@@ -813,9 +810,7 @@ export default function HomeScreen() {
                             {member.profile?.avatar_url ? (
                               <Image source={{ uri: member.profile.avatar_url }} style={s.lidAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
-                              <View style={[s.lidAvatar, s.lidAvatarFallback]}>
-                                <Text style={s.lidAvatarText}>{mName[0]?.toUpperCase()}</Text>
-                              </View>
+                              <AvatarPlaceholder size={45} label={mName[0]?.toUpperCase() ?? '?'} borderRadius={22} />
                             )}
                             {member.is_active && (
                               <View style={s.onlineBadge}>
@@ -980,9 +975,7 @@ export default function HomeScreen() {
             {(group as any)?.avatar_url ? (
               <Image source={{ uri: (group as any).avatar_url }} style={s.avatarPreviewImg} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <View style={[s.avatarPreviewImg, s.avatarFallback]}>
-                <Text style={s.avatarPreviewText}>{group.name?.[0]?.toUpperCase() ?? '?'}</Text>
-              </View>
+              <AvatarPlaceholder size={200} label={group.name?.[0]?.toUpperCase() ?? '?'} borderRadius={100} fontSize={64} />
             )}
           </Animated.View>
         </View>
@@ -1112,11 +1105,12 @@ export default function HomeScreen() {
                 {selectedMemberData.member.profile?.avatar_url ? (
                   <Image source={{ uri: selectedMemberData.member.profile.avatar_url }} style={s.profileAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
-                  <View style={[s.profileAvatar, s.avatarFallback]}>
-                    <Text style={s.profileAvatarText}>
-                      {(selectedMemberData.member.user_id === user?.id ? 'Jij' : (selectedMemberData.member.profile?.full_name || '?'))[0]?.toUpperCase()}
-                    </Text>
-                  </View>
+                  <AvatarPlaceholder
+                    size={160}
+                    label={(selectedMemberData.member.user_id === user?.id ? 'Jij' : (selectedMemberData.member.profile?.full_name || '?'))[0]?.toUpperCase() ?? '?'}
+                    borderRadius={80}
+                    fontSize={48}
+                  />
                 )}
               </Animated.View>
               {/* Name */}
