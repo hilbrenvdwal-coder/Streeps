@@ -401,14 +401,6 @@
             });
         }
 
-        // Auto-attempt to open the app on mobile devices when code is present
-        var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (code && isMobile) {
-          setTimeout(function () {
-            window.location.href = deepLink;
-          }, 1200);
-        }
-
         // Show stores toggle
         var showStoresBtn = document.getElementById('show-stores');
         var stores = document.getElementById('stores');
