@@ -78,12 +78,6 @@
             <!-- ─── Dark branded header ─── -->
             <tr>
               <td style="background-color:#0E0D1C;border-radius:24px 24px 0 0;padding:0;" align="center">
-                <!-- Gradient accent bar -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td height="4" style="height:4px;line-height:4px;font-size:4px;background-color:#FF0085;background-image:linear-gradient(90deg,#FF0085 0%,#8B5CF6 33%,#00BEAE 66%,#00FE96 100%);border-radius:24px 24px 0 0;">&nbsp;</td>
-                  </tr>
-                </table>
                 <!-- Logo + wordmark -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
@@ -238,12 +232,6 @@
             <!-- ─── Dark branded header ─── -->
             <tr>
               <td style="background-color:#0E0D1C;border-radius:24px 24px 0 0;padding:0;" align="center">
-                <!-- Gradient accent bar -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td height="4" style="height:4px;line-height:4px;font-size:4px;background-color:#FF0085;background-image:linear-gradient(90deg,#FF0085 0%,#8B5CF6 33%,#00BEAE 66%,#00FE96 100%);border-radius:24px 24px 0 0;">&nbsp;</td>
-                  </tr>
-                </table>
                 <!-- Logo + wordmark -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
