@@ -3,40 +3,739 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0B0B14" />
+    <meta name="theme-color" content="#0E0D1C" />
     <title>Streeps — streepjes voor vriendengroepen</title>
-    <meta name="description" content="Streeps houdt streepjes bij voor jouw vriendengroep. Rondjes, afrekeningen en een beetje chaos in een app." />
+    <meta name="description" content="Streeps houdt streepjes bij voor jouw vriendengroep. Rondjes, afrekeningen via Tikkie, en een beetje chaos in één app." />
     <meta property="og:title" content="Streeps" />
-    <meta property="og:description" content="Streepjes voor vriendengroepen." />
+    <meta property="og:description" content="Streepjes voor vriendengroepen. Rondjes, afrekenen, en een beetje chaos in één app." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://streeps.app" />
+    <meta property="og:site_name" content="Streeps" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;700;800&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        --bg: #0b0b14;
+        /* Mirror src/theme.ts brand tokens */
+        --bg-0: #0e0d1c;
+        --bg-1: #141414;
+        --bg-card: rgba(255, 255, 255, 0.03);
+        --bg-card-strong: rgba(255, 255, 255, 0.06);
+        --stroke: rgba(255, 255, 255, 0.08);
+        --stroke-strong: rgba(255, 255, 255, 0.14);
+
         --fg: #ffffff;
-        --muted: #848494;
-        --accent: #ff0085;
-        --accent2: #00beae;
+        --fg-2: #c8c8d4;
+        --fg-3: #848494;
+
+        --green: #00fe96;
+        --magenta: #ff0085;
+        --cyan: #00beae;
+        --red: #ff004d;
+        --violet: #8b5cf6;
+
+        --aurora-pink: rgba(233, 30, 140, 0.35);
+        --aurora-green: rgba(0, 217, 163, 0.30);
+        --aurora-violet: rgba(139, 92, 246, 0.28);
+
+        --display: "Unbounded", system-ui, sans-serif;
+        --body: "Manrope", system-ui, sans-serif;
+
+        --radius-sm: 12px;
+        --radius: 20px;
+        --radius-lg: 32px;
+        --radius-pill: 999px;
+
+        --container: 1200px;
       }
-      * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
-      body { min-height: 100svh; display: grid; place-items: center; padding: 24px; }
-      main { max-width: 560px; text-align: center; }
-      .logo { font-size: 56px; font-weight: 800; letter-spacing: -0.03em; background: linear-gradient(120deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; margin: 0 0 12px; }
-      .tagline { color: var(--muted); font-size: 18px; margin: 0 0 40px; }
-      .cta { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; background: var(--fg); color: var(--bg); border-radius: 999px; font-weight: 600; text-decoration: none; font-size: 15px; transition: transform 0.15s ease; }
-      .cta:hover { transform: translateY(-1px); }
-      .foot { margin-top: 40px; color: var(--muted); font-size: 13px; }
-      .foot a { color: var(--muted); text-decoration: underline; }
+
+      /* ─── Reset ─────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: radial-gradient(ellipse at top, #141228 0%, var(--bg-0) 45%, #0a0914 100%);
+        color: var(--fg);
+        font-family: var(--body);
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        overflow-x: hidden;
+        min-height: 100svh;
+      }
+      img, svg { display: block; max-width: 100%; }
+      button, input { font: inherit; color: inherit; }
+      a { color: inherit; text-decoration: none; }
+
+      /* ─── Grain overlay for atmosphere ─────── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.035;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+
+      /* ─── Aurora blobs ─────────────────────── */
+      .aurora {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        overflow: hidden;
+      }
+      .aurora span {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(120px);
+        will-change: transform;
+      }
+      .aurora .a1 {
+        width: 620px; height: 620px;
+        top: -120px; left: -160px;
+        background: var(--aurora-pink);
+        animation: drift1 22s ease-in-out infinite alternate;
+      }
+      .aurora .a2 {
+        width: 540px; height: 540px;
+        top: 20vh; right: -180px;
+        background: var(--aurora-green);
+        animation: drift2 28s ease-in-out infinite alternate;
+      }
+      .aurora .a3 {
+        width: 720px; height: 720px;
+        bottom: -200px; left: 10vw;
+        background: var(--aurora-violet);
+        animation: drift3 32s ease-in-out infinite alternate;
+      }
+      @keyframes drift1 {
+        from { transform: translate3d(0, 0, 0) scale(1); }
+        to   { transform: translate3d(80px, 60px, 0) scale(1.08); }
+      }
+      @keyframes drift2 {
+        from { transform: translate3d(0, 0, 0) scale(1); }
+        to   { transform: translate3d(-120px, 40px, 0) scale(0.94); }
+      }
+      @keyframes drift3 {
+        from { transform: translate3d(0, 0, 0) scale(1); }
+        to   { transform: translate3d(60px, -80px, 0) scale(1.1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .aurora span { animation: none !important; }
+      }
+
+      /* ─── Layout shell ─────────────────────── */
+      .shell {
+        position: relative;
+        z-index: 2;
+        max-width: var(--container);
+        margin: 0 auto;
+        padding: 0 28px;
+      }
+
+      /* ─── Nav ──────────────────────────────── */
+      .nav {
+        position: relative;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 28px 28px;
+        max-width: var(--container);
+        margin: 0 auto;
+      }
+      .nav-brand {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: -0.02em;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .nav-brand::before {
+        content: "";
+        width: 14px; height: 14px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 18px var(--green);
+      }
+      .nav-links {
+        display: flex;
+        gap: 28px;
+        font-family: var(--body);
+        font-weight: 500;
+        font-size: 14px;
+        color: var(--fg-2);
+      }
+      .nav-links a:hover { color: var(--fg); }
+      @media (max-width: 640px) {
+        .nav-links { display: none; }
+      }
+
+      /* ─── Hero ─────────────────────────────── */
+      .hero {
+        padding: 80px 0 120px;
+        text-align: center;
+      }
+      .hero .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-2);
+        padding: 10px 18px;
+        border: 1px solid var(--stroke-strong);
+        border-radius: var(--radius-pill);
+        background: var(--bg-card);
+        backdrop-filter: blur(12px);
+        margin-bottom: 44px;
+        opacity: 0;
+        animation: rise 0.9s 0.1s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+      .hero .eyebrow::before {
+        content: "";
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 12px var(--green);
+      }
+      .hero h1 {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(64px, 14vw, 180px);
+        line-height: 0.88;
+        letter-spacing: -0.045em;
+        margin: 0;
+        background: linear-gradient(130deg, #ffffff 0%, #ffffff 35%, var(--magenta) 60%, var(--violet) 82%, var(--cyan) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        opacity: 0;
+        animation: rise 1.1s 0.22s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+      .hero .tagline {
+        font-family: var(--body);
+        font-weight: 500;
+        font-size: clamp(18px, 2.3vw, 22px);
+        line-height: 1.4;
+        color: var(--fg-2);
+        max-width: 620px;
+        margin: 32px auto 0;
+        opacity: 0;
+        animation: rise 1.0s 0.38s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+      .hero .ctas {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 44px;
+        justify-content: center;
+        opacity: 0;
+        animation: rise 1.0s 0.54s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 26px;
+        border-radius: var(--radius-pill);
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 14px;
+        letter-spacing: 0.01em;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      }
+      .btn-primary {
+        background: var(--fg);
+        color: var(--bg-0);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 8px 32px rgba(255, 0, 133, 0.25);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 12px 40px rgba(255, 0, 133, 0.35);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--fg);
+        border-color: var(--stroke-strong);
+      }
+      .btn-ghost:hover {
+        background: var(--bg-card);
+        border-color: rgba(255,255,255,0.22);
+      }
+
+      /* ─── Category strip — 4 colors ───────── */
+      .cat-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        max-width: 720px;
+        margin: 72px auto 0;
+        opacity: 0;
+        animation: rise 1.0s 0.7s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+      }
+      .cat-strip .pill {
+        height: 6px;
+        border-radius: var(--radius-pill);
+        transform-origin: left center;
+        animation: fillLine 1.2s 0.9s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+        transform: scaleX(0);
+      }
+      .cat-strip .pill:nth-child(1) { background: var(--green);   animation-delay: 0.9s;  }
+      .cat-strip .pill:nth-child(2) { background: var(--magenta); animation-delay: 1.0s; }
+      .cat-strip .pill:nth-child(3) { background: var(--cyan);    animation-delay: 1.1s; }
+      .cat-strip .pill:nth-child(4) { background: var(--red);     animation-delay: 1.2s; }
+      @media (max-width: 520px) {
+        .cat-strip { gap: 10px; }
+      }
+
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(24px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fillLine {
+        from { transform: scaleX(0); }
+        to   { transform: scaleX(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hero .eyebrow, .hero h1, .hero .tagline, .hero .ctas, .cat-strip {
+          opacity: 1 !important;
+          animation: none !important;
+        }
+        .cat-strip .pill { transform: scaleX(1) !important; animation: none !important; }
+      }
+
+      /* ─── Section shell ─────────────────────── */
+      section { padding: 100px 0; position: relative; }
+      .section-label {
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .section-label::before {
+        content: "";
+        width: 28px; height: 1px;
+        background: var(--stroke-strong);
+      }
+      .section-title {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(34px, 5.5vw, 64px);
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+        margin: 0 0 22px;
+        max-width: 16ch;
+      }
+      .section-lead {
+        font-family: var(--body);
+        font-weight: 400;
+        font-size: 18px;
+        line-height: 1.65;
+        color: var(--fg-2);
+        max-width: 58ch;
+        margin: 0;
+      }
+
+      /* ─── Idea section ──────────────────────── */
+      .idea {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 80px;
+        align-items: center;
+      }
+      @media (max-width: 900px) {
+        .idea { grid-template-columns: 1fr; gap: 40px; }
+      }
+      .idea-visual {
+        aspect-ratio: 1 / 1;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--stroke);
+        background:
+          radial-gradient(circle at 30% 30%, var(--aurora-pink), transparent 55%),
+          radial-gradient(circle at 70% 70%, var(--aurora-violet), transparent 55%),
+          var(--bg-card);
+        padding: 36px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        justify-content: flex-end;
+      }
+      .idea-visual::before {
+        /* Big tally marks in the background */
+        content: "llll / llll / llll / ll";
+        position: absolute;
+        inset: 0;
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(50px, 9vw, 110px);
+        color: var(--fg);
+        opacity: 0.07;
+        padding: 30px 40px;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+        white-space: pre-wrap;
+        pointer-events: none;
+      }
+      .idea-visual .row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-radius: var(--radius-sm);
+        background: rgba(255,255,255,0.07);
+        border: 1px solid var(--stroke);
+        backdrop-filter: blur(12px);
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: 13px;
+      }
+      .idea-visual .row .avatar {
+        width: 26px; height: 26px; border-radius: 50%;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 700;
+        margin-right: 10px;
+      }
+      .idea-visual .row .name {
+        display: inline-flex; align-items: center;
+      }
+      .idea-visual .row .tally {
+        font-family: var(--display);
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      .row.r1 .avatar { background: var(--magenta); color: var(--fg); }
+      .row.r2 .avatar { background: var(--cyan);    color: var(--bg-0); }
+      .row.r3 .avatar { background: var(--green);   color: var(--bg-0); }
+
+      /* ─── Features grid ─────────────────────── */
+      .features-wrap { padding-top: 60px; }
+      .features {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+        margin-top: 60px;
+      }
+      @media (max-width: 780px) {
+        .features { grid-template-columns: 1fr; }
+      }
+      .feature {
+        position: relative;
+        padding: 36px;
+        border-radius: var(--radius);
+        border: 1px solid var(--stroke);
+        background: var(--bg-card);
+        backdrop-filter: blur(12px);
+        overflow: hidden;
+        transition: transform 0.3s ease, border-color 0.3s ease;
+      }
+      .feature:hover { transform: translateY(-4px); border-color: var(--stroke-strong); }
+      .feature::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: var(--radius);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        background: radial-gradient(circle at 20% 0%, var(--feat-color), transparent 60%);
+      }
+      .feature:hover::before { opacity: 0.25; }
+      .feature .num {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: 13px;
+        color: var(--feat-color);
+        letter-spacing: 0.1em;
+      }
+      .feature h3 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 28px;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 10px 0 16px;
+        color: var(--fg);
+      }
+      .feature p {
+        font-family: var(--body);
+        font-weight: 400;
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--fg-2);
+        margin: 0;
+      }
+      .feature .tag {
+        display: inline-block;
+        margin-top: 22px;
+        font-family: var(--display);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 7px 12px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--feat-color);
+        color: var(--feat-color);
+        background: color-mix(in oklab, var(--feat-color) 10%, transparent);
+      }
+      .feature.f1 { --feat-color: var(--green); }
+      .feature.f2 { --feat-color: var(--magenta); }
+      .feature.f3 { --feat-color: var(--cyan); }
+      .feature.f4 { --feat-color: var(--red); }
+
+      /* ─── For-whom strip ────────────────────── */
+      .for-whom {
+        padding: 100px 0;
+        text-align: center;
+      }
+      .for-whom .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 32px;
+      }
+      .for-whom .tag {
+        padding: 10px 18px;
+        border-radius: var(--radius-pill);
+        border: 1px solid var(--stroke-strong);
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: 13px;
+        color: var(--fg);
+        background: var(--bg-card);
+      }
+
+      /* ─── Final CTA ─────────────────────────── */
+      .final-cta {
+        padding: 120px 0 100px;
+      }
+      .final-cta-inner {
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--stroke-strong);
+        background:
+          radial-gradient(circle at 15% 20%, rgba(255, 0, 133, 0.18), transparent 55%),
+          radial-gradient(circle at 85% 80%, rgba(0, 190, 174, 0.18), transparent 55%),
+          var(--bg-card);
+        padding: 80px 60px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .final-cta h2 {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(36px, 6vw, 72px);
+        line-height: 0.95;
+        letter-spacing: -0.035em;
+        margin: 0 0 24px;
+        background: linear-gradient(120deg, var(--fg), var(--magenta) 70%, var(--cyan));
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .final-cta p {
+        font-family: var(--body);
+        font-size: 18px;
+        color: var(--fg-2);
+        max-width: 52ch;
+        margin: 0 auto 36px;
+      }
+      @media (max-width: 600px) {
+        .final-cta-inner { padding: 56px 28px; }
+      }
+
+      /* ─── Footer ────────────────────────────── */
+      footer {
+        border-top: 1px solid var(--stroke);
+        padding: 40px 0 56px;
+        color: var(--fg-3);
+      }
+      .footer-grid {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        font-family: var(--body);
+        font-size: 13px;
+      }
+      .footer-brand {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--fg);
+      }
+      .footer-grid a { transition: color 0.2s ease; }
+      .footer-grid a:hover { color: var(--fg); }
+      @media (max-width: 560px) {
+        .footer-grid { flex-direction: column; text-align: center; }
+      }
     </style>
   </head>
   <body>
-    <main>
-      <h1 class="logo">Streeps</h1>
-      <p class="tagline">Streepjes voor vriendengroepen. Rondjes, afrekeningen, en een beetje chaos.</p>
-      <a class="cta" href="#">Binnenkort in de App Store</a>
-      <p class="foot">Contact: <a href="mailto:hallo@streeps.app">hallo@streeps.app</a></p>
+    <div class="aurora" aria-hidden="true">
+      <span class="a1"></span>
+      <span class="a2"></span>
+      <span class="a3"></span>
+    </div>
+
+    <header class="nav">
+      <a href="#" class="nav-brand">Streeps</a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#idee">Het idee</a>
+        <a href="#features">Wat het doet</a>
+        <a href="#voor-wie">Voor wie</a>
+        <a href="mailto:hallo@streeps.app">Contact</a>
+      </nav>
+    </header>
+
+    <main class="shell">
+      <section class="hero">
+        <div class="eyebrow">Nieuw · Binnenkort in de App Store</div>
+        <h1>Streeps.</h1>
+        <p class="tagline">
+          Streepjes voor vriendengroepen. Rondjes, afrekenen via Tikkie,
+          en een beetje chaos — allemaal in één app.
+        </p>
+        <div class="ctas">
+          <a href="#features" class="btn btn-primary">
+            Zo werkt het
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a href="mailto:hallo@streeps.app" class="btn btn-ghost">Laat wat weten</a>
+        </div>
+        <div class="cat-strip" aria-hidden="true">
+          <span class="pill"></span>
+          <span class="pill"></span>
+          <span class="pill"></span>
+          <span class="pill"></span>
+        </div>
+      </section>
+
+      <section id="idee" class="idea">
+        <div>
+          <div class="section-label">Het idee</div>
+          <h2 class="section-title">Geen geklus met Excel of losse briefjes meer.</h2>
+          <p class="section-lead">
+            Als je met een vaste groep vrienden wekelijks op stap gaat, loopt de administratie
+            sneller uit de hand dan de rekening zelf. Streeps houdt álles bij — wie wat dronk,
+            hoeveel het kost, wie wie nog wat schuldig is — zodat jullie je kunnen focussen op
+            het belangrijkste: het volgende rondje.
+          </p>
+        </div>
+        <div class="idea-visual" aria-hidden="true">
+          <div class="row r1">
+            <span class="name"><span class="avatar">R</span>Riemer</span>
+            <span class="tally">lll / lll</span>
+          </div>
+          <div class="row r2">
+            <span class="name"><span class="avatar">H</span>Hilbren</span>
+            <span class="tally">lll / ll</span>
+          </div>
+          <div class="row r3">
+            <span class="name"><span class="avatar">S</span>Sybe</span>
+            <span class="tally">lll / l</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="features-wrap">
+        <div class="section-label">Wat het doet</div>
+        <h2 class="section-title">Snel, eerlijk, en een tikje eigenwijs.</h2>
+        <div class="features">
+          <article class="feature f1">
+            <div class="num">01</div>
+            <h3>Streepjes in één tik.</h3>
+            <p>Ieder groepslid zet zijn eigen streepjes. Eén tap, meteen zichtbaar voor de hele groep. Admins kunnen bijschaven waar nodig — niets verdwijnt stiekem.</p>
+            <span class="tag">Categorie 1</span>
+          </article>
+          <article class="feature f2">
+            <div class="num">02</div>
+            <h3>Jouw eigen kaart.</h3>
+            <p>Normale en speciale drankjes met jullie eigen prijzen. Bier, 0.0, wijn, shotjes — maak je eigen categorieën precies zoals jullie het willen.</p>
+            <span class="tag">Categorie 2</span>
+          </article>
+          <article class="feature f3">
+            <div class="num">03</div>
+            <h3>Tikkie-klaar afrekenen.</h3>
+            <p>Aan het einde van de avond rondt Streeps alles af, deelt het netjes per persoon, en stuurt de Tikkie-links rechtstreeks door. Niemand vergeet nog te betalen.</p>
+            <span class="tag">Categorie 3</span>
+          </article>
+          <article class="feature f4">
+            <div class="num">04</div>
+            <h3>Chatbot met meningen.</h3>
+            <p>Een ingebouwde huisgenoot in jullie groepschat. Houdt de stand in de gaten, dropt memes, roast af en toe een over-achiever — aanpasbaar per groep in vijf persoonlijkheidsdimensies.</p>
+            <span class="tag">Categorie 4</span>
+          </article>
+        </div>
+      </section>
+
+      <section id="voor-wie" class="for-whom">
+        <div class="section-label" style="justify-content:center;">Voor wie</div>
+        <h2 class="section-title" style="margin-left:auto;margin-right:auto;text-align:center;max-width:20ch;">
+          Voor de groep die elke week weer samenkomt.
+        </h2>
+        <p class="section-lead" style="margin:0 auto;text-align:center;">
+          Huisgenoten, stamkroeg-vrienden, zaalvoetbalploegen, vrijdagmiddag-collega's,
+          studentenverenigingen — iedereen die genoeg heeft van losse briefjes en
+          vage Tikkie-ruzies.
+        </p>
+        <div class="tags">
+          <span class="tag">Huisgenoten</span>
+          <span class="tag">Stamkroeg</span>
+          <span class="tag">Voetbalploeg</span>
+          <span class="tag">Vrijdagmiddagborrel</span>
+          <span class="tag">Studentenvereniging</span>
+          <span class="tag">Festival-groep</span>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <div class="final-cta-inner">
+          <h2>Klaar voor de eerste ronde?</h2>
+          <p>
+            Streeps komt binnenkort naar de App Store. Laat iets weten als je wil weten
+            wanneer we live gaan — dan krijg je als eerste een link.
+          </p>
+          <a href="mailto:hallo@streeps.app?subject=Hou%20me%20op%20de%20hoogte" class="btn btn-primary">
+            Hou me op de hoogte
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+      </section>
     </main>
+
+    <footer class="shell">
+      <div class="footer-grid">
+        <div class="footer-brand">Streeps © 2026</div>
+        <div>
+          <a href="mailto:hallo@streeps.app">hallo@streeps.app</a>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
