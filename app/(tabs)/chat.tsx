@@ -1809,6 +1809,8 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
   const [friendshipStatus, setFriendshipStatus] = useState<string | null>(null);
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
 
+  const fetchIdRef = useRef(0);
+
   // Avatar zoom state
   const [avatarZoomed, setAvatarZoomed] = useState(false);
   const zoomAnim = useRef(new Animated.Value(0)).current;
@@ -1853,7 +1855,9 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
         setFriendshipStatus(cachedData.friendshipStatus);
         setFriendshipId(cachedData.friendshipId);
       } else {
-        fetchProfile();
+        fetchIdRef.current += 1;
+        const myFetchId = fetchIdRef.current;
+        fetchProfile(myFetchId);
       }
       setShow(true);
       anim.setValue(0);
@@ -1863,7 +1867,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
     }
   }, [visible, userId]);
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (fetchId: number) => {
     if (!userId || !user) return;
     const [{ data: p }, { data: theirGroups }, { data: myGroups }, { data: f }] = await Promise.all([
       supabase.from('profiles').select('id, full_name, avatar_url').eq('id', userId).single(),
@@ -1873,11 +1877,13 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
         .or(`and(user_id.eq.${user.id},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${user.id})`)
         .maybeSingle(),
     ]);
+    if (fetchId !== fetchIdRef.current) return;
     setProfile(p);
     const myGroupIds = new Set((myGroups || []).map((g) => g.group_id));
     const sharedIds = (theirGroups || []).filter((g) => myGroupIds.has(g.group_id)).map((g) => g.group_id);
     if (sharedIds.length > 0) {
       const { data: groups } = await supabase.from('groups').select('id, name').in('id', sharedIds);
+      if (fetchId !== fetchIdRef.current) return;
       setSharedGroups(groups || []);
     } else {
       setSharedGroups([]);
@@ -2046,6 +2052,7 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
   const bounce = useRef(new Animated.Value(0)).current;
   const prevUserId = useRef(userId);
   const prevStatus = useRef(status);
+  const hasUserActed = useRef(false);
 
   useEffect(() => {
     const userChanged = userId !== prevUserId.current;
@@ -2056,14 +2063,25 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
       progress.setValue(status === 'pending' ? 1 : 0);
       bounce.setValue(0);
       prevStatus.current = status;
+      hasUserActed.current = false;
       return;
     }
 
-    // Zelfde profiel, status veranderd door gebruikersactie
     if (status === prevStatus.current) return;
+
     const wasPending = prevStatus.current === 'pending';
+    const didUserAct = hasUserActed.current;
+    hasUserActed.current = false;
     prevStatus.current = status;
 
+    if (!didUserAct) {
+      // Data-driven change: instant sync, geen animatie
+      progress.setValue(status === 'pending' ? 1 : 0);
+      bounce.setValue(0);
+      return;
+    }
+
+    // User-driven change: animatie afspelen
     if (status === 'pending') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       Animated.parallel([
@@ -2086,6 +2104,8 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
   const addOpacity = progress.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] });
   const pendingOpacity = progress.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
 
+  const wrap = (cb?: () => void) => () => { hasUserActed.current = true; cb?.(); };
+
   if (status === 'accepted') {
     return (
       <View style={{ alignItems: 'center', marginTop: 24, gap: 12 }}>
@@ -2094,7 +2114,7 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
           <Text style={up.friendBadgeText}>Vrienden</Text>
         </View>
         {onRemove && (
-          <Pressable onPress={onRemove} hitSlop={8}>
+          <Pressable onPress={wrap(onRemove)} hitSlop={8}>
             <Text style={{ fontFamily: 'Unbounded', fontSize: 12, color: '#848484' }}>Vriend verwijderen</Text>
           </Pressable>
         )}
@@ -2105,7 +2125,7 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
   if (status === 'pending_incoming') {
     return (
       <View style={{ alignSelf: 'center', marginTop: 24 }}>
-        <Pressable onPress={onAccept} style={{
+        <Pressable onPress={wrap(onAccept)} style={{
           width: 280, height: 50, borderRadius: 25, backgroundColor: '#00BEAE',
           flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -2118,7 +2138,7 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
 
   return (
     <Animated.View style={{ alignSelf: 'center', marginTop: 24, transform: [{ scale: bounceScale }] }}>
-      <Pressable onPress={status === 'pending' ? onCancel : onAdd}>
+      <Pressable onPress={status === 'pending' ? wrap(onCancel) : wrap(onAdd)}>
         <Animated.View style={{
           width: btnWidth,
           height: btnHeight,
