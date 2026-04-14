@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Platform,
   Share,
+  Switch,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
+import { BOT_DIMENSIONS, BOT_DEFAULTS, BOT_MONTHLY_LIMIT, type BotSettings } from '../constants/botSettings';
 
 interface Member {
   id: string;
@@ -338,6 +340,44 @@ function FadeMask({ children }: { children: React.ReactNode }) {
   );
 }
 
+function BotDimensionChooser({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { key: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <View style={s.botDimRow}>
+      <Text style={s.botDimLabel}>{label}</Text>
+      <View style={s.botDimChips}>
+        {options.map((opt) => {
+          const active = opt.key === value;
+          return (
+            <Pressable
+              key={opt.key}
+              onPress={() => onChange(opt.key)}
+              style={({ pressed }) => [
+                s.botDimChip,
+                active ? s.botDimChipActive : s.botDimChipInactive,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={[s.botDimChipText, active && s.botDimChipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function SettingsOverlay({
   visible,
   onClose,
@@ -399,6 +439,8 @@ export default function SettingsOverlay({
     }, 1500);
   }, []);
   const [enabledCats, setEnabledCats] = useState<Set<number>>(new Set([1, 2]));
+  const [botSettings, setBotSettings] = useState<BotSettings>({});
+  const [initialBotSettings, setInitialBotSettings] = useState<BotSettings>({});
   const [priceErrors, setPriceErrors] = useState<Record<number, string | null>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -478,6 +520,10 @@ export default function SettingsOverlay({
         enabledCats: new Set(enabledArray),
       };
 
+      const loadedBotSettings: BotSettings = ((group as any)?.bot_settings ?? {}) as BotSettings;
+      setBotSettings(loadedBotSettings);
+      setInitialBotSettings(loadedBotSettings);
+
       setShowOpen(true);
       scrimOpacity.setValue(0);
       contentAnim.setValue(0);
@@ -499,7 +545,8 @@ export default function SettingsOverlay({
       price3 !== iv.price3 || price4 !== iv.price4 ||
       catName1 !== iv.catName1 || catName2 !== iv.catName2 ||
       catName3 !== iv.catName3 || catName4 !== iv.catName4 ||
-      !setsEqual(enabledCats, iv.enabledCats)
+      !setsEqual(enabledCats, iv.enabledCats) ||
+      JSON.stringify(botSettings) !== JSON.stringify(initialBotSettings)
     );
   };
 
@@ -582,7 +629,9 @@ export default function SettingsOverlay({
       name_category_2: catName2.trim() || 'Categorie 2',
       name_category_3: catName3.trim() || 'Categorie 3',
       name_category_4: catName4.trim() || 'Categorie 4',
+      bot_settings: botSettings,
     });
+    setInitialBotSettings(botSettings);
     setSavedOk(true);
     setTimeout(() => {
       setIsSaving(false);
@@ -1007,6 +1056,73 @@ export default function SettingsOverlay({
             })}
           </View>
 
+          {/* Chatbot */}
+          {(() => {
+            const now = new Date();
+            const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+            const botUsageCount = ((group as any)?.bot_usage_month === currentMonth) ? ((group as any)?.bot_usage_count ?? 0) : 0;
+            const limitReached = botUsageCount >= BOT_MONTHLY_LIMIT;
+            const usagePct = Math.min(100, (botUsageCount / BOT_MONTHLY_LIMIT) * 100);
+            return (
+              <>
+                <Text style={s.sectionHeader}>CHATBOT</Text>
+
+                {/* Usage progress bar — zichtbaar voor alle leden */}
+                <View style={s.card}>
+                  <View style={s.botUsageRow}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text style={s.botUsageLabel}>Gebruik deze maand</Text>
+                      <Text style={s.botUsageCount}>{botUsageCount} / {BOT_MONTHLY_LIMIT}</Text>
+                    </View>
+                    <View style={s.botUsageBarBg}>
+                      <View
+                        style={[
+                          s.botUsageBarFill,
+                          { width: `${usagePct}%` },
+                          limitReached && s.botUsageBarFillFull,
+                        ]}
+                      />
+                    </View>
+                    {limitReached && (
+                      <Text style={s.botUsageWarning}>Limiet bereikt — bot reageert pas weer volgende maand</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Persoonlijkheid — alleen admins */}
+                {isAdmin && (
+                  <>
+                    <Text style={s.botSubHeader}>PERSOONLIJKHEID</Text>
+                    <View style={s.card}>
+                      {BOT_DIMENSIONS.map((dim, idx) => (
+                        <React.Fragment key={dim.key}>
+                          {idx > 0 && <View style={s.divider} />}
+                          <BotDimensionChooser
+                            label={dim.label}
+                            value={(botSettings[dim.key] as string) ?? (BOT_DEFAULTS[dim.key] as string)}
+                            options={dim.options}
+                            onChange={(v) => setBotSettings((p) => ({ ...p, [dim.key]: v }))}
+                          />
+                        </React.Fragment>
+                      ))}
+                    </View>
+
+                    <Text style={s.botSubHeader}>GEDRAG</Text>
+                    <View style={s.card}>
+                      <View style={s.botToggleRow}>
+                        <Text style={s.botToggleLabel}>Reageren op cadeautjes</Text>
+                        <Switch
+                          value={botSettings.respond_to_gift_messages ?? false}
+                          onValueChange={(v) => setBotSettings((p) => ({ ...p, respond_to_gift_messages: v }))}
+                        />
+                      </View>
+                    </View>
+                  </>
+                )}
+              </>
+            );
+          })()}
+
           {/* Invite code */}
           <Text style={s.sectionHeader}>UITNODIGINGSCODE</Text>
           <View style={s.card}>
@@ -1188,4 +1304,24 @@ const s = StyleSheet.create({
   // Danger
   dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
   dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
+
+  // Chatbot
+  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginLeft: 20, marginTop: 12, marginBottom: 4, letterSpacing: 0.5 },
+  botDimRow: { paddingHorizontal: 16, paddingVertical: 12 },
+  botDimLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9', marginBottom: 10 },
+  botDimChips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  botDimChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1 },
+  botDimChipInactive: { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'transparent' },
+  botDimChipActive: { borderColor: '#00BEAE', backgroundColor: 'rgba(0,190,174,0.15)' },
+  botDimChipText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
+  botDimChipTextActive: { color: '#FFFFFF' },
+  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, minHeight: 52 },
+  botToggleLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
+  botUsageRow: { padding: 16 },
+  botUsageLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9' },
+  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
+  botUsageBarBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  botUsageBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#00BEAE' },
+  botUsageBarFillFull: { backgroundColor: '#FF3B30' },
+  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: 8 },
 });
