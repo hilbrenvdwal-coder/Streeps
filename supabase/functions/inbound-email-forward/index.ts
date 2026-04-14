@@ -1,7 +1,8 @@
-// Receives Resend inbound webhooks. Webhook payload only contains metadata +
-// email_id; we fetch the full email via GET /emails/receiving/{id} and forward
-// it to a fixed Gmail address via Resend's outbound API. Lets us use
-// contact@streeps.app as a contact address without running a real inbox.
+// Receives Resend inbound webhooks, fetches the full email body via
+// GET /emails/receiving/{id}, and forwards it to a fixed Gmail address
+// via Resend's outbound API. Preserves the original Message-ID via
+// In-Reply-To / References headers so replies thread correctly on the
+// sender's side.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +31,13 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 }
 
+function normalizeMessageId(id: string): string {
+  const trimmed = id.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('<') && trimmed.endsWith('>')) return trimmed
+  return `<${trimmed}>`
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
@@ -51,12 +59,12 @@ Deno.serve(async (req) => {
     const to = extractEmail(data.to)
     const subject = typeof data.subject === 'string' ? data.subject : '(geen onderwerp)'
     const emailId = typeof data.email_id === 'string' ? data.email_id : (typeof data.id === 'string' ? data.id : '')
+    const originalMessageId = typeof data.message_id === 'string' ? normalizeMessageId(data.message_id) : ''
 
     if (!from || !emailId) {
       return new Response('invalid payload: missing from or email_id', { status: 400, headers: corsHeaders })
     }
 
-    // Fetch full inbound email content via Resend Received Emails API
     const fetchRes = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
     })
@@ -93,20 +101,28 @@ Deno.serve(async (req) => {
       `Onderwerp: ${subject}\n\n` +
       (fetchedText || '(geen plain text body)')
 
+    const outboundPayload: Record<string, unknown> = {
+      from: `Streeps Contact <${FORWARD_FROM}>`,
+      to: [FORWARD_TO],
+      reply_to: from,
+      subject: subject,
+      html: combined,
+      text: combinedText,
+    }
+    if (originalMessageId) {
+      outboundPayload.headers = {
+        'In-Reply-To': originalMessageId,
+        'References': originalMessageId,
+      }
+    }
+
     const sendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: `Streeps Contact <${FORWARD_FROM}>`,
-        to: [FORWARD_TO],
-        reply_to: from,
-        subject: `[Streeps] ${subject}`,
-        html: combined,
-        text: combinedText,
-      }),
+      body: JSON.stringify(outboundPayload),
     })
 
     if (!sendRes.ok) {
