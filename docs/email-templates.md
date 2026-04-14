@@ -54,7 +54,7 @@
       /* Dark mode (Apple Mail, iOS Mail) */
       @media (prefers-color-scheme: dark) {
         .body-bg { background-color: #141414 !important; background-image: linear-gradient(180deg, #1A1D2E 0%, #141414 100%) !important; }
-        .card { background-color: #1A1A2E !important; }
+        .card { background-color: #1F1F1F !important; }
         .card-text { color: #FFFFFF !important; }
         .card-text-muted { color: #C8C8D4 !important; }
         .divider { border-color: rgba(255,255,255,0.08) !important; }
@@ -95,7 +95,7 @@
 
             <!-- ─── Light card body ─── -->
             <tr>
-              <td class="card px-lg py-lg" bgcolor="#1A1A2E" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
+              <td class="card px-lg py-lg" bgcolor="#1F1F1F" style="background-color:#1F1F1F;padding:48px 44px 40px 44px;">
                 <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#FFFFFF;">
                   Welkom bij Streeps
                 </h1>
@@ -144,7 +144,7 @@
 
             <!-- ─── Footer ─── -->
             <tr>
-              <td bgcolor="#1A1A2E" style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
+              <td bgcolor="#1F1F1F" style="background-color:#1F1F1F;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
                 <p class="footer-text" style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:12px;line-height:1.6;color:#A0A0B8;">
                   Streeps &middot; <a href="https://streeps.app" style="color:#A0A0B8;text-decoration:underline;">streeps.app</a>
                 </p>
@@ -207,7 +207,7 @@
       /* Dark mode (Apple Mail, iOS Mail) */
       @media (prefers-color-scheme: dark) {
         .body-bg { background-color: #141414 !important; background-image: linear-gradient(180deg, #1A1D2E 0%, #141414 100%) !important; }
-        .card { background-color: #1A1A2E !important; }
+        .card { background-color: #1F1F1F !important; }
         .card-text { color: #FFFFFF !important; }
         .card-text-muted { color: #C8C8D4 !important; }
         .divider { border-color: rgba(255,255,255,0.08) !important; }
@@ -249,7 +249,7 @@
 
             <!-- ─── Light card body ─── -->
             <tr>
-              <td class="card px-lg py-lg" bgcolor="#1A1A2E" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
+              <td class="card px-lg py-lg" bgcolor="#1F1F1F" style="background-color:#1F1F1F;padding:48px 44px 40px 44px;">
                 <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#FFFFFF;">
                   Nieuw wachtwoord instellen
                 </h1>
@@ -298,7 +298,7 @@
 
             <!-- ─── Footer ─── -->
             <tr>
-              <td bgcolor="#1A1A2E" style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
+              <td bgcolor="#1F1F1F" style="background-color:#1F1F1F;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
                 <p class="footer-text" style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:12px;line-height:1.6;color:#A0A0B8;">
                   Streeps &middot; <a href="https://streeps.app" style="color:#A0A0B8;text-decoration:underline;">streeps.app</a>
                 </p>
