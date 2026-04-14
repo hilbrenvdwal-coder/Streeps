@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "associatedDomains": ["applinks:streeps.app"]
+      "bundleIdentifier": "app.streeps",
+      "associatedDomains": [
+        "applinks:streeps.app"
+      ]
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -30,7 +33,7 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.streeps",
+      "package": "app.streeps",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -42,7 +45,10 @@
               "pathPrefix": "/join/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -56,6 +62,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e50dd677-b5a0-43cb-b4fe-8d9548c5dfc1"
+      }
+    },
+    "owner": "hilbren"
   }
 }
