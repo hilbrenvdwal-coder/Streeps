@@ -52,6 +52,25 @@ function getSenderColor(userId: string, conversationId: string): string {
   return SENDER_COLORS[Math.abs(hash) % SENDER_COLORS.length];
 }
 
+/**
+ * Parse een bericht-string en return een array van React nodes waarin **text**
+ * als vetgedrukt is gerenderd. Gebruikt binnen een <Text> parent.
+ */
+function renderMessageText(text: string): React.ReactNode[] {
+  if (!text) return [];
+  const parts = text.split(/(\*\*[^*]+?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.length >= 4 && part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <Text key={i} style={{ fontWeight: '700' }}>
+          {part.slice(2, -2)}
+        </Text>
+      );
+    }
+    return part;
+  });
+}
+
 // Format for chat bubbles: minutes → then HH:mm after 1 hour
 function formatMessageTime(dateStr: string | null) {
   if (!dateStr) return '';
@@ -841,7 +860,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             )}
             <Pressable onPress={handlePress}>
               <View style={[dt.bubble, dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
-                <Text style={dt.bubbleText}>{item.content}</Text>
+                <Text style={dt.bubbleText}>{renderMessageText(item.content)}</Text>
                 {hasLikes && <HeartBadge count={likedBy.length} isMine={false} />}
               </View>
             </Pressable>
@@ -863,7 +882,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             </Animated.View>
             <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
               <Animated.View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { maxWidth: undefined, alignSelf: 'auto', opacity: bubbleOpacity }]}>
-                <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
+                <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{renderMessageText(item.content)}</Text>
                 {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
               </Animated.View>
             </Pressable>
@@ -871,7 +890,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         ) : (
           <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400}>
             <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }]}>
-              <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{item.content}</Text>
+              <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{renderMessageText(item.content)}</Text>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
             </View>
           </Pressable>
@@ -879,7 +898,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
       ) : (
         <Pressable onPress={handlePress}>
           <View style={[dt.bubble, dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
-            <Text style={dt.bubbleText}>{item.content}</Text>
+            <Text style={dt.bubbleText}>{renderMessageText(item.content)}</Text>
             {hasLikes && <HeartBadge count={likedBy.length} isMine={false} />}
           </View>
         </Pressable>
