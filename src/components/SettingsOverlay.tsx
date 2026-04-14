@@ -979,7 +979,7 @@ export default function SettingsOverlay({
                     {member.profile?.avatar_url ? (
                       <Image source={{ uri: member.profile.avatar_url }} style={s.memberAvatar} transition={200} cachePolicy="memory-disk" />
                     ) : (
-                      <AvatarPlaceholder size={36} label={name[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} />
+                      <AvatarPlaceholder size={36} label={name[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} style={s.memberAvatar} />
                     )}
                     <View style={{ flex: 1 }}>
                       <Text style={s.memberName}>{name}</Text>

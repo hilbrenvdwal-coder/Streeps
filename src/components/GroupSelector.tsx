@@ -376,7 +376,7 @@ export default function GroupSelector({
                       {group.avatar_url ? (
                         <Image source={{ uri: group.avatar_url }} style={st.groupAvatar} transition={200} cachePolicy="memory-disk" />
                       ) : (
-                        <AvatarPlaceholder size={48} label={group.name[0]?.toUpperCase() ?? '?'} borderRadius={24} fontSize={18} />
+                        <AvatarPlaceholder size={48} label={group.name[0]?.toUpperCase() ?? '?'} borderRadius={24} fontSize={18} style={st.groupAvatar} />
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={st.groupName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{group.name}</Text>

@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 
 interface AvatarPlaceholderProps {
@@ -7,6 +7,7 @@ interface AvatarPlaceholderProps {
   label: string;
   borderRadius?: number;
   fontSize?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function AvatarPlaceholder({
@@ -14,6 +15,7 @@ export default function AvatarPlaceholder({
   label,
   borderRadius,
   fontSize,
+  style,
 }: AvatarPlaceholderProps) {
   const radius = borderRadius ?? size / 2;
   const textSize = fontSize ?? Math.round(size * 0.4);
@@ -21,18 +23,10 @@ export default function AvatarPlaceholder({
   const gradientId = `avatarGrad${rawId.replace(/:/g, '')}`;
 
   return (
-    <View style={[styles.wrap, { width: size, height: size, borderRadius: radius }]}>
+    <View style={[styles.wrap, { width: size, height: size, borderRadius: radius }, style]}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFillObject}>
         <Defs>
-          <RadialGradient
-            id={gradientId}
-            cx="50%"
-            cy="50%"
-            rx="50%"
-            ry="50%"
-            fx="50%"
-            fy="50%"
-          >
+          <RadialGradient id={gradientId} cx="50%" cy="50%" rx="50%" ry="50%" fx="50%" fy="50%">
             <Stop offset="0%" stopColor="#2D2D44" stopOpacity="0.5" />
             <Stop offset="100%" stopColor="#A0A0B8" stopOpacity="0.5" />
           </RadialGradient>
@@ -45,14 +39,6 @@ export default function AvatarPlaceholder({
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: {
-    fontFamily: 'Unbounded-Bold',
-    color: '#FFFFFF',
-    includeFontPadding: false,
-  },
+  wrap: { overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  label: { fontFamily: 'Unbounded-Bold', color: '#FFFFFF', includeFontPadding: false },
 });

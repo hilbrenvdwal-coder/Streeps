@@ -785,7 +785,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
               item.profile?.avatar_url ? (
                 <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
               ) : (
-                <AvatarPlaceholder size={20} label={(item.profile?.full_name || '?')[0]?.toUpperCase() ?? '?'} borderRadius={10} fontSize={9} />
+                <AvatarPlaceholder size={20} label={(item.profile?.full_name || '?')[0]?.toUpperCase() ?? '?'} borderRadius={10} fontSize={9} style={dt.bubbleAvatar} />
               )
             )}
             <Pressable onPress={handleImageTap} delayLongPress={400}>
@@ -837,7 +837,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             ) : item.profile?.avatar_url ? (
               <Image source={{ uri: item.profile.avatar_url }} style={dt.bubbleAvatar} transition={200} cachePolicy="memory-disk" />
             ) : (
-              <AvatarPlaceholder size={20} label={senderName[0]?.toUpperCase() ?? '?'} borderRadius={10} fontSize={9} />
+              <AvatarPlaceholder size={20} label={senderName[0]?.toUpperCase() ?? '?'} borderRadius={10} fontSize={9} style={dt.bubbleAvatar} />
             )}
             <Pressable onPress={handlePress}>
               <View style={[dt.bubble, dt.bubbleOther, hasLikes && { marginBottom: 18 }]}>
@@ -2496,7 +2496,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                   {m.profile?.avatar_url ? (
                     <Image source={{ uri: m.profile.avatar_url }} style={gp.memberAvatar} transition={200} cachePolicy="memory-disk" />
                   ) : (
-                    <AvatarPlaceholder size={36} label={m.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} />
+                    <AvatarPlaceholder size={36} label={m.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} style={gp.memberAvatar} />
                   )}
                   <Text style={gp.memberName} numberOfLines={1}>{m.profile?.full_name || 'Onbekend'}</Text>
                   {m.user_id === user?.id && <Text style={gp.youBadge}>Jij</Text>}
@@ -3382,7 +3382,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                       {person.avatar_url ? (
                         <Image source={{ uri: person.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                       ) : (
-                        <AvatarPlaceholder size={52} label={person.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} />
+                        <AvatarPlaceholder size={52} label={person.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} style={ap.personAvatar} />
                       )}
                       <View style={{ flex: 1 }}>
                         <Text style={ap.personName}>{person.full_name}</Text>
@@ -3416,7 +3416,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                             {req.profile?.avatar_url ? (
                               <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
-                              <AvatarPlaceholder size={52} label={req.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} />
+                              <AvatarPlaceholder size={52} label={req.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} style={ap.personAvatar} />
                             )}
                             <View style={{ flex: 1 }}>
                               <Text style={ap.personName}>{req.profile?.full_name || 'Onbekend'}</Text>
@@ -3444,7 +3444,7 @@ function AddPeopleOverlay({ visible, onClose, onFriendshipChange, onViewProfile,
                             {req.profile?.avatar_url ? (
                               <Image source={{ uri: req.profile.avatar_url }} style={ap.personAvatar} transition={200} cachePolicy="memory-disk" />
                             ) : (
-                              <AvatarPlaceholder size={52} label={req.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} />
+                              <AvatarPlaceholder size={52} label={req.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={26} fontSize={20} style={ap.personAvatar} />
                             )}
                             <View style={{ flex: 1 }}>
                               <Text style={ap.personName}>{req.profile?.full_name || 'Onbekend'}</Text>
@@ -4005,7 +4005,7 @@ export default function ChatScreen() {
                 {item.avatar_url ? (
                   <Image source={{ uri: item.avatar_url }} style={cs.convAvatar} transition={200} cachePolicy="memory-disk" />
                 ) : (
-                  <AvatarPlaceholder size={54} label={item.name[0]?.toUpperCase() ?? '?'} borderRadius={27} fontSize={18} />
+                  <AvatarPlaceholder size={54} label={item.name[0]?.toUpperCase() ?? '?'} borderRadius={27} fontSize={18} style={cs.convAvatar} />
                 )}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
