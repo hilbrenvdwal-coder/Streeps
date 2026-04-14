@@ -8,7 +8,7 @@ let cachedApiKey: string | null = null
 // ── Bot personality types (duplicated from src/constants/botSettings.ts) ──
 type HumorOption = 'droog' | 'nuchter' | 'cheesy';
 type ToonOption = 'vriend' | 'vriendelijk' | 'savage';
-type TaalregisterOption = 'genz' | 'neutraal' | 'kroeg';
+type TaalregisterOption = 'goon' | 'neutraal' | 'kroeg';
 type LengteOption = 'matched' | 'kort' | 'uitgebreid';
 type BetrokkenheidOption = 'reactief' | 'betrokken' | 'enthousiast';
 
@@ -24,7 +24,7 @@ interface BotSettings {
 const BOT_DEFAULTS: Required<BotSettings> = {
   humor: 'droog',
   toon: 'vriend',
-  taalregister: 'genz',
+  taalregister: 'goon',
   lengte: 'matched',
   betrokkenheid: 'reactief',
   respond_to_gift_messages: false,
@@ -55,7 +55,7 @@ const FRAGMENTS = {
   } as Record<ToonOption, string>,
 
   taalregister: {
-    genz: `Emoji's (spaarzaam, maar als je ze gebruikt dan zo):
+    goon: `Emoji's (spaarzaam, maar als je ze gebruikt dan zo):
 - 💀 = lachen (niet dood, gewoon grappig)
 - 😭 = huilend van het lachen (TikTok-stijl, niet echt huilen)
 - ✌️ = sarcastisch succes wensen ("moet je zelf weten ✌️") of iemand "twin" noemen (positief)
@@ -120,7 +120,7 @@ ANTI-HALLUCINATIE (STRIKT):
 function buildSystemPrompt(settings: BotSettings): string {
   const humorValid: HumorOption[] = ['droog', 'nuchter', 'cheesy'];
   const toonValid: ToonOption[] = ['vriend', 'vriendelijk', 'savage'];
-  const taalValid: TaalregisterOption[] = ['genz', 'neutraal', 'kroeg'];
+  const taalValid: TaalregisterOption[] = ['goon', 'neutraal', 'kroeg'];
   const lengteValid: LengteOption[] = ['matched', 'kort', 'uitgebreid'];
   const betrokValid: BetrokkenheidOption[] = ['reactief', 'betrokken', 'enthousiast'];
 

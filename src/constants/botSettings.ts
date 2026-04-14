@@ -4,7 +4,7 @@
 
 export type HumorOption = 'droog' | 'nuchter' | 'cheesy';
 export type ToonOption = 'vriend' | 'vriendelijk' | 'savage';
-export type TaalregisterOption = 'genz' | 'neutraal' | 'kroeg';
+export type TaalregisterOption = 'goon' | 'neutraal' | 'kroeg';
 export type LengteOption = 'matched' | 'kort' | 'uitgebreid';
 export type BetrokkenheidOption = 'reactief' | 'betrokken' | 'enthousiast';
 
@@ -20,7 +20,7 @@ export interface BotSettings {
 export const BOT_DEFAULTS: Required<BotSettings> = {
   humor: 'droog',
   toon: 'vriend',
-  taalregister: 'genz',
+  taalregister: 'goon',
   lengte: 'matched',
   betrokkenheid: 'reactief',
   respond_to_gift_messages: false,
@@ -64,7 +64,7 @@ export const BOT_DIMENSIONS: BotDimensionDef[] = [
     key: 'taalregister',
     label: 'Taalregister',
     options: [
-      { key: 'genz', label: 'Gen-Z' },
+      { key: 'goon', label: 'Goon' },
       { key: 'neutraal', label: 'Neutraal' },
       { key: 'kroeg', label: 'Kroeg' },
     ],
@@ -96,7 +96,7 @@ export function resolveBotSettings(settings: BotSettings | null | undefined): Re
   // Validate enum values — onbekende waarden fallbacken naar default
   const humorValid: HumorOption[] = ['droog', 'nuchter', 'cheesy'];
   const toonValid: ToonOption[] = ['vriend', 'vriendelijk', 'savage'];
-  const taalValid: TaalregisterOption[] = ['genz', 'neutraal', 'kroeg'];
+  const taalValid: TaalregisterOption[] = ['goon', 'neutraal', 'kroeg'];
   const lengteValid: LengteOption[] = ['matched', 'kort', 'uitgebreid'];
   const betrokValid: BetrokkenheidOption[] = ['reactief', 'betrokken', 'enthousiast'];
 
