@@ -17,6 +17,7 @@
       "associatedDomains": ["applinks:streeps.app"]
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#1A1A2E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

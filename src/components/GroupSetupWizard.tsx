@@ -14,6 +14,7 @@ import {
   Platform,
   Switch,
   Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Reanimated, {
   useSharedValue,
@@ -375,6 +376,11 @@ export default function GroupSetupWizard({
 
   // ── Step 3: Drinks ──
   const renderStep3 = () => (
+    <KeyboardAvoidingView
+      style={{ flex: 1, width: '100%' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={-(104 + insets.bottom)}
+    >
     <View style={[ws.stepContent, { paddingBottom: 104 + insets.bottom }]}>
       <Text style={ws.stepTitle}>Drankjes</Text>
       <Text style={ws.stepSubtitle}>Beheer de drankjes in je groep</Text>
@@ -383,7 +389,6 @@ export default function GroupSetupWizard({
         style={ws.drinksList}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
         {drinks.map((drink, i) => (
@@ -459,6 +464,7 @@ export default function GroupSetupWizard({
         </View>
       </View>
     </View>
+    </KeyboardAvoidingView>
   );
 
   // ── Step 4: Invite ──
