@@ -53,22 +53,22 @@
 
       /* Dark mode (Apple Mail, iOS Mail) */
       @media (prefers-color-scheme: dark) {
-        .body-bg { background-color: #0E0D1C !important; }
-        .card { background-color: #141228 !important; }
-        .card-text { color: #F1F1F1 !important; }
-        .card-text-muted { color: #A0A0B8 !important; }
+        .body-bg { background-color: #141414 !important; background-image: linear-gradient(180deg, #1A1D2E 0%, #141414 100%) !important; }
+        .card { background-color: #1A1A2E !important; }
+        .card-text { color: #FFFFFF !important; }
+        .card-text-muted { color: #C8C8D4 !important; }
         .divider { border-color: rgba(255,255,255,0.08) !important; }
-        .footer-text { color: #848494 !important; }
+        .footer-text { color: #A0A0B8 !important; }
       }
     </style>
   </head>
-  <body class="body-bg" style="margin:0;padding:0;background-color:#F4F4F8;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <body class="body-bg" style="margin:0;padding:0;background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
     <!-- Preheader (hidden) -->
-    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#F4F4F8;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#141414;">
       Welkom bij Streeps. Bevestig je account en begin met streepjes zetten.
     </div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#F4F4F8;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);">
       <tr>
         <td align="center" style="padding:32px 16px;">
 
@@ -101,11 +101,11 @@
 
             <!-- ─── Light card body ─── -->
             <tr>
-              <td class="card px-lg py-lg" style="background-color:#FFFFFF;padding:48px 44px 40px 44px;">
-                <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#0E0D1C;">
+              <td class="card px-lg py-lg" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
+                <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#FFFFFF;">
                   Welkom bij Streeps
                 </h1>
-                <p class="card-text-muted" style="margin:0 0 28px 0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:400;font-size:16px;line-height:1.6;color:#4A4A68;">
+                <p class="card-text-muted" style="margin:0 0 28px 0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:400;font-size:16px;line-height:1.6;color:#C8C8D4;">
                   Je bent er bijna. Bevestig je e-mailadres en je kunt meteen streepjes zetten met je vrienden, rondjes bijhouden en afrekenen zonder gezeik.
                 </p>
 
@@ -138,7 +138,7 @@
                 <!-- Divider -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
-                    <td class="divider" style="border-top:1px solid #E8E8F0;line-height:1px;font-size:1px;">&nbsp;</td>
+                    <td class="divider" style="border-top:1px solid rgba(255,255,255,0.08);line-height:1px;font-size:1px;">&nbsp;</td>
                   </tr>
                 </table>
 
@@ -150,7 +150,7 @@
 
             <!-- ─── Footer ─── -->
             <tr>
-              <td style="background-color:#FFFFFF;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
+              <td style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
                 <p class="footer-text" style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:12px;line-height:1.6;color:#A0A0B8;">
                   Streeps &middot; <a href="https://streeps.app" style="color:#A0A0B8;text-decoration:underline;">streeps.app</a>
                 </p>
@@ -212,23 +212,23 @@
 
       /* Dark mode (Apple Mail, iOS Mail) */
       @media (prefers-color-scheme: dark) {
-        .body-bg { background-color: #0E0D1C !important; }
-        .card { background-color: #141228 !important; }
-        .card-text { color: #F1F1F1 !important; }
-        .card-text-muted { color: #A0A0B8 !important; }
+        .body-bg { background-color: #141414 !important; background-image: linear-gradient(180deg, #1A1D2E 0%, #141414 100%) !important; }
+        .card { background-color: #1A1A2E !important; }
+        .card-text { color: #FFFFFF !important; }
+        .card-text-muted { color: #C8C8D4 !important; }
         .divider { border-color: rgba(255,255,255,0.08) !important; }
-        .footer-text { color: #848494 !important; }
+        .footer-text { color: #A0A0B8 !important; }
         .notice { background-color: rgba(255,0,77,0.12) !important; color: #FF9AAE !important; }
       }
     </style>
   </head>
-  <body class="body-bg" style="margin:0;padding:0;background-color:#F4F4F8;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <body class="body-bg" style="margin:0;padding:0;background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
     <!-- Preheader (hidden) -->
-    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#F4F4F8;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#141414;">
       Je hebt een wachtwoord reset aangevraagd voor Streeps.
     </div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#F4F4F8;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="body-bg" style="background-color:#141414;background-image:linear-gradient(180deg,#1A1D2E 0%,#141414 100%);">
       <tr>
         <td align="center" style="padding:32px 16px;">
 
@@ -261,11 +261,11 @@
 
             <!-- ─── Light card body ─── -->
             <tr>
-              <td class="card px-lg py-lg" style="background-color:#FFFFFF;padding:48px 44px 40px 44px;">
-                <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#0E0D1C;">
+              <td class="card px-lg py-lg" style="background-color:#1A1A2E;padding:48px 44px 40px 44px;">
+                <h1 class="h1 card-text" style="margin:0 0 16px 0;font-family:'Unbounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:800;font-size:32px;line-height:1.15;letter-spacing:-0.02em;color:#FFFFFF;">
                   Nieuw wachtwoord instellen
                 </h1>
-                <p class="card-text-muted" style="margin:0 0 28px 0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:400;font-size:16px;line-height:1.6;color:#4A4A68;">
+                <p class="card-text-muted" style="margin:0 0 28px 0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:400;font-size:16px;line-height:1.6;color:#C8C8D4;">
                   Je hebt een wachtwoord reset aangevraagd voor je Streeps account. Klik op de knop hieronder om een nieuw wachtwoord te kiezen.
                 </p>
 
@@ -298,8 +298,8 @@
                 <!-- Security notice -->
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 0;">
                   <tr>
-                    <td class="notice" style="background-color:#FFF1F4;border-left:3px solid #FF004D;border-radius:8px;padding:16px 18px;">
-                      <p style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:13px;line-height:1.6;color:#8B2438;">
+                    <td class="notice" style="background-color:rgba(255,0,77,0.12);border-left:3px solid #FF004D;border-radius:8px;padding:16px 18px;">
+                      <p style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:13px;line-height:1.6;color:#FF9AAE;">
                         <strong style="color:#FF004D;">Niet jij geweest?</strong> Dan kun je deze mail negeren en blijft je wachtwoord onveranderd. Deze link is beperkt geldig.
                       </p>
                     </td>
@@ -310,7 +310,7 @@
 
             <!-- ─── Footer ─── -->
             <tr>
-              <td style="background-color:#FFFFFF;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
+              <td style="background-color:#1A1A2E;border-radius:0 0 24px 24px;padding:0 44px 40px 44px;" align="center">
                 <p class="footer-text" style="margin:0;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-weight:500;font-size:12px;line-height:1.6;color:#A0A0B8;">
                   Streeps &middot; <a href="https://streeps.app" style="color:#A0A0B8;text-decoration:underline;">streeps.app</a>
                 </p>
