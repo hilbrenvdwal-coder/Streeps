@@ -1,8 +1,6 @@
 // Receives Resend inbound webhooks, fetches the full email body via
 // GET /emails/receiving/{id}, and forwards it to a fixed Gmail address
-// via Resend's outbound API. Preserves the original Message-ID via
-// In-Reply-To / References headers so replies thread correctly on the
-// sender's side.
+// via Resend's outbound API. Defensive From display name handling.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,6 +25,17 @@ function extractEmail(raw: unknown): string {
   return String(raw)
 }
 
+function parseFromField(raw: string): { name: string, email: string } {
+  const match = raw.match(/^(.*?)\s*<([^>]+)>\s*$/)
+  if (match) {
+    return {
+      name: (match[1] || '').trim().replace(/^["']|["']$/g, ''),
+      email: match[2].trim(),
+    }
+  }
+  return { name: '', email: raw.trim() }
+}
+
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 }
@@ -36,6 +45,15 @@ function normalizeMessageId(id: string): string {
   if (!trimmed) return ''
   if (trimmed.startsWith('<') && trimmed.endsWith('>')) return trimmed
   return `<${trimmed}>`
+}
+
+// RFC 5322 safe display name: strip quotes/brackets/newlines, keep ASCII.
+function safeDisplayName(name: string): string {
+  return name
+    .replace(/[<>"\\\r\n\t]/g, '')
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim()
+    .slice(0, 50)
 }
 
 Deno.serve(async (req) => {
@@ -55,13 +73,15 @@ Deno.serve(async (req) => {
     const body = await req.json() as Record<string, unknown>
     const data = (body.data ?? body) as Record<string, unknown>
 
-    const from = extractEmail(data.from ?? data.sender)
+    const rawFrom = typeof data.from === 'string' ? data.from : extractEmail(data.from ?? data.sender)
+    const parsed = parseFromField(rawFrom)
+    const senderEmail = parsed.email
     const to = extractEmail(data.to)
     const subject = typeof data.subject === 'string' ? data.subject : '(geen onderwerp)'
     const emailId = typeof data.email_id === 'string' ? data.email_id : (typeof data.id === 'string' ? data.id : '')
     const originalMessageId = typeof data.message_id === 'string' ? normalizeMessageId(data.message_id) : ''
 
-    if (!from || !emailId) {
+    if (!senderEmail || !emailId) {
       return new Response('invalid payload: missing from or email_id', { status: 400, headers: corsHeaders })
     }
 
@@ -71,21 +91,19 @@ Deno.serve(async (req) => {
 
     if (!fetchRes.ok) {
       const errText = await fetchRes.text()
-      console.error('[inbound] fetch received email failed:', fetchRes.status, errText)
-      return new Response(`fetch failed: ${fetchRes.status} ${errText}`, { status: 500, headers: corsHeaders })
+      console.error('[inbound] fetch failed:', fetchRes.status, errText)
+      return new Response(`fetch failed: ${fetchRes.status}`, { status: 500, headers: corsHeaders })
     }
 
     const fullEmail = await fetchRes.json() as Record<string, unknown>
     const fetchedText = typeof fullEmail.text === 'string' ? fullEmail.text : ''
     const fetchedHtml = typeof fullEmail.html === 'string' ? fullEmail.html : ''
 
-    const forwardHeader =
-      `<div style="background:#F4F4F8;border-left:3px solid #FF0085;padding:12px 16px;margin-bottom:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#4A4A68;">` +
-      `<strong style="color:#0E0D1C;">Inkomende mail via contact@streeps.app</strong><br/>` +
-      `<strong>Van:</strong> ${esc(from)}<br/>` +
-      `<strong>Aan:</strong> ${esc(to || 'contact@streeps.app')}<br/>` +
-      `<strong>Onderwerp:</strong> ${esc(subject)}` +
-      `</div>`
+    const fullFromRaw = typeof fullEmail.from === 'string' ? fullEmail.from : rawFrom
+    const fullParsed = parseFromField(fullFromRaw)
+    const rawName = fullParsed.name || parsed.name || senderEmail.split('@')[0] || ''
+    const cleanName = safeDisplayName(rawName)
+    const senderEmailFinal = fullParsed.email || senderEmail
 
     const bodyHtml = fetchedHtml
       ? fetchedHtml
@@ -93,21 +111,22 @@ Deno.serve(async (req) => {
         ? `<pre style="white-space:pre-wrap;font-family:-apple-system,sans-serif;">${esc(fetchedText)}</pre>`
         : '<p style="color:#999;"><em>(lege mail)</em></p>'
 
-    const combined = forwardHeader + bodyHtml
-    const combinedText =
-      `--- Inkomende mail via contact@streeps.app ---\n` +
-      `Van: ${from}\n` +
-      `Aan: ${to || 'contact@streeps.app'}\n` +
-      `Onderwerp: ${subject}\n\n` +
-      (fetchedText || '(geen plain text body)')
+    const bodyText = fetchedText || '(geen plain text body)'
+
+    const displayName = cleanName
+      ? `"${cleanName} via Streeps"`
+      : '"Streeps Contact"'
+    const displayFrom = `${displayName} <${FORWARD_FROM}>`
+
+    console.log('[inbound] sending with From:', displayFrom, 'reply_to:', senderEmailFinal)
 
     const outboundPayload: Record<string, unknown> = {
-      from: `Streeps Contact <${FORWARD_FROM}>`,
+      from: displayFrom,
       to: [FORWARD_TO],
-      reply_to: from,
+      reply_to: senderEmailFinal,
       subject: subject,
-      html: combined,
-      text: combinedText,
+      html: bodyHtml,
+      text: bodyText,
     }
     if (originalMessageId) {
       outboundPayload.headers = {
@@ -125,13 +144,15 @@ Deno.serve(async (req) => {
       body: JSON.stringify(outboundPayload),
     })
 
+    const sendResBody = await sendRes.text()
     if (!sendRes.ok) {
-      const errText = await sendRes.text()
-      console.error('[inbound] send error:', sendRes.status, errText)
-      return new Response(`forward failed: ${sendRes.status}`, { status: 500, headers: corsHeaders })
+      console.error('[inbound] send error:', sendRes.status, sendResBody)
+      return new Response(`forward failed: ${sendRes.status} ${sendResBody}`, { status: 500, headers: corsHeaders })
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    console.log('[inbound] send response:', sendResBody)
+
+    return new Response(JSON.stringify({ ok: true, resend: sendResBody }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
