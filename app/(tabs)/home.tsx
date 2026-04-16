@@ -410,10 +410,31 @@ export default function HomeScreen() {
     })
   ).current;
 
+  const isDrinkMode = group?.drinks_as_categories === true;
+
   const activeCategories = useMemo(() => {
     const catsWithDrinks = new Set(drinks.map((d) => d.category));
     return ([1, 2, 3, 4] as const).filter((cat) => catsWithDrinks.has(cat));
   }, [drinks]);
+
+  // In drink-mode: available drinks act as "categories"
+  const drinkCategories = useMemo(() => {
+    if (!isDrinkMode) return [];
+    return drinks.filter((d) => (d as any).is_available !== false);
+  }, [isDrinkMode, drinks]);
+
+  // Selected drink ID for drink-mode
+  const [selectedDrinkId, setSelectedDrinkId] = useState<string | null>(null);
+
+  // Auto-select first drink when entering drink-mode or drinks change
+  useEffect(() => {
+    if (isDrinkMode && drinkCategories.length > 0) {
+      if (!selectedDrinkId || !drinkCategories.some((d) => d.id === selectedDrinkId)) {
+        setSelectedDrinkId(drinkCategories[0].id);
+        setSelectedCategory(drinkCategories[0].category);
+      }
+    }
+  }, [isDrinkMode, drinkCategories]);
 
   // ── Live badge: auto-expires at the exact moment the 10-min window closes ──
   const [isLive, setIsLive] = useState(false);
@@ -498,20 +519,20 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCategoryTap = (cat: number) => {
+  const handleCategoryTap = (cat: number, drinkId?: string) => {
     if (adding) return; // debounce: block while tally is being saved
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(cat);
+    if (drinkId) setSelectedDrinkId(drinkId);
   };
 
   const handleConfirmTally = async () => {
     if (!selectedCategory || tallyCount < 1) { setShowVerification(false); return; }
     const count = tallyCount;
-    const catName = getCategoryName(selectedCategory);
     setShowVerification(false);
     setAdding(true);
     try {
-      await addTally(selectedCategory as 1 | 2 | 3 | 4, count);
+      await addTally(selectedCategory as 1 | 2 | 3 | 4, count, isDrinkMode ? (selectedDrinkId ?? undefined) : undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const newCount = confirmCount + 1;
       setConfirmCount(newCount);
@@ -707,20 +728,35 @@ export default function HomeScreen() {
                 onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
                 onSwipeCycle={(direction: 'next' | 'prev') => {
                   if (adding) return;
-                  const list = activeCategories;
-                  if (!list || list.length === 0) return;
-                  const currentIdx = list.findIndex((c) => c === selectedCategory);
-                  if (currentIdx === -1) return;
-                  const nextIdx = direction === 'next'
-                    ? (currentIdx + 1) % list.length
-                    : (currentIdx - 1 + list.length) % list.length;
-                  setSelectedCategory(list[nextIdx]);
-                  Haptics.selectionAsync();
+                  if (isDrinkMode) {
+                    if (drinkCategories.length === 0) return;
+                    const currentIdx = drinkCategories.findIndex((d) => d.id === selectedDrinkId);
+                    if (currentIdx === -1) return;
+                    const nextIdx = direction === 'next'
+                      ? (currentIdx + 1) % drinkCategories.length
+                      : (currentIdx - 1 + drinkCategories.length) % drinkCategories.length;
+                    setSelectedDrinkId(drinkCategories[nextIdx].id);
+                    setSelectedCategory(drinkCategories[nextIdx].category);
+                    Haptics.selectionAsync();
+                  } else {
+                    const list = activeCategories;
+                    if (!list || list.length === 0) return;
+                    const currentIdx = list.findIndex((c) => c === selectedCategory);
+                    if (currentIdx === -1) return;
+                    const nextIdx = direction === 'next'
+                      ? (currentIdx + 1) % list.length
+                      : (currentIdx - 1 + list.length) % list.length;
+                    setSelectedCategory(list[nextIdx]);
+                    Haptics.selectionAsync();
+                  }
                 }}
                 auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
-                activeColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined}
+                activeColor={isDrinkMode
+                  ? (selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined)
+                  : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined)
+                }
               />
-              {selectedCategory && credits[selectedCategory] > 0 && (
+              {!isDrinkMode && selectedCategory && credits[selectedCategory] > 0 && (
                 <View style={s.creditBadge}>
                   <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
                 </View>
@@ -739,17 +775,31 @@ export default function HomeScreen() {
 
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
             <View style={s.categories}>
-              {activeCategories.map((cat) => (
-                <CategoryRow
-                  key={cat}
-                  name={getCategoryName(cat)}
-                  price={getCategoryPrice(cat)}
-                  color={t.categoryColors[(cat - 1) % 4]}
-                  categoryIndex={cat}
-                  selected={selectedCategory === cat}
-                  onPress={() => handleCategoryTap(cat)}
-                />
-              ))}
+              {isDrinkMode ? (
+                drinkCategories.map((drink, idx) => (
+                  <CategoryRow
+                    key={drink.id}
+                    name={`${drink.emoji ?? '🍺'} ${drink.name}`}
+                    price={(drink as any).price_override ?? 0}
+                    color={t.categoryColors[idx % t.categoryColors.length]}
+                    categoryIndex={idx + 1}
+                    selected={selectedDrinkId === drink.id}
+                    onPress={() => handleCategoryTap(drink.category, drink.id)}
+                  />
+                ))
+              ) : (
+                activeCategories.map((cat) => (
+                  <CategoryRow
+                    key={cat}
+                    name={getCategoryName(cat)}
+                    price={getCategoryPrice(cat)}
+                    color={t.categoryColors[(cat - 1) % 4]}
+                    categoryIndex={cat}
+                    selected={selectedCategory === cat}
+                    onPress={() => handleCategoryTap(cat)}
+                  />
+                ))
+              )}
             </View>
 
             {/* ── Leden ── */}
@@ -1047,7 +1097,7 @@ export default function HomeScreen() {
           refresh={refreshGroup}
           tallyCounts={tallyCategoryCounts}
           recentTallies={recentTallies}
-          addTally={addTallyForMemberByCategory}
+          addTally={(cat, userId, drinkId) => addTallyForMemberByCategory(cat, userId!, drinkId)}
           removeTally={removeTally}
           activeCategories={activeCategories as number[]}
           getCategoryName={getCategoryName}
@@ -1067,10 +1117,19 @@ export default function HomeScreen() {
       <StreepjesVerificatieModal
         visible={showVerification}
         count={tallyCount}
-        categoryName={selectedCategory ? getCategoryName(selectedCategory) : ''}
-        categoryColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : '#00BEAE'}
-        categoryPrice={selectedCategory ? getCategoryPrice(selectedCategory) : undefined}
-        credit={selectedCategory ? (credits[selectedCategory] || 0) : 0}
+        categoryName={isDrinkMode
+          ? (drinkCategories.find((d) => d.id === selectedDrinkId)?.name ?? '')
+          : (selectedCategory ? getCategoryName(selectedCategory) : '')
+        }
+        categoryColor={isDrinkMode
+          ? t.categoryColors[Math.max(0, drinkCategories.findIndex((d) => d.id === selectedDrinkId)) % t.categoryColors.length]
+          : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : '#00BEAE')
+        }
+        categoryPrice={isDrinkMode
+          ? ((drinkCategories.find((d) => d.id === selectedDrinkId) as any)?.price_override ?? 0)
+          : (selectedCategory ? getCategoryPrice(selectedCategory) : undefined)
+        }
+        credit={isDrinkMode ? 0 : (selectedCategory ? (credits[selectedCategory] || 0) : 0)}
         onConfirm={handleConfirmTally}
         onCancel={() => setShowVerification(false)}
       />

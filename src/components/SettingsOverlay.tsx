@@ -42,6 +42,7 @@ interface Drink {
   name: string;
   category: number;
   emoji: string | null;
+  price_override?: number | null;
 }
 
 interface Props {
@@ -69,7 +70,7 @@ interface Props {
   // Tally management
   tallyCounts?: Record<string, Record<number, number>>;
   recentTallies?: any[];
-  addTally?: (category: 1|2|3|4, userId?: string) => Promise<void>;
+  addTally?: (category: 1|2|3|4, userId?: string, drinkId?: string) => Promise<void>;
   removeTally?: (tallyId: string) => Promise<void>;
   activeCategories?: number[];
   getCategoryName?: (cat: number) => string;
@@ -446,6 +447,10 @@ export default function SettingsOverlay({
   const [isSaving, setIsSaving] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [savedOk, setSavedOk] = useState(false);
+  const [drinksAsCategories, setDrinksAsCategories] = useState(false);
+  const [drinkPrices, setDrinkPrices] = useState<Record<string, string>>({});
+  const [drinkPriceErrors, setDrinkPriceErrors] = useState<Record<string, string | null>>({});
+  const [dacToggling, setDacToggling] = useState(false);
   const catOpacityAnims = useRef([
     new Animated.Value(1),
     new Animated.Value(1),
@@ -524,6 +529,17 @@ export default function SettingsOverlay({
       const loadedBotSettings: BotSettings = ((group as any)?.bot_settings ?? {}) as BotSettings;
       setBotSettings(loadedBotSettings);
       setInitialBotSettings(loadedBotSettings);
+
+      // Drinks as categories
+      setDrinksAsCategories(group.drinks_as_categories ?? false);
+      const priceMap: Record<string, string> = {};
+      drinks.forEach((d) => {
+        if (d.price_override != null) {
+          priceMap[d.id] = centsToEuroStr(d.price_override);
+        }
+      });
+      setDrinkPrices(priceMap);
+      setDrinkPriceErrors({});
 
       setShowOpen(true);
       scrimOpacity.setValue(0);
@@ -683,6 +699,135 @@ export default function SettingsOverlay({
     });
   };
 
+  const handleDrinkPriceChange = (drinkId: string, value: string) => {
+    setDrinkPrices((prev) => ({ ...prev, [drinkId]: value }));
+    if (drinkPriceErrors[drinkId]) {
+      setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: null }));
+    }
+  };
+
+  const handleDrinkPriceBlur = (drinkId: string) => {
+    const value = drinkPrices[drinkId] ?? '';
+    if (!value.trim()) return;
+    const formatted = formatEuroStr(value);
+    if (formatted == null) {
+      setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: 'Ongeldig bedrag' }));
+    } else {
+      setDrinkPrices((prev) => ({ ...prev, [drinkId]: formatted }));
+      setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: null }));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const saveDrinkPrice = async (drinkId: string) => {
+    const value = drinkPrices[drinkId] ?? '';
+    const cents = euroStrToCents(value);
+    if (cents == null) return;
+    await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
+  };
+
+  const handleToggleDrinksAsCategories = async (newValue: boolean) => {
+    if (dacToggling) return;
+    setDacToggling(true);
+    try {
+      if (newValue) {
+        // Toggle AAN: backup categories, set price_override on drinks
+        const backup: any = {
+          categories: {} as any,
+          drink_categories: {} as any,
+        };
+        for (let i = 1; i <= 4; i++) {
+          const nameKey = `name_category_${i}` as keyof typeof group;
+          const priceKey = `price_category_${i}` as keyof typeof group;
+          const enabled = enabledCats.has(i);
+          backup.categories[String(i)] = enabled ? {
+            name: group[nameKey] || `Categorie ${i}`,
+            price: group[priceKey] ?? 0,
+            enabled: true,
+          } : null;
+        }
+        drinks.forEach((d) => {
+          backup.drink_categories[d.id] = { category: d.category };
+        });
+
+        // Set price_override on drinks where null
+        const updates: PromiseLike<any>[] = [];
+        const newPriceMap: Record<string, string> = { ...drinkPrices };
+        drinks.forEach((d) => {
+          if (d.price_override == null) {
+            const catPriceKey = `price_category_${d.category}` as keyof typeof group;
+            const catPrice = (group[catPriceKey] as number) ?? 150;
+            updates.push(supabase.from('drinks').update({ price_override: catPrice }).eq('id', d.id).then());
+            newPriceMap[d.id] = centsToEuroStr(catPrice);
+          }
+        });
+        await Promise.all(updates);
+        setDrinkPrices(newPriceMap);
+
+        await supabase.from('groups').update({
+          drinks_as_categories: true,
+          category_backup: backup,
+        }).eq('id', groupId);
+
+        setDrinksAsCategories(true);
+      } else {
+        // Toggle UIT: restore categories from backup
+        const backup = group.category_backup;
+        const updateData: Record<string, any> = { drinks_as_categories: false };
+
+        if (backup?.categories) {
+          for (const [catStr, catData] of Object.entries(backup.categories)) {
+            const catNum = parseInt(catStr);
+            if (catData && typeof catData === 'object') {
+              const cd = catData as { name: string; price: number; enabled: boolean };
+              updateData[`name_category_${catNum}`] = cd.name;
+              updateData[`price_category_${catNum}`] = cd.enabled ? cd.price : null;
+            }
+          }
+        }
+
+        await supabase.from('groups').update(updateData).eq('id', groupId);
+
+        // Restore drink categories
+        if (backup?.drink_categories) {
+          const drinkUpdates: PromiseLike<any>[] = [];
+          const knownDrinkIds = new Set(Object.keys(backup.drink_categories));
+
+          drinks.forEach((d) => {
+            if (knownDrinkIds.has(d.id)) {
+              // Restore original category
+              const origCat = backup.drink_categories[d.id]?.category ?? d.category;
+              drinkUpdates.push(supabase.from('drinks').update({ category: origCat }).eq('id', d.id).then());
+            } else {
+              // New drink: find closest category by price
+              if (d.price_override != null && backup.categories) {
+                let bestCat = d.category;
+                let bestDiff = Infinity;
+                for (const [catStr, catData] of Object.entries(backup.categories)) {
+                  if (!catData || typeof catData !== 'object') continue;
+                  const cd = catData as { price: number; enabled: boolean };
+                  if (!cd.enabled) continue;
+                  const diff = Math.abs(d.price_override - cd.price);
+                  if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestCat = parseInt(catStr);
+                  }
+                }
+                drinkUpdates.push(supabase.from('drinks').update({ category: bestCat }).eq('id', d.id).then());
+              }
+            }
+          });
+          await Promise.all(drinkUpdates);
+        }
+
+        setDrinksAsCategories(false);
+      }
+      await refresh();
+    } finally {
+      setDacToggling(false);
+    }
+  };
+
   const handleAddDrink = async () => {
     if (!newDrinkName.trim()) return;
     await addDrink(newDrinkName.trim(), parseInt(newDrinkCat) || 1, newDrinkEmoji || '🍺');
@@ -838,7 +983,31 @@ export default function SettingsOverlay({
             </View>
           </View>
 
-          {/* Categories */}
+          {/* Drinks as categories toggle */}
+          {isAdmin && (
+            <>
+              <Text style={s.sectionHeader}>PRIJSMODUS</Text>
+              <View style={s.card}>
+                <View style={s.autoTrustRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.autoTrustLabel}>Dranken als categorieën</Text>
+                    <Text style={s.autoTrustHint}>Elk drankje krijgt een eigen prijs</Text>
+                  </View>
+                  <Switch
+                    value={drinksAsCategories}
+                    onValueChange={handleToggleDrinksAsCategories}
+                    disabled={dacToggling}
+                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Categories — hidden when drinks_as_categories is on */}
+          {!drinksAsCategories && (
+          <>
           <Text style={s.sectionHeader}>CATEGORIEËN</Text>
           <View style={s.catSectionRow}>
             {/* Toggles kolom links */}
@@ -911,6 +1080,9 @@ export default function SettingsOverlay({
             </View>
           </View>
 
+          </>
+          )}
+
           {/* Drinks */}
           <Text style={s.sectionHeader}>DE KAART</Text>
           <View style={s.card}>
@@ -925,14 +1097,37 @@ export default function SettingsOverlay({
                   {i > 0 && <View style={s.divider} />}
                   <View style={s.drinkRow}>
                     <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '🍺'}</Text>
-                    <Text style={s.drinkName}>{drink.name}</Text>
-                    <View style={[s.drinkCatBadge, { backgroundColor: catColor + '20' }]}>
-                      <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
-                    </View>
+                    <Text style={[s.drinkName, drinksAsCategories && { flex: 0, marginRight: 8 }]}>{drink.name}</Text>
+                    {drinksAsCategories && isAdmin ? (
+                      <View style={[s.catPriceWrapper, { flex: 1, marginRight: 8 }]}>
+                        <Text style={s.euroSign}>€</Text>
+                        <TextInput
+                          style={[s.catPriceInput, drinkPriceErrors[drink.id] ? s.catPriceInputError : null]}
+                          value={drinkPrices[drink.id] ?? ''}
+                          onChangeText={(v) => handleDrinkPriceChange(drink.id, v)}
+                          onBlur={() => { handleDrinkPriceBlur(drink.id); saveDrinkPrice(drink.id); }}
+                          keyboardType="decimal-pad"
+                          placeholder="0,00"
+                          placeholderTextColor="#848484"
+                          maxLength={5}
+                        />
+                      </View>
+                    ) : !drinksAsCategories ? (
+                      <View style={[s.drinkCatBadge, { backgroundColor: catColor + '20' }]}>
+                        <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontFamily: 'Unbounded', fontSize: 13, color: '#848484', flex: 1, textAlign: 'right', marginRight: 8 }}>
+                        €{centsToEuroStr(drink.price_override ?? 0)}
+                      </Text>
+                    )}
                     <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.7 }} accessibilityLabel={`${drink.name} verwijderen`} accessibilityRole="button">
                       <Ionicons name="close-circle" size={20} color="#EB5466" />
                     </Pressable>
                   </View>
+                  {drinksAsCategories && drinkPriceErrors[drink.id] && (
+                    <Text style={s.priceError}>{drinkPriceErrors[drink.id]}</Text>
+                  )}
                 </React.Fragment>
               );
             })}
@@ -950,18 +1145,22 @@ export default function SettingsOverlay({
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </Pressable>
             </View>
-            {/* Category badge selector: hold to expand, drag to pick */}
-            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
-              <CategoryBadgeSelector
-                value={parseInt(newDrinkCat) || 1}
-                onChange={(v) => setNewDrinkCat(String(v))}
-                colors={categoryColors}
-                enabledCategories={[...enabledCats].sort()}
-                getCategoryName={getCategoryName}
-                onScrollEnable={setScrollEnabled}
-              />
-            </View>
-            <Text style={s.catSelectorHint}>Houd ingedrukt en sleep om te kiezen</Text>
+            {/* Category badge selector: hold to expand, drag to pick — hidden in drink-mode */}
+            {!drinksAsCategories && (
+              <>
+                <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
+                  <CategoryBadgeSelector
+                    value={parseInt(newDrinkCat) || 1}
+                    onChange={(v) => setNewDrinkCat(String(v))}
+                    colors={categoryColors}
+                    enabledCategories={[...enabledCats].sort()}
+                    getCategoryName={getCategoryName}
+                    onScrollEnable={setScrollEnabled}
+                  />
+                </View>
+                <Text style={s.catSelectorHint}>Houd ingedrukt en sleep om te kiezen</Text>
+              </>
+            )}
           </View>
 
           {/* Members */}

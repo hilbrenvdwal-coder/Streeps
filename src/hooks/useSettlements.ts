@@ -30,15 +30,37 @@ export function useSettlements(groupId: string) {
   const [settling, setSettling] = useState(false);
   const [history, setHistory] = useState<SettlementHistoryItem[]>([]);
 
+  const getCategoryPrice = useCallback((group: Group, catNum: number): number => {
+    switch (catNum) {
+      case 1: return group.price_category_1;
+      case 2: return group.price_category_2;
+      case 3: return group.price_category_3 ?? 0;
+      case 4: return group.price_category_4 ?? 0;
+      default: return 0;
+    }
+  }, []);
+
   const getUnsettledTallies = useCallback(async (group: Group) => {
     const { data: tallies } = await supabase
       .from('tallies')
-      .select('user_id, category, profiles!tallies_user_id_fkey(full_name)')
+      .select('user_id, category, drink_id, profiles!tallies_user_id_fkey(full_name)')
       .eq('group_id', groupId)
       .eq('removed', false)
       .is('settlement_id', null);
 
     if (!tallies || tallies.length === 0) return [];
+
+    // Fetch drinks for drink-based pricing
+    let drinksMap: Record<string, { price_override: number | null }> = {};
+    if (group.drinks_as_categories) {
+      const { data: drinksData } = await supabase
+        .from('drinks')
+        .select('id, price_override')
+        .eq('group_id', groupId);
+      if (drinksData) {
+        drinksData.forEach((d: any) => { drinksMap[d.id] = { price_override: d.price_override }; });
+      }
+    }
 
     // Group by user
     const memberMap: Record<string, UnsettledMember> = {};
@@ -56,22 +78,31 @@ export function useSettlements(groupId: string) {
       memberMap[uid].counts[cat] = (memberMap[uid].counts[cat] || 0) + 1;
     });
 
-    // Calculate amounts
-    Object.values(memberMap).forEach((member) => {
-      let total = 0;
-      for (const [cat, count] of Object.entries(member.counts)) {
-        const catNum = parseInt(cat);
-        let price = 0;
-        switch (catNum) {
-          case 1: price = group.price_category_1; break;
-          case 2: price = group.price_category_2; break;
-          case 3: price = group.price_category_3 ?? 0; break;
-          case 4: price = group.price_category_4 ?? 0; break;
+    // Calculate amounts — dual path
+    if (group.drinks_as_categories) {
+      // Drink-based pricing: calculate per tally using drink's price_override
+      Object.values(memberMap).forEach((member) => { member.amount = 0; });
+      tallies.forEach((t: any) => {
+        const uid = t.user_id;
+        const member = memberMap[uid];
+        if (!member) return;
+        if (t.drink_id && drinksMap[t.drink_id]?.price_override != null) {
+          member.amount += drinksMap[t.drink_id].price_override!;
+        } else {
+          // Fallback to category price
+          member.amount += getCategoryPrice(group, t.category ?? 1);
         }
-        total += count * price;
-      }
-      member.amount = total;
-    });
+      });
+    } else {
+      // Category-based pricing (original logic)
+      Object.values(memberMap).forEach((member) => {
+        let total = 0;
+        for (const [cat, count] of Object.entries(member.counts)) {
+          total += count * getCategoryPrice(group, parseInt(cat));
+        }
+        member.amount = total;
+      });
+    }
 
     // Fetch credits for all members in this group
     const { data: allGifts } = await supabase
@@ -96,13 +127,7 @@ export function useSettlements(groupId: string) {
         if (!userCredits) return;
         for (const [cat, creditCount] of Object.entries(userCredits)) {
           const catNum = parseInt(cat);
-          let price = 0;
-          switch (catNum) {
-            case 1: price = group.price_category_1; break;
-            case 2: price = group.price_category_2; break;
-            case 3: price = group.price_category_3 ?? 0; break;
-            case 4: price = group.price_category_4 ?? 0; break;
-          }
+          const price = getCategoryPrice(group, catNum);
           member.amount -= (creditCount as number) * price;
         }
         member.amount = Math.max(0, member.amount);
@@ -119,7 +144,7 @@ export function useSettlements(groupId: string) {
     // Get all unsettled tallies for selected users
     const { data: tallies } = await supabase
       .from('tallies')
-      .select('id, user_id, category')
+      .select('id, user_id, category, drink_id')
       .eq('group_id', groupId)
       .eq('removed', false)
       .is('settlement_id', null)
@@ -130,6 +155,18 @@ export function useSettlements(groupId: string) {
       return;
     }
 
+    // Fetch drinks for drink-based pricing
+    let drinksMap: Record<string, { price_override: number | null }> = {};
+    if (group.drinks_as_categories) {
+      const { data: drinksData } = await supabase
+        .from('drinks')
+        .select('id, price_override')
+        .eq('group_id', groupId);
+      if (drinksData) {
+        drinksData.forEach((d: any) => { drinksMap[d.id] = { price_override: d.price_override }; });
+      }
+    }
+
     // Calculate per user
     const userCounts: Record<string, Record<number, number>> = {};
     tallies.forEach((t) => {
@@ -138,31 +175,51 @@ export function useSettlements(groupId: string) {
       userCounts[t.user_id][cat] = (userCounts[t.user_id][cat] || 0) + 1;
     });
 
-    // Calculate total
+    // Calculate total — dual path
     let totalAmount = 0;
-    const lines = Object.entries(userCounts).map(([userId, counts]) => {
-      let amount = 0;
-      for (const [cat, count] of Object.entries(counts)) {
-        const catNum = parseInt(cat);
-        let price = 0;
-        switch (catNum) {
-          case 1: price = group.price_category_1; break;
-          case 2: price = group.price_category_2; break;
-          case 3: price = group.price_category_3 ?? 0; break;
-          case 4: price = group.price_category_4 ?? 0; break;
+    let lines: { user_id: string; amount: number; tally_count_1: number; tally_count_2: number; tally_count_3: number; tally_count_4: number }[];
+
+    if (group.drinks_as_categories) {
+      // Drink-based pricing: per-tally calculation
+      const userAmounts: Record<string, number> = {};
+      tallies.forEach((t) => {
+        if (!userAmounts[t.user_id]) userAmounts[t.user_id] = 0;
+        if (t.drink_id && drinksMap[t.drink_id]?.price_override != null) {
+          userAmounts[t.user_id] += drinksMap[t.drink_id].price_override!;
+        } else {
+          userAmounts[t.user_id] += getCategoryPrice(group, t.category ?? 1);
         }
-        amount += count * price;
-      }
-      totalAmount += amount;
-      return {
-        user_id: userId,
-        amount,
-        tally_count_1: counts[1] || 0,
-        tally_count_2: counts[2] || 0,
-        tally_count_3: counts[3] || 0,
-        tally_count_4: counts[4] || 0,
-      };
-    });
+      });
+      lines = Object.entries(userCounts).map(([userId, counts]) => {
+        const amount = userAmounts[userId] || 0;
+        totalAmount += amount;
+        return {
+          user_id: userId,
+          amount,
+          tally_count_1: counts[1] || 0,
+          tally_count_2: counts[2] || 0,
+          tally_count_3: counts[3] || 0,
+          tally_count_4: counts[4] || 0,
+        };
+      });
+    } else {
+      // Category-based pricing (original logic)
+      lines = Object.entries(userCounts).map(([userId, counts]) => {
+        let amount = 0;
+        for (const [cat, count] of Object.entries(counts)) {
+          amount += count * getCategoryPrice(group, parseInt(cat));
+        }
+        totalAmount += amount;
+        return {
+          user_id: userId,
+          amount,
+          tally_count_1: counts[1] || 0,
+          tally_count_2: counts[2] || 0,
+          tally_count_3: counts[3] || 0,
+          tally_count_4: counts[4] || 0,
+        };
+      });
+    }
 
     // Insert settlement
     const { data: settlement, error: settleErr } = await supabase

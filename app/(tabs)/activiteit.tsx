@@ -40,6 +40,7 @@ interface GroupBill {
   category_prices: number[];
   counts: Record<number, number>;
   total: number;
+  drinks_as_categories?: boolean;
 }
 
 interface SettlementRecord {
@@ -114,8 +115,18 @@ export default function ActiviteitScreen() {
     if (!memberships || memberships.length === 0) { setBills([]); setBillLoading(false); return; }
     const groupIds = memberships.map((m) => m.group_id);
     const { data: groups } = await supabase.from('groups').select('*').in('id', groupIds);
-    const { data: tallies } = await supabase.from('tallies').select('group_id, category').eq('user_id', user.id).eq('removed', false).is('settlement_id', null).in('group_id', groupIds);
+    const { data: tallies } = await supabase.from('tallies').select('group_id, category, drink_id').eq('user_id', user.id).eq('removed', false).is('settlement_id', null).in('group_id', groupIds);
     if (!groups) { setBills([]); setBillLoading(false); return; }
+
+    // Fetch drinks for groups with drinks_as_categories
+    const dacGroupIds = groups.filter((g: any) => g.drinks_as_categories).map((g: any) => g.id);
+    let drinksMap: Record<string, { price_override: number | null }> = {};
+    if (dacGroupIds.length > 0) {
+      const { data: drinksData } = await supabase.from('drinks').select('id, price_override').in('group_id', dacGroupIds);
+      if (drinksData) {
+        drinksData.forEach((d: any) => { drinksMap[d.id] = { price_override: d.price_override }; });
+      }
+    }
 
     const billMap: Record<string, GroupBill> = {};
     groups.forEach((g: any) => {
@@ -124,6 +135,7 @@ export default function ActiviteitScreen() {
         category_names: [g.name_category_1 || 'Categorie 1', g.name_category_2 || 'Categorie 2', g.name_category_3 || 'Categorie 3', g.name_category_4 || 'Categorie 4'],
         category_prices: [g.price_category_1, g.price_category_2, g.price_category_3 ?? 0, g.price_category_4 ?? 0],
         counts: {}, total: 0,
+        drinks_as_categories: g.drinks_as_categories ?? false,
       };
     });
     (tallies || []).forEach((tally: any) => {
@@ -134,8 +146,20 @@ export default function ActiviteitScreen() {
     });
     Object.values(billMap).forEach((bill) => {
       let total = 0;
-      for (const [cat, count] of Object.entries(bill.counts)) {
-        total += count * (bill.category_prices[parseInt(cat) - 1] || 0);
+      if (bill.drinks_as_categories) {
+        // Drink-based pricing: calculate per tally
+        (tallies || []).forEach((tally: any) => {
+          if (tally.group_id !== bill.group_id) return;
+          if (tally.drink_id && drinksMap[tally.drink_id]?.price_override != null) {
+            total += drinksMap[tally.drink_id].price_override!;
+          } else {
+            total += bill.category_prices[(tally.category ?? 1) - 1] || 0;
+          }
+        });
+      } else {
+        for (const [cat, count] of Object.entries(bill.counts)) {
+          total += count * (bill.category_prices[parseInt(cat) - 1] || 0);
+        }
       }
       bill.total = total;
     });

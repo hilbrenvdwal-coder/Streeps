@@ -3664,6 +3664,7 @@ export default function ChatScreen() {
   const [botNameMap, setBotNameMap] = useState<Record<string, string>>({});
   const [adminOnlyChatMap, setAdminOnlyChatMap] = useState<Record<string, boolean>>({});
   const [groupAdminMap, setGroupAdminMap] = useState<Record<string, boolean>>({});
+  const [drinksAsCategoriesMap, setDrinksAsCategoriesMap] = useState<Record<string, boolean>>({});
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
   const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
 
@@ -3748,6 +3749,7 @@ export default function ChatScreen() {
       setBotEnabledMap((prev) => ({ ...prev, [groupId]: g.bot_enabled !== false }));
       setBotNameMap((prev) => ({ ...prev, [groupId]: g.bot_name ?? BOT_DEFAULT_NAME }));
       setAdminOnlyChatMap((prev) => ({ ...prev, [groupId]: g.admin_only_chat === true }));
+      setDrinksAsCategoriesMap((prev) => ({ ...prev, [groupId]: g.drinks_as_categories === true }));
     }
     if (user && members.length > 0) {
       const me = members.find((m: any) => m.user_id === user.id);
@@ -4059,14 +4061,15 @@ export default function ChatScreen() {
       {/* ── Chat detail overlay (slides in from right) ── */}
       {showingChat && currentConv && (
         <Animated.View
-          style={[StyleSheet.absoluteFillObject, {
+          style={{
+            position: 'absolute', top: 0, left: 0, width: SCREEN_W, height: SCREEN_H,
             transform: [{
               translateX: Animated.add(
                 swipeX,
                 slideAnim.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_W, 0] })
               ),
             }],
-          }]}
+          }}
           {...chatPan.panHandlers}
         >
           <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
@@ -4083,7 +4086,7 @@ export default function ChatScreen() {
             otherUserId={currentConv.other_user_id}
             onProfilePress={currentConv.other_user_id ? () => setViewProfileUserId(currentConv.other_user_id) : undefined}
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
-            onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
+            onGiftPress={currentConv.type === 'group' && !(currentConv.group_id && drinksAsCategoriesMap[currentConv.group_id]) ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
             botName={currentConv.group_id ? botNameMap[currentConv.group_id] : undefined}
             adminOnlyChat={currentConv.group_id ? adminOnlyChatMap[currentConv.group_id] === true : false}

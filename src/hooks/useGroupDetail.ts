@@ -187,7 +187,7 @@ export function useGroupDetail(groupId: string) {
     };
   }, [fetchAll]);
 
-  const addTally = async (category: number, count: number = 1) => {
+  const addTally = async (category: number, count: number = 1, drinkId?: string) => {
     if (!user) return;
 
     const rows = Array.from({ length: count }, () => ({
@@ -195,6 +195,7 @@ export function useGroupDetail(groupId: string) {
       user_id: user.id,
       category,
       added_by: user.id,
+      ...(drinkId ? { drink_id: drinkId } : {}),
     }));
 
     await supabase.from('tallies').insert(rows);
@@ -334,13 +335,14 @@ export function useGroupDetail(groupId: string) {
     });
   };
 
-  const addTallyForMemberByCategory = async (category: number, userId: string) => {
+  const addTallyForMemberByCategory = async (category: number, userId: string, drinkId?: string) => {
     if (!user) return;
     await supabase.from('tallies').insert({
       group_id: groupId,
       user_id: userId,
       category,
       added_by: user.id,
+      ...(drinkId ? { drink_id: drinkId } : {}),
     });
   };
 
