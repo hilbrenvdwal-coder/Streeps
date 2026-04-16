@@ -24,6 +24,7 @@ export interface Group {
   name_category_2: string;
   name_category_3: string;
   name_category_4: string;
+  auto_trust_members: boolean;
   created_at: string;
   created_by: string;
 }

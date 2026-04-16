@@ -77,6 +77,7 @@ export default function GroupSetupWizard({
   const [cat2Enabled, setCat2Enabled] = useState(true);
   const [cat3Enabled, setCat3Enabled] = useState(false);
   const [cat4Enabled, setCat4Enabled] = useState(false);
+  const [autoTrust, setAutoTrust] = useState(false);
 
   // Step 3: Drinks
   const [drinks, setDrinks] = useState<{ id: string; name: string; emoji: string; category: number }[]>([]);
@@ -106,6 +107,7 @@ export default function GroupSetupWizard({
       setCat2Enabled(true);
       setCat3Enabled(false);
       setCat4Enabled(false);
+      setAutoTrust(false);
       setNewDrinkName('');
       setNewDrinkEmoji('');
       setNewDrinkCat(1);
@@ -187,6 +189,7 @@ export default function GroupSetupWizard({
         price_category_2: cat2Enabled ? (parseCents(price2) || 300) : null,
         price_category_3: cat3Enabled ? (parseCents(price3) || 450) : null,
         price_category_4: cat4Enabled ? (parseCents(price4) || 600) : null,
+        auto_trust_members: autoTrust,
       }).eq('id', groupId);
     }
     goToStep(step + 1);
@@ -370,6 +373,21 @@ export default function GroupSetupWizard({
             </View>
           </React.Fragment>
         ))}
+
+        {/* Auto-trust toggle */}
+        <View style={ws.divider} />
+        <View style={ws.autoTrustRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={ws.autoTrustLabel}>Nieuwe leden automatisch vertrouwen?</Text>
+            <Text style={ws.autoTrustHint}>Nieuwe leden worden automatisch admin</Text>
+          </View>
+          <Switch
+            value={autoTrust}
+            onValueChange={setAutoTrust}
+            trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
       </View>
     );
   };
@@ -743,6 +761,26 @@ const ws = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#848484',
+  },
+
+  // Auto-trust
+  autoTrustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  autoTrustLabel: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  autoTrustHint: {
+    fontFamily: 'Unbounded',
+    fontSize: 11,
+    color: '#848484',
+    marginTop: 4,
   },
 
   // Step 3: Drinks

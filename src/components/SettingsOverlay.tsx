@@ -966,6 +966,25 @@ export default function SettingsOverlay({
 
           {/* Members */}
           <Text style={s.sectionHeader}>LEDEN</Text>
+          {isAdmin && (
+            <View style={[s.card, { marginBottom: 8 }]}>
+              <View style={s.autoTrustRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.autoTrustLabel}>Nieuwe leden automatisch vertrouwen?</Text>
+                  <Text style={s.autoTrustHint}>Nieuwe leden worden automatisch admin</Text>
+                </View>
+                <Switch
+                  value={group?.auto_trust_members ?? false}
+                  onValueChange={async (val) => {
+                    await supabase.from('groups').update({ auto_trust_members: val }).eq('id', groupId);
+                    refresh();
+                  }}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+          )}
           <View style={s.card}>
             {members.map((member, i) => {
               const name = member.user_id === currentUserId ? 'Jij' : (member.profile?.full_name || 'Onbekend');
@@ -1286,6 +1305,11 @@ const s = StyleSheet.create({
   drinkCatBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
   drinkCatBadgeText: { fontFamily: 'Unbounded', fontSize: 11 },
   catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', textAlign: 'center', paddingBottom: 8, paddingHorizontal: 16 },
+
+  // Auto-trust
+  autoTrustRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  autoTrustLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
+  autoTrustHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginTop: 4 },
 
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 56 },
