@@ -1152,8 +1152,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   }, []);
 
   // Keyboard tracking — iOS only (Android uses adjustResize)
-  const INPUT_BAR_H = 56;
-  const restBottom = (bottomInset || 12) + INPUT_BAR_H;
+  const restBottom = bottomInset || 12;
   const bottomAnim = useRef(new Animated.Value(restBottom)).current;
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -1388,7 +1387,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         {messageList}
       </View>
       <Animated.View style={{ height: Platform.OS === 'ios' ? bottomAnim : restBottom }} />
-      <Animated.View style={[dt.inputBarWrap, { bottom: 0, paddingBottom: Platform.OS === 'ios' ? bottomAnim : restBottom }]}>
+      <Animated.View style={[dt.inputBarWrap, { bottom: Platform.OS === 'ios' ? bottomAnim : restBottom }]}>
         {adminOnlyLocked ? lockedInputBar : inputBar}
       </Animated.View>
       <CameraOverlay visible={showCamera} onClose={() => setShowCamera(false)} onSend={(uri) => sendImage(uri)} />

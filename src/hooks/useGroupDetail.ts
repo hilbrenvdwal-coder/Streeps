@@ -260,13 +260,14 @@ export function useGroupDetail(groupId: string) {
       .eq('id', groupId);
   };
 
-  const addDrink = async (name: string, category: number, emoji: string) => {
+  const addDrink = async (name: string, category: number, emoji: string, priceOverride?: number) => {
     if (!user) return;
     await supabase.from('drinks').insert({
       group_id: groupId,
       name,
       category,
       emoji,
+      ...(priceOverride != null && { price_override: priceOverride }),
     });
     await fetchAll();
   };

@@ -776,17 +776,22 @@ export default function HomeScreen() {
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
             <View style={s.categories}>
               {isDrinkMode ? (
-                drinkCategories.map((drink, idx) => (
-                  <CategoryRow
-                    key={drink.id}
-                    name={`${drink.emoji ?? '🍺'} ${drink.name}`}
-                    price={(drink as any).price_override ?? 0}
-                    color={t.categoryColors[idx % t.categoryColors.length]}
-                    categoryIndex={idx + 1}
-                    selected={selectedDrinkId === drink.id}
-                    onPress={() => handleCategoryTap(drink.category, drink.id)}
-                  />
-                ))
+                <View style={s.drinkGrid}>
+                  {drinkCategories.map((drink, idx) => (
+                    <View key={drink.id} style={s.drinkTileWrap}>
+                      <CategoryRow
+                        name={drink.name}
+                        emoji={drink.emoji ?? '🍺'}
+                        price={(drink as any).price_override ?? 0}
+                        color={t.categoryColors[idx % t.categoryColors.length]}
+                        categoryIndex={idx + 1}
+                        selected={selectedDrinkId === drink.id}
+                        onPress={() => handleCategoryTap(drink.category, drink.id)}
+                        vertical
+                      />
+                    </View>
+                  ))}
+                </View>
               ) : (
                 activeCategories.map((cat) => (
                   <CategoryRow
@@ -1474,6 +1479,8 @@ const styles = StyleSheet.create({
 
   // ── Categories ── SVG: 350×50 rows, 9px gap
   categories: { marginBottom: 24, paddingHorizontal: 10 },
+  drinkGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, paddingHorizontal: 10, gap: 10, marginBottom: 24 },
+  drinkTileWrap: { width: '47%' as any },
 
   // ── Section Title ── SVG node 122:106
   sectionTitle: {

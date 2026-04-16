@@ -106,7 +106,7 @@ export default function ActiviteitScreen() {
   const [billLoading, setBillLoading] = useState(true);
 
   // ── History data ──
-  const { history, loading: historyLoading, refresh: refreshHistory } = useHistory();
+  const { history, loading: historyLoading, refresh: refreshHistory, loadMore, loadingMore } = useHistory();
 
   const fetchBills = useCallback(async () => {
     if (!user) return;
@@ -303,7 +303,16 @@ export default function ActiviteitScreen() {
             contentContainerStyle={styles.historyScrollContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <Text style={styles.emptyText}>Nog geen streepjes gezet</Text>
+              historyLoading
+                ? <ActivityIndicator size="large" color="#FF004D" style={{ marginTop: 80 }} />
+                : <Text style={styles.emptyText}>Nog geen streepjes gezet</Text>
+            }
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              loadingMore
+                ? <ActivityIndicator size="small" color="#FF004D" style={{ paddingVertical: 24 }} />
+                : null
             }
             renderItem={({ item, index }) => {
               const catColor = t.categoryColors[(item.category - 1) % 4];

@@ -57,7 +57,7 @@ interface Props {
   categoryColors: readonly string[];
   updateGroupPrices: (data: Record<string, any>) => Promise<void>;
   updateGroupName: (name: string) => Promise<void>;
-  addDrink: (name: string, category: number, emoji: string) => Promise<void>;
+  addDrink: (name: string, category: number, emoji: string, priceOverride?: number) => Promise<void>;
   removeDrink: (drinkId: string) => Promise<void>;
   toggleAdmin: (userId: string) => Promise<void>;
   removeMember: (userId: string) => Promise<void>;
@@ -551,6 +551,21 @@ export default function SettingsOverlay({
     }
   }, [visible]);
 
+  // Sync drinkPrices when drinks prop changes (e.g. new drink added via realtime)
+  useEffect(() => {
+    if (drinksAsCategories && visible) {
+      setDrinkPrices((prev) => {
+        const next = { ...prev };
+        drinks.forEach((d) => {
+          if (!(d.id in next) && d.price_override != null) {
+            next[d.id] = centsToEuroStr(d.price_override);
+          }
+        });
+        return next;
+      });
+    }
+  }, [drinks, drinksAsCategories, visible]);
+
   // Debounced auto-save for bot_settings
   useEffect(() => {
     if (!visible || !group?.id) return;
@@ -706,24 +721,25 @@ export default function SettingsOverlay({
     }
   };
 
-  const handleDrinkPriceBlur = (drinkId: string) => {
+  const handleDrinkPriceBlurAndSave = async (drinkId: string) => {
     const value = drinkPrices[drinkId] ?? '';
     if (!value.trim()) return;
     const formatted = formatEuroStr(value);
     if (formatted == null) {
       setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: 'Ongeldig bedrag' }));
-    } else {
-      setDrinkPrices((prev) => ({ ...prev, [drinkId]: formatted }));
-      setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: null }));
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      return;
     }
-  };
+    setDrinkPrices((prev) => ({ ...prev, [drinkId]: formatted }));
+    setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: null }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-  const saveDrinkPrice = async (drinkId: string) => {
-    const value = drinkPrices[drinkId] ?? '';
     const cents = euroStrToCents(value);
-    if (cents == null) return;
-    await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
+    if (cents != null) {
+      const { error } = await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
+      if (error) {
+        setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: 'Opslaan mislukt' }));
+      }
+    }
   };
 
   const handleToggleDrinksAsCategories = async (newValue: boolean) => {
@@ -830,7 +846,13 @@ export default function SettingsOverlay({
 
   const handleAddDrink = async () => {
     if (!newDrinkName.trim()) return;
-    await addDrink(newDrinkName.trim(), parseInt(newDrinkCat) || 1, newDrinkEmoji || '🍺');
+    const cat = parseInt(newDrinkCat) || 1;
+    let defaultPrice: number | undefined;
+    if (drinksAsCategories && group) {
+      const catPriceKey = `price_category_${cat}` as keyof typeof group;
+      defaultPrice = (group[catPriceKey] as number) ?? 150;
+    }
+    await addDrink(newDrinkName.trim(), cat, newDrinkEmoji || '🍺', defaultPrice);
     setNewDrinkName('');
     setNewDrinkEmoji('');
     setNewDrinkCat('1');
@@ -1099,13 +1121,13 @@ export default function SettingsOverlay({
                     <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '🍺'}</Text>
                     <Text style={[s.drinkName, drinksAsCategories && { flex: 0, marginRight: 8 }]}>{drink.name}</Text>
                     {drinksAsCategories && isAdmin ? (
-                      <View style={[s.catPriceWrapper, { flex: 1, marginRight: 8 }]}>
+                      <View style={[s.catPriceWrapper, { marginLeft: 'auto', marginRight: 8 }]}>
                         <Text style={s.euroSign}>€</Text>
                         <TextInput
                           style={[s.catPriceInput, drinkPriceErrors[drink.id] ? s.catPriceInputError : null]}
                           value={drinkPrices[drink.id] ?? ''}
                           onChangeText={(v) => handleDrinkPriceChange(drink.id, v)}
-                          onBlur={() => { handleDrinkPriceBlur(drink.id); saveDrinkPrice(drink.id); }}
+                          onBlur={() => handleDrinkPriceBlurAndSave(drink.id)}
                           keyboardType="decimal-pad"
                           placeholder="0,00"
                           placeholderTextColor="#848484"
