@@ -10,6 +10,7 @@ import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
 import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useHomeReady } from '@/src/contexts/HomeReadyContext';
 import { supabase } from '@/src/lib/supabase';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useGroups } from '@/src/hooks/useGroups';
@@ -217,6 +218,15 @@ export default function HomeScreen() {
     loading: detailLoading, isAdmin, addTally, addTallyForMember, addTallyForMemberByCategory, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
     updateGroupPrices, updateGroupName, addDrink, removeDrink, deleteGroup, regenerateInviteCode, refresh: refreshGroup,
   } = useGroupDetail(selectedGroupId ?? '');
+
+  // Signal HomeReadyContext when home data is loaded
+  const { setHomeReady } = useHomeReady();
+  const homeDataReady = !groupsLoading && (groups.length === 0 || (!detailLoading && group !== null));
+  useEffect(() => {
+    if (homeDataReady) {
+      setHomeReady(true);
+    }
+  }, [homeDataReady]);
 
   // Auto-activate user in selected group
   const myMember = members.find((m) => m.user_id === user?.id);

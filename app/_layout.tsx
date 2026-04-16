@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
+import { HomeReadyProvider, useHomeReady } from '@/src/contexts/HomeReadyContext';
 import { ThemeProvider as StreepsThemeProvider } from '@/src/contexts/ThemeContext';
 import { getTheme } from '@/src/theme';
 import { useHeartbeat } from '@/src/hooks/useHeartbeat';
@@ -48,12 +49,14 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <StreepsThemeProvider>
-          <AuthProvider>
-            <RootLayoutNav />
-            {showSplash && (
-              <SplashOverlay onComplete={() => setShowSplash(false)} />
-            )}
-          </AuthProvider>
+          <HomeReadyProvider>
+            <AuthProvider>
+              <RootLayoutNav />
+              {showSplash && (
+                <SplashOverlay onComplete={() => setShowSplash(false)} />
+              )}
+            </AuthProvider>
+          </HomeReadyProvider>
         </StreepsThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
@@ -62,7 +65,8 @@ export default function RootLayout() {
 
 function SplashOverlay({ onComplete }: { onComplete: () => void }) {
   const { loading } = useAuth();
-  return <SplashAnimation authLoading={loading} onComplete={onComplete} />;
+  const { homeReady } = useHomeReady();
+  return <SplashAnimation authLoading={loading} dataLoading={!homeReady} onComplete={onComplete} />;
 }
 
 function RootLayoutNav() {
