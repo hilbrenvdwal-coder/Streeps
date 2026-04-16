@@ -35,8 +35,8 @@ const PILL_LEFTS = PILL_POSITIONS.map((x) => scale(x));
 
 const PILL_W_SCALED = scale(PILL_W);
 
-const PILL_H = 50;
-const PILL_H_THIN = 38;
+const PILL_H = 42;
+const PILL_H_THIN = 32;
 
 const SPRING_CONF = { damping: 20, stiffness: 300, mass: 1 };
 
@@ -151,8 +151,6 @@ export default function CustomNavBar({ state, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
   },
   tintOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -167,7 +165,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
   bar: {
-    height: 77,
+    height: 64,
     position: 'relative',
   },
   pill: {
@@ -183,7 +181,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 48,
     height: 48,
-    top: 15,
+    top: 11,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,

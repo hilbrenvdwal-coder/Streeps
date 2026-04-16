@@ -882,7 +882,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             </Animated.View>
             <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
               <Animated.View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { maxWidth: undefined, alignSelf: 'auto', opacity: bubbleOpacity }]}>
-                <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{renderMessageText(item.content)}</Text>
+                <Text style={[dt.bubbleText, { color: '#1A1A1A' }]}>{renderMessageText(item.content)}</Text>
                 {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
               </Animated.View>
             </Pressable>
@@ -890,7 +890,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         ) : (
           <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400}>
             <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }]}>
-              <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{renderMessageText(item.content)}</Text>
+              <Text style={[dt.bubbleText, { color: '#1A1A1A' }]}>{renderMessageText(item.content)}</Text>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
             </View>
           </Pressable>
@@ -1152,7 +1152,8 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
   }, []);
 
   // Keyboard tracking — iOS only (Android uses adjustResize)
-  const restBottom = bottomInset || 12;
+  const INPUT_BAR_H = 56;
+  const restBottom = (bottomInset || 12) + INPUT_BAR_H;
   const bottomAnim = useRef(new Animated.Value(restBottom)).current;
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -1418,7 +1419,7 @@ const dt = StyleSheet.create({
   headerLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00FE96' },
   headerLiveText: { fontFamily: 'Unbounded', fontSize: 9, fontWeight: '700', color: '#00FE96', letterSpacing: 0.5 },
   bubble: { maxWidth: '82%', marginBottom: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#FF0085', borderBottomRightRadius: 4 },
+  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#D9D9D9', borderBottomRightRadius: 4 },
   bubbleOther: { alignSelf: 'flex-start', backgroundColor: 'rgba(78,78,78,0.3)', borderBottomLeftRadius: 4 },
   bubbleSender: { fontFamily: 'Unbounded', fontSize: 11, color: '#00BEAE', marginBottom: 4, marginLeft: 28 },
   bubbleAvatar: { width: 20, height: 20, borderRadius: 10, marginRight: 8 },
