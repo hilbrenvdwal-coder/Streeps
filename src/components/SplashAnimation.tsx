@@ -124,16 +124,16 @@ export default function SplashAnimation({ authLoading, dataLoading, onComplete }
           // Monochrome fade out (kleurlogo wordt weer zichtbaar)
           Animated.timing(monoLogoOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
           // Hold color
-          Animated.delay(2000),
+          Animated.delay(1500),
         ])
       );
       crossfadeLoop.start();
     }, 1200);
 
-    // t=10000ms: Animation done (10s minimum voor testing)
+    // t=4500ms: Animation done (minimale duur: één volledige logo cyclus)
     const doneTimeout = setTimeout(() => {
       setAnimationDone(true);
-    }, 10000);
+    }, 4500);
 
     return () => {
       clearTimeout(textTimeout);

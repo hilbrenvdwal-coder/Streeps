@@ -64,9 +64,11 @@ export default function RootLayout() {
 }
 
 function SplashOverlay({ onComplete }: { onComplete: () => void }) {
-  const { loading } = useAuth();
+  const { loading, session } = useAuth();
   const { homeReady } = useHomeReady();
-  return <SplashAnimation authLoading={loading} dataLoading={!homeReady} onComplete={onComplete} />;
+  // Niet ingelogd → geen data om op te wachten
+  const dataLoading = session ? !homeReady : false;
+  return <SplashAnimation authLoading={loading} dataLoading={dataLoading} onComplete={onComplete} />;
 }
 
 function RootLayoutNav() {

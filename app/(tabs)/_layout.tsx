@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useRef } from 'react';
-import { Animated } from 'react-native';
+import { Animated, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme } from '@/src/theme';
