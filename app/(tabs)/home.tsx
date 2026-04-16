@@ -186,6 +186,7 @@ export default function HomeScreen() {
   const { groups, loading: groupsLoading, createGroup, joinGroup } = useGroups();
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [headerLayoutHeight, setHeaderLayoutHeight] = useState(140);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((id) => { if (id) setSelectedGroupId(id); });
@@ -636,6 +637,62 @@ export default function HomeScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  // ── Counter content (extracted for conditional placement) ──
+  const counterContent = (
+    <View style={s.counterWrap}>
+      <CounterControl
+        value={tallyCount}
+        onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
+        onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
+        onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+        onSwipeCycle={(direction: 'next' | 'prev') => {
+          if (adding) return;
+          if (isDrinkMode) {
+            if (drinkCategories.length === 0) return;
+            const currentIdx = drinkCategories.findIndex((d) => d.id === selectedDrinkId);
+            if (currentIdx === -1) return;
+            const nextIdx = direction === 'next'
+              ? (currentIdx + 1) % drinkCategories.length
+              : (currentIdx - 1 + drinkCategories.length) % drinkCategories.length;
+            setSelectedDrinkId(drinkCategories[nextIdx].id);
+            setSelectedCategory(drinkCategories[nextIdx].category);
+            Haptics.selectionAsync();
+          } else {
+            const list = activeCategories;
+            if (!list || list.length === 0) return;
+            const currentIdx = list.findIndex((c) => c === selectedCategory);
+            if (currentIdx === -1) return;
+            const nextIdx = direction === 'next'
+              ? (currentIdx + 1) % list.length
+              : (currentIdx - 1 + list.length) % list.length;
+            setSelectedCategory(list[nextIdx]);
+            Haptics.selectionAsync();
+          }
+        }}
+        auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
+        activeColor={isDrinkMode
+          ? (selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined)
+          : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined)
+        }
+      />
+      {!isDrinkMode && selectedCategory && credits[selectedCategory] > 0 && (
+        <View style={s.creditBadge}>
+          <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
+        </View>
+      )}
+      <Animated.View
+        style={{
+          height: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
+          marginTop: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
+          opacity: hintProgress,
+          overflow: 'hidden',
+        }}
+      >
+        <Text style={s.submitHint}>Tik om te bevestigen</Text>
+      </Animated.View>
+    </View>
+  );
+
   // ════════════════════════════════════════════════════════════
   // RENDER — pixel-exact from Home_fixed_v3.svg
   // ════════════════════════════════════════════════════════════
@@ -677,7 +734,7 @@ export default function HomeScreen() {
         {selectedGroupId && group ? (
           <Animated.View style={{ opacity: contentOpacity }}>
             {/* ── Group Header ── SVG: Groepheader + Group 13 (expand icon) */}
-            <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)}>
+            <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)} onLayout={(e) => setHeaderLayoutHeight(e.nativeEvent.layout.height + 12)}>
               <View style={s.groupTopRow}>
                 <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined} hitSlop={6}>
                   <View ref={avatarRef} collapsable={false}>
@@ -720,58 +777,11 @@ export default function HomeScreen() {
             </Pressable>
 
             {/* ── Counter ── SVG node Counter: minus(19,190) display(158,190) plus(245,190) */}
-            <View style={s.counterWrap}>
-              <CounterControl
-                value={tallyCount}
-                onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
-                onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
-                onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
-                onSwipeCycle={(direction: 'next' | 'prev') => {
-                  if (adding) return;
-                  if (isDrinkMode) {
-                    if (drinkCategories.length === 0) return;
-                    const currentIdx = drinkCategories.findIndex((d) => d.id === selectedDrinkId);
-                    if (currentIdx === -1) return;
-                    const nextIdx = direction === 'next'
-                      ? (currentIdx + 1) % drinkCategories.length
-                      : (currentIdx - 1 + drinkCategories.length) % drinkCategories.length;
-                    setSelectedDrinkId(drinkCategories[nextIdx].id);
-                    setSelectedCategory(drinkCategories[nextIdx].category);
-                    Haptics.selectionAsync();
-                  } else {
-                    const list = activeCategories;
-                    if (!list || list.length === 0) return;
-                    const currentIdx = list.findIndex((c) => c === selectedCategory);
-                    if (currentIdx === -1) return;
-                    const nextIdx = direction === 'next'
-                      ? (currentIdx + 1) % list.length
-                      : (currentIdx - 1 + list.length) % list.length;
-                    setSelectedCategory(list[nextIdx]);
-                    Haptics.selectionAsync();
-                  }
-                }}
-                auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
-                activeColor={isDrinkMode
-                  ? (selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined)
-                  : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined)
-                }
-              />
-              {!isDrinkMode && selectedCategory && credits[selectedCategory] > 0 && (
-                <View style={s.creditBadge}>
-                  <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
-                </View>
-              )}
-              <Animated.View
-                style={{
-                  height: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
-                  marginTop: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
-                  opacity: hintProgress,
-                  overflow: 'hidden',
-                }}
-              >
-                <Text style={s.submitHint}>Tik om te bevestigen</Text>
-              </Animated.View>
-            </View>
+            {isDrinkMode ? (
+              <View style={{ height: 108 }} />
+            ) : (
+              counterContent
+            )}
 
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
             <View style={s.categories}>
@@ -1006,6 +1016,28 @@ export default function HomeScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      {/* ── Sticky counter for drink-mode ── */}
+      {isDrinkMode && group && selectedGroupId && (
+        <View
+          style={{
+            position: 'absolute',
+            top: insets.top + headerLayoutHeight,
+            left: 20,
+            right: 20,
+            zIndex: 10,
+            alignItems: 'center',
+          }}
+          pointerEvents="box-none"
+        >
+          {counterContent}
+          <LinearGradient
+            colors={['#0E0D1C', 'rgba(14,13,28,0)']}
+            style={{ height: 28, width: '100%', marginTop: 8 }}
+            pointerEvents="none"
+          />
+        </View>
+      )}
 
       {/* ── Avatar preview overlay ── */}
       {showAvatarPreview && group && (
