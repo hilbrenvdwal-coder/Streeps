@@ -1388,7 +1388,7 @@ function ChatDetail({ conversationId, name, avatarUrl, onBack, type, navBarHeigh
         {messageList}
       </View>
       <Animated.View style={{ height: Platform.OS === 'ios' ? bottomAnim : restBottom }} />
-      <Animated.View style={[dt.inputBarWrap, { bottom: Platform.OS === 'ios' ? bottomAnim : restBottom }]}>
+      <Animated.View style={[dt.inputBarWrap, { bottom: 0, paddingBottom: Platform.OS === 'ios' ? bottomAnim : restBottom }]}>
         {adminOnlyLocked ? lockedInputBar : inputBar}
       </Animated.View>
       <CameraOverlay visible={showCamera} onClose={() => setShowCamera(false)} onSend={(uri) => sendImage(uri)} />

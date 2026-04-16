@@ -172,8 +172,14 @@ export default function SplashAnimation({ authLoading, dataLoading, onComplete }
       style={[styles.container, { opacity: overlayOpacity }]}
       pointerEvents="none"
     >
-      {/* Aurora group RIGHT — clockwise rotation */}
-      <Animated.View style={[styles.auroraGroup, { transform: [{ rotate: rotateRight }] }]}>
+      {/* Aurora group RIGHT — clockwise, pivot at cluster center (307, 6) */}
+      <Animated.View style={[styles.auroraGroupRight, { transform: [
+        { translateX: 12 },
+        { translateY: -244 },
+        { rotate: rotateRight },
+        { translateX: -12 },
+        { translateY: 244 },
+      ] }]}>
         <AuroraBackground
           width={LOGIN_GROUP_RIGHT.container.w}
           height={LOGIN_GROUP_RIGHT.container.h}
@@ -183,8 +189,14 @@ export default function SplashAnimation({ authLoading, dataLoading, onComplete }
         />
       </Animated.View>
 
-      {/* Aurora group LEFT — counter-clockwise rotation */}
-      <Animated.View style={[styles.auroraGroup, { transform: [{ rotate: rotateLeft }] }]}>
+      {/* Aurora group LEFT — counter-clockwise, pivot at cluster center (12, 152) */}
+      <Animated.View style={[styles.auroraGroupLeft, { transform: [
+        { translateX: -283 },
+        { translateY: -98 },
+        { rotate: rotateLeft },
+        { translateX: 283 },
+        { translateY: 98 },
+      ] }]}>
         <AuroraBackground
           width={LOGIN_GROUP_LEFT.container.w}
           height={LOGIN_GROUP_LEFT.container.h}
@@ -243,7 +255,14 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     backgroundColor: '#0D0D0D',
   },
-  auroraGroup: {
+  auroraGroupRight: {
+    position: 'absolute',
+    top: (SCREEN_HEIGHT - 500) / 2,
+    left: (SCREEN_WIDTH - 590) / 2 + 200,
+    width: 590,
+    height: 500,
+  },
+  auroraGroupLeft: {
     position: 'absolute',
     top: (SCREEN_HEIGHT - 500) / 2,
     left: (SCREEN_WIDTH - 590) / 2,
