@@ -1458,6 +1458,7 @@ const styles = StyleSheet.create({
   stickyCounterWrap: {
     backgroundColor: 'transparent',
     paddingVertical: 46,
+    marginTop: -46,
     overflow: 'visible',
   },
 
