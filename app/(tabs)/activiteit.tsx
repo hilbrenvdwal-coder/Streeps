@@ -430,10 +430,18 @@ export default function ActiviteitScreen() {
                         const count = bill.counts[cat] || 0;
                         if (count === 0) return null;
                         const price = bill.category_prices[cat - 1] || 0;
+                        const catColor = t.categoryColors[(cat - 1) % 4];
                         return (
-                          <Text key={cat} style={styles.rekMeta}>
-                            {bill.category_names[cat - 1]}: {count}{'\u00D7'}{'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
-                          </Text>
+                          <View key={cat} style={styles.rekCatRow}>
+                            <View style={[styles.rekCatBadge, { backgroundColor: catColor + '20' }]}>
+                              <Text style={[styles.rekCatBadgeText, { color: catColor }]}>
+                                {bill.category_names[cat - 1]}
+                              </Text>
+                            </View>
+                            <Text style={styles.rekCatCount}>
+                              {count}{'\u00D7'} {'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
+                            </Text>
+                          </View>
                         );
                       })}
                     </View>
@@ -554,7 +562,7 @@ function createStyles(t: Theme) {
     totalAmount: {
       fontFamily: 'Unbounded',
       fontSize: 48,
-      fontWeight: '600',
+      fontWeight: '700',
     },
     totalLabel: {
       fontFamily: 'Unbounded',
@@ -589,7 +597,7 @@ function createStyles(t: Theme) {
     rekCountText: {
       fontFamily: 'Unbounded-SemiBold',
       fontSize: 22,
-      fontWeight: '600',
+      fontWeight: '700',
     },
     rekLeft: {
       flex: 1,
@@ -619,6 +627,29 @@ function createStyles(t: Theme) {
       fontSize: 11,
       color: '#848484',
       marginTop: 1,
+    },
+    rekCatRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 6,
+      gap: 8,
+    },
+    rekCatBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      alignSelf: 'flex-start',
+    },
+    rekCatBadgeText: {
+      fontFamily: 'Unbounded',
+      fontSize: 11,
+      fontWeight: '500',
+    },
+    rekCatCount: {
+      fontFamily: 'Unbounded',
+      fontSize: 12,
+      color: '#848484',
+      fontWeight: '700',
     },
     payButton: {
       backgroundColor: '#00BEAE',
