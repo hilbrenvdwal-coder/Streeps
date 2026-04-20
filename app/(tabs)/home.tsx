@@ -1457,7 +1457,7 @@ const styles = StyleSheet.create({
   // ── Sticky counter wrap (drink-mode, native sticky header) ──
   stickyCounterWrap: {
     backgroundColor: 'transparent',
-    paddingVertical: 16,
+    paddingVertical: 32,
     overflow: 'visible',
   },
 
