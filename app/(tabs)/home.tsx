@@ -8,6 +8,7 @@ import GroupSetupWizard from '@/src/components/GroupSetupWizard';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
+import AddDrinkOverlay from '@/src/components/AddDrinkOverlay';
 import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useHomeReady } from '@/src/contexts/HomeReadyContext';
@@ -332,6 +333,7 @@ export default function HomeScreen() {
   // Group selector modal
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAddDrink, setShowAddDrink] = useState(false);
   const [wizardGroup, setWizardGroup] = useState<{ id: string; name: string; invite_code: string } | null>(null);
   const navBarAnim = useNavBarAnim();
 
@@ -944,7 +946,20 @@ export default function HomeScreen() {
                 </View>
                 <View style={s.drankenlijstHeader}>
                   <Text style={s.drankenlijstTitle}>De kaart</Text>
-                  <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
+                  {isAdmin ? (
+                    <Pressable
+                      onPress={() => setShowAddDrink(true)}
+                      hitSlop={8}
+                      accessibilityLabel="Drankje toevoegen"
+                      accessibilityRole="button"
+                      style={({ pressed }) => [s.addDrinkHeaderBtn, pressed && { opacity: 0.85 }]}
+                    >
+                      <Ionicons name="add" size={16} color="#FFFFFF" />
+                      <Text style={s.addDrinkHeaderBtnText}>drank</Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
+                  )}
                 </View>
                 <View style={s.drankenlijstList}>
                   {drinks.slice(0, 4).map((drink, i) => {
@@ -1165,6 +1180,25 @@ export default function HomeScreen() {
           removeTally={removeTally}
           activeCategories={activeCategories as number[]}
           getCategoryName={getCategoryName}
+        />
+      )}
+
+      {/* ── Add Drink overlay ── */}
+      {selectedGroupId && group && (
+        <AddDrinkOverlay
+          visible={showAddDrink}
+          onClose={() => setShowAddDrink(false)}
+          group={group}
+          isDrinkMode={isDrinkMode}
+          activeCategories={activeCategories as number[]}
+          categoryColors={t.categoryColors}
+          getCategoryName={getCategoryName}
+          addDrink={addDrink}
+          onDone={(count) => {
+            if (count > 0) {
+              showToast(count === 1 ? 'Drankje toegevoegd' : `${count} drankjes toegevoegd`, 'success');
+            }
+          }}
         />
       )}
 
@@ -1585,6 +1619,21 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#FFFFFF',
     opacity: 0.5,
+  },
+  addDrinkHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#00BEAE',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  addDrinkHeaderBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   drankenlijstList: {
     paddingTop: 20,
