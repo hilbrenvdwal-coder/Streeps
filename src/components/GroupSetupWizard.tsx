@@ -397,11 +397,6 @@ export default function GroupSetupWizard({
             <View style={ws.drinkRow}>
               <Text style={ws.drinkEmoji}>{drink.emoji}</Text>
               <Text style={ws.drinkName} numberOfLines={1}>{drink.name}</Text>
-              <View style={[ws.catBadge, { backgroundColor: categoryColors[(drink.category - 1) % 4] + '30', marginRight: 8 }]}>
-                <Text style={[ws.catBadgeText, { color: categoryColors[(drink.category - 1) % 4] }]}>
-                  {[catName1, catName2, catName3, catName4][(drink.category - 1) % 4] || `Groep ${drink.category}`}
-                </Text>
-              </View>
               <View style={[ws.catPriceWrapper, { marginRight: 8 }]}>
                 <Text style={ws.euroSign}>€</Text>
                 <TextInput
@@ -453,31 +448,6 @@ export default function GroupSetupWizard({
               placeholder="0,00"
               placeholderTextColor="#848484"
             />
-          </View>
-        </View>
-        <View style={ws.addDrinkCatRow}>
-          <View style={ws.catSelectorRow}>
-            {[1, 2, 3, 4]
-              .filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled))
-              .map((c) => {
-                const isSelected = newDrinkCat === c;
-                const color = categoryColors[(c - 1) % 4];
-                const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Groep ${c}`;
-                return (
-                  <Pressable
-                    key={c}
-                    onPress={() => setNewDrinkCat(c)}
-                    style={[
-                      ws.catSelectorPill,
-                      { backgroundColor: isSelected ? color : color + '30' },
-                    ]}
-                  >
-                    <Text style={[ws.catSelectorPillText, { color: isSelected ? '#0F0F1E' : color }]}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
           </View>
           <Reanimated.View style={addBtnAnimStyle}>
             <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
@@ -718,19 +688,6 @@ const ws = StyleSheet.create({
   catRowDisabled: {
     opacity: 0.4,
   },
-  catBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 10,
-    minWidth: 72,
-    alignItems: 'center' as const,
-  },
-  catBadgeText: {
-    fontFamily: 'Unbounded',
-    fontSize: 11,
-    fontWeight: '600',
-  },
   catNameInput: {
     fontFamily: 'Unbounded',
     flex: 1,
@@ -820,12 +777,6 @@ const ws = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  addDrinkCatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
   addDrinkEmojiWrap: {
     width: 40,
     height: 44,
@@ -867,27 +818,6 @@ const ws = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 12,
     paddingHorizontal: 12,
-  },
-  catSelectorRow: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    flex: 1,
-  },
-  catSelectorPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    minHeight: 44,
-    minWidth: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  catSelectorPillText: {
-    fontFamily: 'Unbounded',
-    fontSize: 11,
-    fontWeight: '600',
   },
   addDrinkBtn: {
     width: 36,
