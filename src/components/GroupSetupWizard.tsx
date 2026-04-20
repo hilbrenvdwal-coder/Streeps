@@ -310,6 +310,21 @@ export default function GroupSetupWizard({
       {groupAvatarUrl && (
         <Text style={ws.avatarHint}>Tik om te wijzigen</Text>
       )}
+
+      {/* Auto-trust toggle */}
+      <View style={ws.divider} />
+      <View style={ws.autoTrustRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={ws.autoTrustLabel}>Nieuwe leden automatisch vertrouwen?</Text>
+          <Text style={ws.autoTrustHint}>Nieuwe leden worden automatisch admin</Text>
+        </View>
+        <Switch
+          value={autoTrust}
+          onValueChange={setAutoTrust}
+          trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
+          thumbColor="#FFFFFF"
+        />
+      </View>
     </View>
   );
 
@@ -374,20 +389,6 @@ export default function GroupSetupWizard({
           </React.Fragment>
         ))}
 
-        {/* Auto-trust toggle */}
-        <View style={ws.divider} />
-        <View style={ws.autoTrustRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={ws.autoTrustLabel}>Nieuwe leden automatisch vertrouwen?</Text>
-            <Text style={ws.autoTrustHint}>Nieuwe leden worden automatisch admin</Text>
-          </View>
-          <Switch
-            value={autoTrust}
-            onValueChange={setAutoTrust}
-            trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
       </View>
     );
   };
