@@ -1119,9 +1119,14 @@ export default function HomeScreen() {
 
       {/* ── Sticky counter overlay (drink-mode) ── */}
       {counterSticky && isDrinkMode && (
-        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, opacity: stickyFade }} pointerEvents="box-none">
-          <LinearGradient
-            colors={['#0E0D1C', '#0E0D1C', 'rgba(14,13,28,0)']}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }} pointerEvents="box-none">
+          <Animated.View style={{ ...StyleSheet.absoluteFillObject, opacity: stickyFade }} pointerEvents="none">
+            <LinearGradient
+              colors={['#0E0D1C', '#0E0D1C', 'rgba(14,13,28,0)']}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+          <View
             style={{ paddingTop: insets.top + 8, paddingBottom: 20, paddingHorizontal: 12, alignItems: 'stretch' }}
             pointerEvents="box-none"
           >
@@ -1145,8 +1150,8 @@ export default function HomeScreen() {
               auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
               activeColor={selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined}
             />
-          </LinearGradient>
-        </Animated.View>
+          </View>
+        </View>
       )}
 
       {/* ── Avatar preview overlay ── */}
