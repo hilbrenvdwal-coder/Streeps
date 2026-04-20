@@ -220,6 +220,7 @@ export default function HomeScreen() {
     group, members, drinks, tallyCounts, tallyCategoryCounts, recentTallies, credits,
     loading: detailLoading, isAdmin, addTally, addTallyForMember, addTallyForMemberByCategory, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
     updateGroupPrices, updateGroupName, addDrink, removeDrink, deleteGroup, regenerateInviteCode, refresh: refreshGroup,
+    lastPriceEvent, markOwnChange,
   } = useGroupDetail(selectedGroupId ?? '');
 
   // Signal HomeReadyContext when home data is loaded
@@ -268,6 +269,31 @@ export default function HomeScreen() {
       Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setToast(null));
   };
+
+  // Price-change toast: wanneer een admin prijzen wijzigt, krijgen andere leden
+  // met de app open een toast. De actor wordt geskipt via suppressUntilRef in useGroupDetail.
+  useEffect(() => {
+    if (!lastPriceEvent) return;
+    const fmt = (c: number) => `€${(c / 100).toFixed(2).replace('.', ',')}`;
+    let msg = '';
+    if (
+      lastPriceEvent.type === 'category' &&
+      lastPriceEvent.oldPrice !== undefined &&
+      lastPriceEvent.newPrice !== undefined
+    ) {
+      msg = `Prijs gewijzigd: ${lastPriceEvent.label} ${fmt(lastPriceEvent.oldPrice)} → ${fmt(lastPriceEvent.newPrice)}`;
+    } else if (
+      lastPriceEvent.type === 'drink' &&
+      lastPriceEvent.oldPrice !== undefined &&
+      lastPriceEvent.newPrice !== undefined
+    ) {
+      msg = `${lastPriceEvent.label}: ${fmt(lastPriceEvent.oldPrice)} → ${fmt(lastPriceEvent.newPrice)}`;
+    } else if (lastPriceEvent.type === 'mode_toggle') {
+      msg = 'Prijs-modus gewijzigd in deze groep';
+    }
+    if (msg) showToast(msg, 'success');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPriceEvent?.timestamp]);
 
   // Content fade-in on data load (triggers on group switch + initial load)
   const contentOpacity = useRef(new Animated.Value(0)).current;
@@ -1194,6 +1220,7 @@ export default function HomeScreen() {
           categoryColors={t.categoryColors}
           updateGroupPrices={updateGroupPrices}
           updateGroupName={updateGroupName}
+          markOwnChange={markOwnChange}
           addDrink={addDrink}
           removeDrink={removeDrink}
           toggleAdmin={toggleAdmin}

@@ -57,6 +57,7 @@ interface Props {
   categoryColors: readonly string[];
   updateGroupPrices: (data: Record<string, any>) => Promise<void>;
   updateGroupName: (name: string) => Promise<void>;
+  markOwnChange?: () => void;
   addDrink: (name: string, category: number, emoji: string, priceOverride?: number) => Promise<void>;
   removeDrink: (drinkId: string) => Promise<void>;
   toggleAdmin: (userId: string) => Promise<void>;
@@ -392,6 +393,7 @@ export default function SettingsOverlay({
   categoryColors,
   updateGroupPrices,
   updateGroupName,
+  markOwnChange,
   addDrink,
   removeDrink,
   toggleAdmin,
@@ -668,25 +670,61 @@ export default function SettingsOverlay({
       return;
     }
 
-    setIsSaving(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await updateGroupPrices({
-      ...(groupName.trim() ? { name: groupName.trim() } : {}),
-      price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
-      price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
-      price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
-      price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
-      name_category_1: catName1.trim() || 'Categorie 1',
-      name_category_2: catName2.trim() || 'Categorie 2',
-      name_category_3: catName3.trim() || 'Categorie 3',
-      name_category_4: catName4.trim() || 'Categorie 4',
-    });
-    setSavedOk(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSavedOk(false);
-      performClose();
-    }, 600);
+    // Detecteer of categorie-prijzen daadwerkelijk zijn gewijzigd t.o.v.
+    // de waardes waarmee de overlay is geopend. Zo ja: confirm-dialog
+    // tonen zodat de admin weet dat andere leden een melding krijgen.
+    const iv = initialValues.current;
+    const priceChanged =
+      !!iv && (
+        price1 !== iv.price1 ||
+        price2 !== iv.price2 ||
+        price3 !== iv.price3 ||
+        price4 !== iv.price4
+      );
+
+    const doSave = async () => {
+      setIsSaving(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Suppress de prijs-toast voor de actor zelf
+      if (priceChanged) markOwnChange?.();
+      await updateGroupPrices({
+        ...(groupName.trim() ? { name: groupName.trim() } : {}),
+        price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
+        price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
+        price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
+        price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
+        name_category_1: catName1.trim() || 'Categorie 1',
+        name_category_2: catName2.trim() || 'Categorie 2',
+        name_category_3: catName3.trim() || 'Categorie 3',
+        name_category_4: catName4.trim() || 'Categorie 4',
+      });
+      setSavedOk(true);
+      setTimeout(() => {
+        setIsSaving(false);
+        setSavedOk(false);
+        performClose();
+      }, 600);
+    };
+
+    if (priceChanged) {
+      const otherMembers = Math.max(0, (members?.length ?? 0) - 1);
+      const memberText =
+        otherMembers === 0
+          ? 'Geen andere leden krijgen een melding.'
+          : otherMembers === 1
+            ? '1 groepslid krijgt een melding.'
+            : `${otherMembers} groepsleden krijgen een melding.`;
+      Alert.alert(
+        'Prijs wijzigen?',
+        `De nieuwe prijzen zijn direct van toepassing. ${memberText}`,
+        [
+          { text: 'Annuleren', style: 'cancel' },
+          { text: 'Wijzig prijs', onPress: () => { void doSave(); } },
+        ]
+      );
+    } else {
+      await doSave();
+    }
   };
 
   const toggleCategory = (cat: number) => {
@@ -735,6 +773,8 @@ export default function SettingsOverlay({
 
     const cents = euroStrToCents(value);
     if (cents != null) {
+      // Suppress de prijs-toast voor de actor zelf
+      markOwnChange?.();
       const { error } = await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
       if (error) {
         setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: 'Opslaan mislukt' }));
@@ -745,6 +785,8 @@ export default function SettingsOverlay({
   const handleToggleDrinksAsCategories = async (newValue: boolean) => {
     if (dacToggling) return;
     setDacToggling(true);
+    // Suppress de prijs/modus-toast voor de actor zelf
+    markOwnChange?.();
     try {
       if (newValue) {
         // Toggle AAN: backup categories, set price_override on drinks
