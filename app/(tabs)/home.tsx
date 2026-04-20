@@ -1112,7 +1112,7 @@ export default function HomeScreen() {
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }} pointerEvents="box-none">
           <LinearGradient
             colors={['#0E0D1C', '#0E0D1C', 'rgba(14,13,28,0)']}
-            style={{ paddingTop: insets.top + 8, paddingBottom: 20, paddingHorizontal: 20, alignItems: 'center' }}
+            style={{ paddingTop: insets.top + 8, paddingBottom: 20, paddingHorizontal: 12, alignItems: 'stretch' }}
             pointerEvents="box-none"
           >
             <CounterControl
