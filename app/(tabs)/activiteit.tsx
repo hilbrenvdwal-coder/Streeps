@@ -41,6 +41,7 @@ interface GroupBill {
   counts: Record<number, number>;
   total: number;
   drinks_as_categories?: boolean;
+  drink_breakdown?: Array<{ drink_id: string; drink_name: string; drink_emoji: string | null; color: string; count: number; price: number }>;
 }
 
 interface SettlementRecord {
@@ -118,13 +119,32 @@ export default function ActiviteitScreen() {
     const { data: tallies } = await supabase.from('tallies').select('group_id, category, drink_id').eq('user_id', user.id).eq('removed', false).is('settlement_id', null).in('group_id', groupIds);
     if (!groups) { setBills([]); setBillLoading(false); return; }
 
-    // Fetch drinks for groups with drinks_as_categories
+    // Fetch drinks for groups with drinks_as_categories (full details + position per group for index-based color)
     const dacGroupIds = groups.filter((g: any) => g.drinks_as_categories).map((g: any) => g.id);
-    let drinksMap: Record<string, { price_override: number | null }> = {};
+    // drinksMap: drink_id -> { price_override, name, emoji, category, group_id, drinkIndex (position within its group) }
+    let drinksMap: Record<string, { price_override: number | null; name: string; emoji: string | null; category: number; group_id: string; drinkIndex: number }> = {};
     if (dacGroupIds.length > 0) {
-      const { data: drinksData } = await supabase.from('drinks').select('id, price_override').in('group_id', dacGroupIds);
+      const { data: drinksData } = await supabase
+        .from('drinks')
+        .select('id, name, emoji, price_override, category, group_id')
+        .in('group_id', dacGroupIds)
+        .eq('is_available', true)
+        .order('category', { ascending: true });
       if (drinksData) {
-        drinksData.forEach((d: any) => { drinksMap[d.id] = { price_override: d.price_override }; });
+        // Compute per-group index
+        const perGroupIndex: Record<string, number> = {};
+        drinksData.forEach((d: any) => {
+          const idx = (perGroupIndex[d.group_id] ?? -1) + 1;
+          perGroupIndex[d.group_id] = idx;
+          drinksMap[d.id] = {
+            price_override: d.price_override,
+            name: d.name,
+            emoji: d.emoji ?? null,
+            category: d.category ?? 1,
+            group_id: d.group_id,
+            drinkIndex: idx,
+          };
+        });
       }
     }
 
@@ -147,15 +167,33 @@ export default function ActiviteitScreen() {
     Object.values(billMap).forEach((bill) => {
       let total = 0;
       if (bill.drinks_as_categories) {
-        // Drink-based pricing: calculate per tally
+        // Drink-based pricing + breakdown per drink
+        const breakdownMap: Record<string, { drink_id: string; drink_name: string; drink_emoji: string | null; color: string; count: number; price: number }> = {};
         (tallies || []).forEach((tally: any) => {
           if (tally.group_id !== bill.group_id) return;
-          if (tally.drink_id && drinksMap[tally.drink_id]?.price_override != null) {
-            total += drinksMap[tally.drink_id].price_override!;
+          const drink = tally.drink_id ? drinksMap[tally.drink_id] : null;
+          if (drink) {
+            const price = drink.price_override != null
+              ? drink.price_override
+              : (bill.category_prices[(drink.category ?? 1) - 1] || 0);
+            total += price;
+            if (!breakdownMap[tally.drink_id]) {
+              breakdownMap[tally.drink_id] = {
+                drink_id: tally.drink_id,
+                drink_name: drink.name,
+                drink_emoji: drink.emoji,
+                color: t.categoryColors[drink.drinkIndex % 4],
+                count: 0,
+                price,
+              };
+            }
+            breakdownMap[tally.drink_id].count += 1;
           } else {
+            // Fallback: no drink_id — count toward category price (kept in counts)
             total += bill.category_prices[(tally.category ?? 1) - 1] || 0;
           }
         });
+        bill.drink_breakdown = Object.values(breakdownMap);
       } else {
         for (const [cat, count] of Object.entries(bill.counts)) {
           total += count * (bill.category_prices[parseInt(cat) - 1] || 0);
@@ -317,8 +355,10 @@ export default function ActiviteitScreen() {
             renderItem={({ item, index }) => {
               const catColor = t.categoryColors[(item.category - 1) % 4];
               const catLabel = item.type === 'gift_sent'
-                ? `Gedoneerd · Cat ${item.category}`
-                : `Categorie ${item.category}`;
+                ? `Gedoneerd · ${item.drinks_as_categories && item.drink_name ? item.drink_name : `Cat ${item.category}`}`
+                : (item.drinks_as_categories && item.drink_name
+                    ? `${item.drink_emoji ? item.drink_emoji + ' ' : ''}${item.drink_name}`
+                    : `Categorie ${item.category}`);
               const displayCount = item.type === 'gift_sent'
                 ? (item.gift_quantity ?? 1)
                 : (item.count ?? 1);
@@ -426,24 +466,39 @@ export default function ActiviteitScreen() {
                   <View key={bill.group_id} style={styles.rekItem}>
                     <View style={styles.rekLeft}>
                       <Text style={styles.rekGroupName}>{bill.group_name}</Text>
-                      {[1, 2, 3, 4].map((cat) => {
-                        const count = bill.counts[cat] || 0;
-                        if (count === 0) return null;
-                        const price = bill.category_prices[cat - 1] || 0;
-                        const catColor = t.categoryColors[(cat - 1) % 4];
-                        return (
-                          <View key={cat} style={styles.rekCatRow}>
-                            <View style={[styles.rekCatBadge, { backgroundColor: catColor + '20' }]}>
-                              <Text style={[styles.rekCatBadgeText, { color: catColor }]}>
-                                {bill.category_names[cat - 1]}
+                      {bill.drinks_as_categories && bill.drink_breakdown && bill.drink_breakdown.length > 0 ? (
+                        bill.drink_breakdown.map((d) => (
+                          <View key={d.drink_id} style={styles.rekCatRow}>
+                            <View style={[styles.rekCatBadge, { backgroundColor: d.color + '20' }]}>
+                              <Text style={[styles.rekCatBadgeText, { color: d.color }]}>
+                                {d.drink_emoji ? `${d.drink_emoji} ` : ''}{d.drink_name}
                               </Text>
                             </View>
                             <Text style={styles.rekCatCount}>
-                              {count}{'\u00D7'} {'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
+                              {d.count}{'\u00D7'} {'\u20AC'}{(d.price / 100).toFixed(2).replace('.', ',')}
                             </Text>
                           </View>
-                        );
-                      })}
+                        ))
+                      ) : (
+                        [1, 2, 3, 4].map((cat) => {
+                          const count = bill.counts[cat] || 0;
+                          if (count === 0) return null;
+                          const price = bill.category_prices[cat - 1] || 0;
+                          const catColor = t.categoryColors[(cat - 1) % 4];
+                          return (
+                            <View key={cat} style={styles.rekCatRow}>
+                              <View style={[styles.rekCatBadge, { backgroundColor: catColor + '20' }]}>
+                                <Text style={[styles.rekCatBadgeText, { color: catColor }]}>
+                                  {bill.category_names[cat - 1]}
+                                </Text>
+                              </View>
+                              <Text style={styles.rekCatCount}>
+                                {count}{'\u00D7'} {'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      )}
                     </View>
                     <View style={styles.rekAmountBox}>
                       <Text style={[styles.rekCountText, { color: '#FF004D' }]}>

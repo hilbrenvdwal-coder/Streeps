@@ -12,6 +12,10 @@ interface HistoryItem {
   count?: number;
   gift_quantity?: number;
   gift_other_name?: string;
+  drink_id?: string | null;
+  drink_name?: string | null;
+  drink_emoji?: string | null;
+  drinks_as_categories?: boolean;
 }
 
 const PAGE_SIZE = 20;
@@ -75,7 +79,7 @@ export function useHistory() {
     // Fetch tallies for this page
     const { data: tallies, error } = await supabase
       .from('tallies')
-      .select(`id, category, created_at, removed, group:groups(name)`)
+      .select(`id, category, drink_id, created_at, removed, group:groups(name, drinks_as_categories)`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + fetchLimit - 1);
@@ -87,20 +91,57 @@ export function useHistory() {
       return;
     }
 
-    // Group tallies by category + group + time window (within 60s = same batch)
+    // Group tallies by category + group + drink_id + time window (within 60s = same batch)
     const tallyItems: HistoryItem[] = [];
     let prev: any = null;
     for (const t of (tallies ?? []) as any[]) {
       const gName = t.group?.name ?? '?';
+      const dac = t.group?.drinks_as_categories ?? false;
       const cat = t.category ?? 1;
+      const drinkId = t.drink_id ?? null;
       const ts = new Date(t.created_at).getTime();
       if (prev && prev.category === cat && prev.group_name === gName
+          && prev.drink_id === drinkId
           && Math.abs(ts - prev.ts) < 60000 && !t.removed && !prev.removed) {
         // Same batch — increment count
         prev.count += 1;
       } else {
-        prev = { id: t.id, group_name: gName, category: cat, created_at: t.created_at, removed: t.removed, type: 'tally' as const, count: 1, ts };
+        prev = {
+          id: t.id,
+          group_name: gName,
+          category: cat,
+          created_at: t.created_at,
+          removed: t.removed,
+          type: 'tally' as const,
+          count: 1,
+          ts,
+          drink_id: drinkId,
+          drinks_as_categories: dac,
+        };
         tallyItems.push(prev);
+      }
+    }
+
+    // Enrich tallies with drink name/emoji (batch-fetch for unique drink_ids)
+    const uniqueDrinkIds = Array.from(new Set(
+      tallyItems
+        .map((t) => t.drink_id)
+        .filter((id): id is string => !!id)
+    ));
+    if (uniqueDrinkIds.length > 0) {
+      const { data: drinksData } = await supabase
+        .from('drinks')
+        .select('id, name, emoji')
+        .in('id', uniqueDrinkIds);
+      if (drinksData) {
+        const drinksMap: Record<string, { name: string; emoji: string | null }> = {};
+        drinksData.forEach((d: any) => { drinksMap[d.id] = { name: d.name, emoji: d.emoji ?? null }; });
+        tallyItems.forEach((t) => {
+          if (t.drink_id && drinksMap[t.drink_id]) {
+            t.drink_name = drinksMap[t.drink_id].name;
+            t.drink_emoji = drinksMap[t.drink_id].emoji;
+          }
+        });
       }
     }
 

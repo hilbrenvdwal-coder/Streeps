@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { categoryColors } from '../theme';
 import type { Group } from '../types/database';
 
 interface UnsettledMember {
@@ -8,6 +9,7 @@ interface UnsettledMember {
   full_name: string;
   counts: Record<number, number>; // category -> count
   amount: number; // total in cents
+  drink_counts?: Record<string, { name: string; emoji: string | null; count: number; price: number; color: string }>;
 }
 
 interface SettlementHistoryItem {
@@ -52,14 +54,24 @@ export function useSettlements(groupId: string) {
     if (!tallies || tallies.length === 0) return [];
 
     // Fetch drinks for drink-based pricing
-    let drinksMap: Record<string, { price_override: number | null }> = {};
+    let drinksMap: Record<string, { price_override: number | null; name: string; emoji: string | null; category: number; color: string }> = {};
     if (group.drinks_as_categories) {
       const { data: drinksData } = await supabase
         .from('drinks')
-        .select('id, price_override')
-        .eq('group_id', groupId);
+        .select('id, name, emoji, price_override, category')
+        .eq('group_id', groupId)
+        .eq('is_available', true)
+        .order('category', { ascending: true });
       if (drinksData) {
-        drinksData.forEach((d: any) => { drinksMap[d.id] = { price_override: d.price_override }; });
+        drinksData.forEach((d: any, idx: number) => {
+          drinksMap[d.id] = {
+            price_override: d.price_override,
+            name: d.name,
+            emoji: d.emoji ?? null,
+            category: d.category ?? 1,
+            color: categoryColors[idx % categoryColors.length],
+          };
+        });
       }
     }
 
@@ -73,6 +85,7 @@ export function useSettlements(groupId: string) {
           full_name: t.profiles?.full_name ?? 'Onbekend',
           counts: {},
           amount: 0,
+          drink_counts: group.drinks_as_categories ? {} : undefined,
         };
       }
       const cat = t.category ?? 1;
@@ -87,10 +100,23 @@ export function useSettlements(groupId: string) {
         const uid = t.user_id;
         const member = memberMap[uid];
         if (!member) return;
-        if (t.drink_id && drinksMap[t.drink_id]?.price_override != null) {
-          member.amount += drinksMap[t.drink_id].price_override!;
+        if (t.drink_id && drinksMap[t.drink_id]) {
+          const d = drinksMap[t.drink_id];
+          const price = d.price_override != null ? d.price_override : getCategoryPrice(group, d.category);
+          member.amount += price;
+          if (!member.drink_counts) member.drink_counts = {};
+          if (!member.drink_counts[t.drink_id]) {
+            member.drink_counts[t.drink_id] = {
+              name: d.name,
+              emoji: d.emoji,
+              count: 0,
+              price,
+              color: d.color,
+            };
+          }
+          member.drink_counts[t.drink_id].count += 1;
         } else {
-          // Fallback to category price
+          // Fallback to category price (tally without drink_id in drink-mode)
           member.amount += getCategoryPrice(group, t.category ?? 1);
         }
       });

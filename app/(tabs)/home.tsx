@@ -1422,7 +1422,13 @@ export default function HomeScreen() {
                 <View style={[s.checkbox, selected && s.checkboxChecked]} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: 'Unbounded', color: '#fff', fontSize: 14, fontWeight: '400' }}>{member.user_id === user?.id ? 'Jij' : member.full_name}</Text>
-                  {activeCategories.map((cat) => { const count = member.counts[cat] || 0; if (!count) return null; return (<Text key={cat} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>{getCategoryName(cat)}: {count}x</Text>); })}
+                  {isDrinkMode && member.drink_counts
+                    ? Object.values(member.drink_counts as Record<string, { name: string; emoji: string | null; count: number }>).map((d) => (
+                        <Text key={d.name} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>
+                          {d.emoji ? `${d.emoji} ` : ''}{d.name}: {d.count}x
+                        </Text>
+                      ))
+                    : activeCategories.map((cat) => { const count = member.counts[cat] || 0; if (!count) return null; return (<Text key={cat} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>{getCategoryName(cat)}: {count}x</Text>); })}
                 </View>
                 <Text style={{ fontFamily: 'Unbounded', fontSize: 16, color: '#00BEAE', fontWeight: '600' }}>{'\u20AC'} {(member.amount / 100).toFixed(2).replace('.', ',')}</Text>
               </Pressable>
