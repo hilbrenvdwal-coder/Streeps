@@ -162,6 +162,9 @@ export default function ActiviteitScreen() {
       const bill = billMap[tally.group_id];
       if (!bill) return;
       const cat = tally.category ?? 1;
+      // In drankmodus tellen alleen orphan-tallies (zonder drink_id) in counts;
+      // tallies met drink_id komen in drink_breakdown zodat we niet dubbel renderen.
+      if (bill.drinks_as_categories && tally.drink_id) return;
       bill.counts[cat] = (bill.counts[cat] || 0) + 1;
     });
     Object.values(billMap).forEach((bill) => {
@@ -466,19 +469,39 @@ export default function ActiviteitScreen() {
                   <View key={bill.group_id} style={styles.rekItem}>
                     <View style={styles.rekLeft}>
                       <Text style={styles.rekGroupName}>{bill.group_name}</Text>
-                      {bill.drinks_as_categories && bill.drink_breakdown && bill.drink_breakdown.length > 0 ? (
-                        bill.drink_breakdown.map((d) => (
-                          <View key={d.drink_id} style={styles.rekCatRow}>
-                            <View style={[styles.rekCatBadge, { backgroundColor: d.color + '20' }]}>
-                              <Text style={[styles.rekCatBadgeText, { color: d.color }]}>
-                                {d.drink_emoji ? `${d.drink_emoji} ` : ''}{d.drink_name}
+                      {bill.drinks_as_categories ? (
+                        <>
+                          {bill.drink_breakdown && bill.drink_breakdown.map((d) => (
+                            <View key={d.drink_id} style={styles.rekCatRow}>
+                              <View style={[styles.rekCatBadge, { backgroundColor: d.color + '20' }]}>
+                                <Text style={[styles.rekCatBadgeText, { color: d.color }]}>
+                                  {d.drink_emoji ? `${d.drink_emoji} ` : ''}{d.drink_name}
+                                </Text>
+                              </View>
+                              <Text style={styles.rekCatCount}>
+                                {d.count}{'\u00D7'} {'\u20AC'}{(d.price / 100).toFixed(2).replace('.', ',')}
                               </Text>
                             </View>
-                            <Text style={styles.rekCatCount}>
-                              {d.count}{'\u00D7'} {'\u20AC'}{(d.price / 100).toFixed(2).replace('.', ',')}
-                            </Text>
-                          </View>
-                        ))
+                          ))}
+                          {[1, 2, 3, 4].map((cat) => {
+                            const count = bill.counts[cat] || 0;
+                            if (count === 0) return null;
+                            const price = bill.category_prices[cat - 1] || 0;
+                            const catColor = t.categoryColors[(cat - 1) % 4];
+                            return (
+                              <View key={`orphan-${cat}`} style={styles.rekCatRow}>
+                                <View style={[styles.rekCatBadge, { backgroundColor: catColor + '20' }]}>
+                                  <Text style={[styles.rekCatBadgeText, { color: catColor }]}>
+                                    {bill.category_names[cat - 1]}
+                                  </Text>
+                                </View>
+                                <Text style={styles.rekCatCount}>
+                                  {count}{'\u00D7'} {'\u20AC'}{(price / 100).toFixed(2).replace('.', ',')}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </>
                       ) : (
                         [1, 2, 3, 4].map((cat) => {
                           const count = bill.counts[cat] || 0;
