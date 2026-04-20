@@ -1362,7 +1362,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Scroll content ──
-  scroll: { paddingHorizontal: 20 },
+  scroll: { paddingHorizontal: 12 },
 
   // ── Group Selector ── SVG: top area
   selectorWrap: { marginTop: 8 },
@@ -1510,8 +1510,8 @@ const styles = StyleSheet.create({
   creditText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', fontWeight: '600' },
 
   // ── Categories ── SVG: 350×50 rows, 9px gap
-  categories: { marginBottom: 24, paddingHorizontal: 10 },
-  drinkGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, paddingHorizontal: 10, gap: 10, marginBottom: 24 },
+  categories: { marginBottom: 24, paddingHorizontal: 0 },
+  drinkGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, paddingHorizontal: 0, gap: 10, marginBottom: 24 },
   drinkTileWrap: { width: '47%' as any },
 
   // ── Section Title ── SVG node 122:106
@@ -1542,7 +1542,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingTop: 20,
     zIndex: 1,
   },
@@ -1561,7 +1561,7 @@ const styles = StyleSheet.create({
   },
   drankenlijstList: {
     paddingTop: 20,
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     zIndex: 1,
   },
 
@@ -1575,7 +1575,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingTop: 20,
     zIndex: 1,
   },
@@ -1594,7 +1594,7 @@ const styles = StyleSheet.create({
   },
   ledenList: {
     paddingTop: 20,
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     zIndex: 1,
   },
   lidRow: {
