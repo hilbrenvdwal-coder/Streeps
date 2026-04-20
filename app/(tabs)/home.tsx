@@ -186,7 +186,8 @@ export default function HomeScreen() {
   const { groups, loading: groupsLoading, createGroup, joinGroup } = useGroups();
 
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [headerLayoutHeight, setHeaderLayoutHeight] = useState(140);
+  const [counterSticky, setCounterSticky] = useState(false);
+  const counterNaturalY = useRef(0);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((id) => { if (id) setSelectedGroupId(id); });
@@ -713,6 +714,12 @@ export default function HomeScreen() {
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={s.scroll}
+        scrollEventThrottle={16}
+        onScroll={isDrinkMode ? (e: any) => {
+          const y = e.nativeEvent.contentOffset.y;
+          const stickyPoint = counterNaturalY.current - insets.top - 120;
+          setCounterSticky(y > stickyPoint && stickyPoint > 0);
+        } : undefined}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -733,8 +740,8 @@ export default function HomeScreen() {
 
         {selectedGroupId && group ? (
           <Animated.View style={{ opacity: contentOpacity }}>
-            {/* ── Group Header ── SVG: Groepheader + Group 13 (expand icon) */}
-            <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)} onLayout={(e) => setHeaderLayoutHeight(e.nativeEvent.layout.height + 12)}>
+            {/* ── Group Header ── */}
+            <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)}>
               <View style={s.groupTopRow}>
                 <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined} hitSlop={6}>
                   <View ref={avatarRef} collapsable={false}>
@@ -776,13 +783,23 @@ export default function HomeScreen() {
               </View>
             </Pressable>
 
-            {/* ── Counter ── SVG node Counter: minus(19,190) display(158,190) plus(245,190) */}
-            {isDrinkMode ? (
-              <View style={{ height: 108 }} />
-            ) : (
-              counterContent
-            )}
+            {/* Counter inline (normal mode) */}
+            {!isDrinkMode && counterContent}
+          </Animated.View>
+        ) : null}
 
+        {/* ── Rest of content (drink-mode: counter + categories; normal: categories only) ── */}
+        {selectedGroupId && group ? (
+          <Animated.View style={{ opacity: contentOpacity }}>
+            {/* Counter inline in drink-mode (invisible when sticky, keeps layout space) */}
+            {isDrinkMode && (
+              <View
+                onLayout={(e) => { counterNaturalY.current = e.nativeEvent.layout.y; }}
+                style={counterSticky ? { opacity: 0 } : undefined}
+              >
+                {counterContent}
+              </View>
+            )}
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
             <View style={s.categories}>
               {isDrinkMode ? (
@@ -1017,25 +1034,35 @@ export default function HomeScreen() {
         ) : null}
       </ScrollView>
 
-      {/* ── Sticky counter for drink-mode ── */}
-      {isDrinkMode && group && selectedGroupId && (
-        <View
-          style={{
-            position: 'absolute',
-            top: insets.top + headerLayoutHeight,
-            left: 20,
-            right: 20,
-            zIndex: 10,
-            alignItems: 'center',
-          }}
-          pointerEvents="box-none"
-        >
-          {counterContent}
+      {/* ── Sticky counter overlay (drink-mode) ── */}
+      {counterSticky && isDrinkMode && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }} pointerEvents="box-none">
           <LinearGradient
-            colors={['#0E0D1C', 'rgba(14,13,28,0)']}
-            style={{ height: 28, width: '100%', marginTop: 8 }}
-            pointerEvents="none"
-          />
+            colors={['#0E0D1C', '#0E0D1C', 'rgba(14,13,28,0)']}
+            style={{ paddingTop: insets.top + 8, paddingBottom: 20, paddingHorizontal: 20, alignItems: 'center' }}
+            pointerEvents="box-none"
+          >
+            <CounterControl
+              value={tallyCount}
+              onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
+              onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
+              onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+              onSwipeCycle={(direction: 'next' | 'prev') => {
+                if (adding) return;
+                if (drinkCategories.length === 0) return;
+                const currentIdx = drinkCategories.findIndex((d) => d.id === selectedDrinkId);
+                if (currentIdx === -1) return;
+                const nextIdx = direction === 'next'
+                  ? (currentIdx + 1) % drinkCategories.length
+                  : (currentIdx - 1 + drinkCategories.length) % drinkCategories.length;
+                setSelectedDrinkId(drinkCategories[nextIdx].id);
+                setSelectedCategory(drinkCategories[nextIdx].category);
+                Haptics.selectionAsync();
+              }}
+              auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
+              activeColor={selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined}
+            />
+          </LinearGradient>
         </View>
       )}
 
