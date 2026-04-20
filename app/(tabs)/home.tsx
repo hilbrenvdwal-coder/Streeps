@@ -830,11 +830,6 @@ export default function HomeScreen() {
         {/* ── Sticky counter (drink-mode) — native stickyHeaderIndices target ── */}
         {selectedGroupId && group && isDrinkMode ? (
           <Animated.View style={[s.stickyCounterWrap, { opacity: contentOpacity }]}>
-            <LinearGradient
-              colors={['#0E0D1C', '#0E0D1C', 'rgba(14,13,28,0)']}
-              style={StyleSheet.absoluteFillObject}
-              pointerEvents="none"
-            />
             {counterContent}
           </Animated.View>
         ) : null}
