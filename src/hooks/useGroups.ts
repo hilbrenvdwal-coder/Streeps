@@ -111,7 +111,7 @@ export function useGroups() {
     // Create the group
     const { data: group, error } = await supabase
       .from('groups')
-      .insert({ name, created_by: user.id })
+      .insert({ name, created_by: user.id, drinks_as_categories: true })
       .select()
       .single();
 
@@ -131,13 +131,13 @@ export function useGroups() {
       return { error: memberError.message };
     }
 
-    // Add default drinks
+    // Add default drinks (with price_override since we default to drinks_as_categories mode)
     const { error: drinksError } = await supabase.from('drinks').insert([
-      { group_id: group.id, name: 'Bier', category: 1, emoji: '🍺' },
-      { group_id: group.id, name: 'Wijn', category: 2, emoji: '🍷' },
-      { group_id: group.id, name: '0.0', category: 1, emoji: '🚗' },
-      { group_id: group.id, name: 'Fris', category: 1, emoji: '🥤' },
-      { group_id: group.id, name: 'Cocktail', category: 2, emoji: '🍸' },
+      { group_id: group.id, name: 'Bier', category: 1, emoji: '🍺', price_override: 150 },
+      { group_id: group.id, name: 'Wijn', category: 2, emoji: '🍷', price_override: 300 },
+      { group_id: group.id, name: '0.0', category: 1, emoji: '🚗', price_override: 150 },
+      { group_id: group.id, name: 'Fris', category: 1, emoji: '🥤', price_override: 150 },
+      { group_id: group.id, name: 'Cocktail', category: 2, emoji: '🍸', price_override: 450 },
     ]);
     if (drinksError) {
       console.error('Error adding drinks:', drinksError.message);

@@ -32,7 +32,7 @@ import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
 import { categoryColors } from '@/src/theme';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 interface GroupSetupWizardProps {
   visible: boolean;
@@ -65,25 +65,22 @@ export default function GroupSetupWizard({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
 
-  // Step 2: Categories
+  // Category labels (read from DB, used as "kleur-groep" label in drinks mode)
   const [catName1, setCatName1] = useState('Normaal');
   const [catName2, setCatName2] = useState('Speciaal');
   const [catName3, setCatName3] = useState('Categorie 3');
   const [catName4, setCatName4] = useState('Categorie 4');
-  const [price1, setPrice1] = useState('1,50');
-  const [price2, setPrice2] = useState('3,00');
-  const [price3, setPrice3] = useState('4,50');
-  const [price4, setPrice4] = useState('6,00');
   const [cat2Enabled, setCat2Enabled] = useState(true);
   const [cat3Enabled, setCat3Enabled] = useState(false);
   const [cat4Enabled, setCat4Enabled] = useState(false);
   const [autoTrust, setAutoTrust] = useState(false);
 
-  // Step 3: Drinks
-  const [drinks, setDrinks] = useState<{ id: string; name: string; emoji: string; category: number }[]>([]);
+  // Step 2: Drinks (was step 3)
+  const [drinks, setDrinks] = useState<{ id: string; name: string; emoji: string; category: number; priceStr: string }[]>([]);
   const [newDrinkName, setNewDrinkName] = useState('');
   const [newDrinkEmoji, setNewDrinkEmoji] = useState('');
   const [newDrinkCat, setNewDrinkCat] = useState(1);
+  const [newDrinkPrice, setNewDrinkPrice] = useState('');
 
   const addBtnScale = useSharedValue(1);
   const addBtnAnimStyle = useAnimatedStyle(() => ({
@@ -100,10 +97,6 @@ export default function GroupSetupWizard({
       setCatName2('Speciaal');
       setCatName3('Categorie 3');
       setCatName4('Categorie 4');
-      setPrice1('1,50');
-      setPrice2('3,00');
-      setPrice3('4,50');
-      setPrice4('6,00');
       setCat2Enabled(true);
       setCat3Enabled(false);
       setCat4Enabled(false);
@@ -111,9 +104,11 @@ export default function GroupSetupWizard({
       setNewDrinkName('');
       setNewDrinkEmoji('');
       setNewDrinkCat(1);
+      setNewDrinkPrice('');
 
-      // Load existing drinks from DB
+      // Load existing drinks + category labels from DB
       loadDrinks();
+      loadCategoryLabels();
 
       scrimOpacity.setValue(0);
       contentAnim.setValue(0);
@@ -125,13 +120,53 @@ export default function GroupSetupWizard({
     }
   }, [visible]);
 
+  // Helpers: convert between cents and euro string (Dutch notation with comma)
+  const centsToEuroStr = (cents: number | null | undefined): string => {
+    if (cents == null || cents === 0) return '';
+    return (cents / 100).toFixed(2).replace('.', ',');
+  };
+  const euroStrToCents = (str: string): number | null => {
+    if (!str.trim()) return null;
+    const normalized = str.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    if (isNaN(parsed) || parsed < 0.01 || parsed > 99.99) return null;
+    return Math.round(parsed * 100);
+  };
+
   const loadDrinks = async () => {
     const { data } = await supabase
       .from('drinks')
-      .select('id, name, emoji, category')
+      .select('id, name, emoji, category, price_override')
       .eq('group_id', groupId)
       .order('created_at', { ascending: true });
-    if (data) setDrinks(data.map((d) => ({ id: d.id, name: d.name, emoji: d.emoji ?? '🍺', category: d.category })));
+    if (data) {
+      setDrinks(
+        data.map((d) => ({
+          id: d.id,
+          name: d.name,
+          emoji: d.emoji ?? '🍺',
+          category: d.category,
+          priceStr: centsToEuroStr(d.price_override),
+        }))
+      );
+    }
+  };
+
+  const loadCategoryLabels = async () => {
+    const { data } = await supabase
+      .from('groups')
+      .select('name_category_1, name_category_2, name_category_3, name_category_4, price_category_2, price_category_3, price_category_4')
+      .eq('id', groupId)
+      .maybeSingle();
+    if (data) {
+      if (data.name_category_1) setCatName1(data.name_category_1);
+      if (data.name_category_2) setCatName2(data.name_category_2);
+      if (data.name_category_3) setCatName3(data.name_category_3);
+      if (data.name_category_4) setCatName4(data.name_category_4);
+      setCat2Enabled(data.price_category_2 != null);
+      setCat3Enabled(data.price_category_3 != null);
+      setCat4Enabled(data.price_category_4 != null);
+    }
   };
 
   const handleClose = useCallback(() => {
@@ -173,27 +208,14 @@ export default function GroupSetupWizard({
   }, []);
 
   const handleNext = useCallback(async () => {
-    if (step === 2) {
-      // Save categories to DB
-      const parseCents = (val: string) => {
-        const cleaned = val.replace(',', '.');
-        const num = parseFloat(cleaned);
-        return isNaN(num) ? 0 : Math.round(num * 100);
-      };
+    if (step === 1) {
+      // Save auto-trust setting to DB
       await supabase.from('groups').update({
-        name_category_1: catName1.trim() || 'Normaal',
-        name_category_2: catName2.trim() || 'Speciaal',
-        name_category_3: catName3.trim() || 'Categorie 3',
-        name_category_4: catName4.trim() || 'Categorie 4',
-        price_category_1: parseCents(price1) || 150,
-        price_category_2: cat2Enabled ? (parseCents(price2) || 300) : null,
-        price_category_3: cat3Enabled ? (parseCents(price3) || 450) : null,
-        price_category_4: cat4Enabled ? (parseCents(price4) || 600) : null,
         auto_trust_members: autoTrust,
       }).eq('id', groupId);
     }
     goToStep(step + 1);
-  }, [step, catName1, catName2, catName3, catName4, price1, price2, price3, price4, cat2Enabled, cat3Enabled, cat4Enabled, groupId, goToStep]);
+  }, [step, autoTrust, groupId, goToStep]);
 
   const handleSkip = useCallback(() => {
     goToStep(step + 1);
@@ -225,7 +247,7 @@ export default function GroupSetupWizard({
     setUploadingAvatar(false);
   };
 
-  // Step 3: Add drink
+  // Step 2: Add drink
   const handleAddDrink = async () => {
     if (!newDrinkName.trim()) return;
     addBtnScale.value = withSequence(
@@ -234,21 +256,45 @@ export default function GroupSetupWizard({
     );
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const emoji = newDrinkEmoji.trim() || '🍺';
+    const priceCents = euroStrToCents(newDrinkPrice);
     const { data, error } = await supabase.from('drinks').insert({
       group_id: groupId,
       name: newDrinkName.trim(),
       emoji,
       category: newDrinkCat,
+      price_override: priceCents,
     }).select().single();
     if (error) { Alert.alert('Fout', error.message); return; }
-    if (data) setDrinks((prev) => [...prev, { id: data.id, name: data.name, emoji: data.emoji ?? '🍺', category: data.category }]);
+    if (data) setDrinks((prev) => [...prev, {
+      id: data.id,
+      name: data.name,
+      emoji: data.emoji ?? '🍺',
+      category: data.category,
+      priceStr: centsToEuroStr(data.price_override),
+    }]);
     setNewDrinkName('');
     setNewDrinkEmoji('');
+    setNewDrinkPrice('');
   };
 
   const handleRemoveDrink = async (drinkId: string) => {
     await supabase.from('drinks').delete().eq('id', drinkId);
     setDrinks((prev) => prev.filter((d) => d.id !== drinkId));
+  };
+
+  // Update a drink's price_override (called on blur from price input)
+  const handleUpdateDrinkPrice = async (drinkId: string, newPriceStr: string) => {
+    const cents = euroStrToCents(newPriceStr);
+    await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
+    setDrinks((prev) => prev.map((d) =>
+      d.id === drinkId ? { ...d, priceStr: centsToEuroStr(cents) } : d
+    ));
+  };
+
+  const handleUpdateDrinkPriceLocal = (drinkId: string, newPriceStr: string) => {
+    setDrinks((prev) => prev.map((d) =>
+      d.id === drinkId ? { ...d, priceStr: newPriceStr } : d
+    ));
   };
 
   // Step 4: Copy & share
@@ -328,73 +374,8 @@ export default function GroupSetupWizard({
     </View>
   );
 
-  // ── Step 2: Categories ──
-  const renderStep2 = () => {
-    const categories = [
-      { name: catName1, setName: setCatName1, price: price1, setPrice: setPrice1, enabled: true, setEnabled: null as null, index: 0 },
-      { name: catName2, setName: setCatName2, price: price2, setPrice: setPrice2, enabled: cat2Enabled, setEnabled: setCat2Enabled, index: 1 },
-      { name: catName3, setName: setCatName3, price: price3, setPrice: setPrice3, enabled: cat3Enabled, setEnabled: setCat3Enabled, index: 2 },
-      { name: catName4, setName: setCatName4, price: price4, setPrice: setPrice4, enabled: cat4Enabled, setEnabled: setCat4Enabled, index: 3 },
-    ];
-
-    return (
-      <View style={ws.stepContent}>
-        <Text style={ws.stepTitle}>Categorieën</Text>
-        <Text style={ws.stepSubtitle}>Stel prijzen in per categorie</Text>
-
-        {categories.map((cat, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <View style={ws.divider} />}
-            <View style={[ws.catRow, !cat.enabled && ws.catRowDisabled]}>
-              <View style={[ws.catBadge, { backgroundColor: categoryColors[cat.index] + '30' }]}>
-                <Text style={[ws.catBadgeText, { color: categoryColors[cat.index] }]}>{cat.name || `Cat ${i + 1}`}</Text>
-              </View>
-              {cat.enabled ? (
-                <>
-                  <TextInput
-                    style={ws.catNameInput}
-                    value={cat.name}
-                    onChangeText={cat.setName}
-                    placeholder={`Categorie ${i + 1}`}
-                    placeholderTextColor="#848484"
-                    maxLength={15}
-                  />
-                  <View style={ws.catPriceWrapper}>
-                    <Text style={ws.euroSign}>€</Text>
-                    <TextInput
-                      style={ws.catPriceInput}
-                      value={cat.price}
-                      onChangeText={cat.setPrice}
-                      keyboardType="decimal-pad"
-                      placeholder="0,00"
-                      placeholderTextColor="#848484"
-                    />
-                  </View>
-                </>
-              ) : (
-                <View style={{ flex: 1 }} />
-              )}
-              {cat.setEnabled !== null ? (
-                <Switch
-                  value={cat.enabled}
-                  onValueChange={cat.setEnabled}
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
-                  thumbColor="#FFFFFF"
-                  style={{ marginLeft: 8, alignSelf: 'center' }}
-                />
-              ) : (
-                <View style={{ width: 59 }} />
-              )}
-            </View>
-          </React.Fragment>
-        ))}
-
-      </View>
-    );
-  };
-
-  // ── Step 3: Drinks ──
-  const renderStep3 = () => (
+  // ── Step 2: Drinks (was step 3) ──
+  const renderStep2 = () => (
     <KeyboardAvoidingView
       style={{ flex: 1, width: '100%' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -402,7 +383,7 @@ export default function GroupSetupWizard({
     >
     <View style={[ws.stepContent, { paddingBottom: 104 + insets.bottom }]}>
       <Text style={ws.stepTitle}>Drankjes</Text>
-      <Text style={ws.stepSubtitle}>Beheer de drankjes in je groep</Text>
+      <Text style={ws.stepSubtitle}>Beheer de drankjes en prijzen</Text>
 
       <ScrollView
         style={ws.drinksList}
@@ -415,11 +396,23 @@ export default function GroupSetupWizard({
             {i > 0 && <View style={ws.divider} />}
             <View style={ws.drinkRow}>
               <Text style={ws.drinkEmoji}>{drink.emoji}</Text>
-              <Text style={ws.drinkName}>{drink.name}</Text>
-              <View style={[ws.catBadge, { backgroundColor: categoryColors[(drink.category - 1) % 4] + '30', marginRight: 12 }]}>
+              <Text style={ws.drinkName} numberOfLines={1}>{drink.name}</Text>
+              <View style={[ws.catBadge, { backgroundColor: categoryColors[(drink.category - 1) % 4] + '30', marginRight: 8 }]}>
                 <Text style={[ws.catBadgeText, { color: categoryColors[(drink.category - 1) % 4] }]}>
-                  {[catName1, catName2, catName3, catName4][(drink.category - 1) % 4] || `Cat ${drink.category}`}
+                  {[catName1, catName2, catName3, catName4][(drink.category - 1) % 4] || `Groep ${drink.category}`}
                 </Text>
+              </View>
+              <View style={[ws.catPriceWrapper, { marginRight: 8 }]}>
+                <Text style={ws.euroSign}>€</Text>
+                <TextInput
+                  style={ws.catPriceInput}
+                  value={drink.priceStr}
+                  onChangeText={(val) => handleUpdateDrinkPriceLocal(drink.id, val)}
+                  onBlur={() => handleUpdateDrinkPrice(drink.id, drink.priceStr)}
+                  keyboardType="decimal-pad"
+                  placeholder="0,00"
+                  placeholderTextColor="#848484"
+                />
               </View>
               <Pressable onPress={() => handleRemoveDrink(drink.id)} hitSlop={8}>
                 <Ionicons name="close-circle" size={20} color="#EB5466" />
@@ -450,6 +443,17 @@ export default function GroupSetupWizard({
             returnKeyType="done"
             onSubmitEditing={handleAddDrink}
           />
+          <View style={ws.catPriceWrapper}>
+            <Text style={ws.euroSign}>€</Text>
+            <TextInput
+              style={ws.catPriceInput}
+              value={newDrinkPrice}
+              onChangeText={setNewDrinkPrice}
+              keyboardType="decimal-pad"
+              placeholder="0,00"
+              placeholderTextColor="#848484"
+            />
+          </View>
         </View>
         <View style={ws.addDrinkCatRow}>
           <View style={ws.catSelectorRow}>
@@ -458,7 +462,7 @@ export default function GroupSetupWizard({
               .map((c) => {
                 const isSelected = newDrinkCat === c;
                 const color = categoryColors[(c - 1) % 4];
-                const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Cat ${c}`;
+                const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Groep ${c}`;
                 return (
                   <Pressable
                     key={c}
@@ -486,8 +490,8 @@ export default function GroupSetupWizard({
     </KeyboardAvoidingView>
   );
 
-  // ── Step 4: Invite ──
-  const renderStep4 = () => (
+  // ── Step 3: Invite (was step 4) ──
+  const renderStep3 = () => (
     <View style={ws.stepContent}>
       <Text style={ws.stepTitle}>Nodig vrienden uit</Text>
       <Text style={ws.stepSubtitle}>Deel de code met je groep</Text>
@@ -509,8 +513,8 @@ export default function GroupSetupWizard({
     </View>
   );
 
-  // ── Step 5: Done ──
-  const renderStep5 = () => (
+  // ── Step 4: Done (was step 5) ──
+  const renderStep4 = () => (
     <View style={ws.stepContent}>
       <View style={ws.doneIcon}>
         <Ionicons name="checkmark-circle" size={80} color="#00BEAE" />
@@ -522,7 +526,7 @@ export default function GroupSetupWizard({
 
   // ── Bottom bar ──
   const renderBottomBar = () => {
-    if (step === 5) {
+    if (step === 4) {
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable style={ws.beginBtn} onPress={handleFinish}>
@@ -559,7 +563,7 @@ export default function GroupSetupWizard({
       );
     }
 
-    // Steps 2, 3, 4: Back button + Volgende
+    // Steps 2, 3: Back button + Volgende
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={ws.backBtn} onPress={handleBack}>
@@ -579,7 +583,6 @@ export default function GroupSetupWizard({
       case 2: return renderStep2();
       case 3: return renderStep3();
       case 4: return renderStep4();
-      case 5: return renderStep5();
       default: return null;
     }
   };
