@@ -189,6 +189,7 @@ export default function HomeScreen() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [counterSticky, setCounterSticky] = useState(false);
   const counterNaturalY = useRef(0);
+  const counterWrapRef = useRef<View>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((id) => { if (id) setSelectedGroupId(id); });
@@ -473,6 +474,22 @@ export default function HomeScreen() {
     }
   }, [isDrinkMode, drinkCategories]);
 
+  // Re-measure sticky counter position after layout settles
+  useEffect(() => {
+    if (!isDrinkMode) return;
+    const t = setTimeout(() => {
+      const scrollNode = (scrollRef.current as any)?.getScrollableNode?.() ?? scrollRef.current;
+      if (scrollNode && counterWrapRef.current) {
+        counterWrapRef.current.measureLayout(
+          scrollNode as any,
+          (_x, y) => { counterNaturalY.current = y; },
+          () => {}
+        );
+      }
+    }, 100);
+    return () => clearTimeout(t);
+  }, [isDrinkMode, drinkCategories.length, group?.id]);
+
   // ── Live badge: auto-expires at the exact moment the 10-min window closes ──
   const [isLive, setIsLive] = useState(false);
 
@@ -752,7 +769,7 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
         onScroll={isDrinkMode ? (e: any) => {
           const y = e.nativeEvent.contentOffset.y;
-          const stickyPoint = counterNaturalY.current - insets.top - 120;
+          const stickyPoint = counterNaturalY.current - (insets.top + 8);
           setCounterSticky(y > stickyPoint && stickyPoint > 0);
         } : undefined}
         refreshControl={
@@ -840,7 +857,18 @@ export default function HomeScreen() {
             {/* Counter inline in drink-mode (invisible when sticky, keeps layout space) */}
             {isDrinkMode && (
               <View
-                onLayout={(e) => { counterNaturalY.current = e.nativeEvent.layout.y; }}
+                ref={counterWrapRef}
+                collapsable={false}
+                onLayout={() => {
+                  const scrollNode = (scrollRef.current as any)?.getScrollableNode?.() ?? scrollRef.current;
+                  if (scrollNode && counterWrapRef.current) {
+                    counterWrapRef.current.measureLayout(
+                      scrollNode as any,
+                      (_x, y) => { counterNaturalY.current = y; },
+                      () => {}
+                    );
+                  }
+                }}
                 style={counterSticky ? { opacity: 0 } : undefined}
               >
                 {counterContent}
