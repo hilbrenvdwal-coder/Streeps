@@ -404,7 +404,6 @@ const s = StyleSheet.create({
   },
 
   btnClean: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
