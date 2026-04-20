@@ -769,6 +769,15 @@ export default function HomeScreen() {
                 >
                   {group.name}
                 </Text>
+                <Pressable
+                  onPress={() => openSettings()}
+                  hitSlop={10}
+                  style={({ pressed }) => [s.gearBtn, pressed && { opacity: 0.6 }]}
+                  accessibilityLabel="Instellingen"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="settings-outline" size={22} color="rgba(241,241,241,0.7)" />
+                </Pressable>
                 {/* SVG Group 13: radial glow + up/down arrows */}
                 <View style={s.chevronWrap} pointerEvents="none">
                   <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
@@ -942,7 +951,7 @@ export default function HomeScreen() {
 
             {/* ── Drankenlijst ── */}
             {drinks.length === 0 && isAdmin && (
-              <Pressable style={s.emptyState} onPress={openSettings}>
+              <Pressable style={s.emptyState} onPress={() => setShowAddDrink(true)}>
                 <Text style={s.emptyStateText}>Nog geen drankjes — tik om toe te voegen</Text>
               </Pressable>
             )}
@@ -1048,7 +1057,7 @@ export default function HomeScreen() {
                 <Ionicons name={showMoreOptions ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
               </View>
             </Pressable>
-            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onSettings={openSettings} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
+            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
 
             <View style={{ height: 90 + insets.bottom }} />
           </Animated.View>
@@ -1474,6 +1483,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  gearBtn: { padding: 4 },
   activePill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1939,7 +1949,7 @@ const styles = StyleSheet.create({
 });
 
 // ── MoreOptionsPanel: animated expand/collapse ──
-function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: boolean; isAdmin: boolean; onSettings: () => void; onLeave: () => void }) {
+function MoreOptionsPanel({ visible, isAdmin, onLeave }: { visible: boolean; isAdmin: boolean; onLeave: () => void }) {
   const anim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
 
@@ -1961,11 +1971,6 @@ function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: 
 
   return (
     <Animated.View style={{ maxHeight, opacity, overflow: 'hidden' as const }}>
-      {isAdmin && (
-        <Pressable style={{ marginTop: 24, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' }} onPress={onSettings}>
-          <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FFFFFF' }}>Instellingen</Text>
-        </Pressable>
-      )}
       <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,77,0.5)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
         <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF004D' }}>Uitstappen</Text>
       </Pressable>
