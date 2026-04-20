@@ -189,6 +189,7 @@ export default function HomeScreen() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [counterSticky, setCounterSticky] = useState(false);
   const counterNaturalY = useRef(0);
+  const stickyFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((id) => { if (id) setSelectedGroupId(id); });
@@ -472,6 +473,15 @@ export default function HomeScreen() {
       }
     }
   }, [isDrinkMode, drinkCategories]);
+
+  // Fade-in sticky counter overlay when mounted
+  useEffect(() => {
+    if (counterSticky) {
+      Animated.timing(stickyFade, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    } else {
+      stickyFade.setValue(0);
+    }
+  }, [counterSticky, stickyFade]);
 
   // ── Live badge: auto-expires at the exact moment the 10-min window closes ──
   const [isLive, setIsLive] = useState(false);
@@ -1109,7 +1119,7 @@ export default function HomeScreen() {
 
       {/* ── Sticky counter overlay (drink-mode) ── */}
       {counterSticky && isDrinkMode && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }} pointerEvents="box-none">
+        <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, opacity: stickyFade }} pointerEvents="box-none">
           <LinearGradient
             colors={['#0E0D1C', '#0E0D1C', 'rgba(14,13,28,0)']}
             style={{ paddingTop: insets.top + 8, paddingBottom: 20, paddingHorizontal: 12, alignItems: 'stretch' }}
@@ -1136,7 +1146,7 @@ export default function HomeScreen() {
               activeColor={selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined}
             />
           </LinearGradient>
-        </View>
+        </Animated.View>
       )}
 
       {/* ── Avatar preview overlay ── */}
