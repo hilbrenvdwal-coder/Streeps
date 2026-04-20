@@ -961,7 +961,7 @@ export default function HomeScreen() {
                       accessibilityRole="button"
                       style={({ pressed }) => [s.addDrinkHeaderBtn, pressed && { opacity: 0.85 }]}
                     >
-                      <Ionicons name="add" size={16} color="#FFFFFF" />
+                      <Ionicons name="add" size={16} color="#00BEAE" />
                       <Text style={s.addDrinkHeaderBtnText}>drank</Text>
                     </Pressable>
                   ) : (
@@ -1645,15 +1645,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#00BEAE',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
   },
   addDrinkHeaderBtnText: {
     fontFamily: 'Unbounded',
     fontSize: 13,
-    color: '#FFFFFF',
+    color: '#00BEAE',
     fontWeight: '600',
   },
   drankenlijstList: {

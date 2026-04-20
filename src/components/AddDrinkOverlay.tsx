@@ -3,6 +3,7 @@ import {
   Animated,
   Easing,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 interface Props {
@@ -53,6 +55,7 @@ export default function AddDrinkOverlay({
   addDrink,
   onDone,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [show, setShow] = useState(false);
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   const contentAnim = useRef(new Animated.Value(0)).current;
@@ -157,29 +160,42 @@ export default function AddDrinkOverlay({
   const contentAnimStyle = {
     opacity: contentAnim,
     transform: [
-      { translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
+      { translateY: contentAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) },
     ],
   };
 
   const submitDisabled = !nameInput.trim() || sending;
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      {/* Scrim */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]} pointerEvents="auto">
-        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
-        <View style={s.scrim} />
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={onDoneWithToast} />
-      </Animated.View>
+    <Modal
+      transparent
+      statusBarTranslucent
+      animationType="none"
+      visible={show}
+      onRequestClose={onDoneWithToast}
+    >
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+        {/* Scrim */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]} pointerEvents="auto">
+          <BlurView
+            intensity={30}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={s.scrim} />
+        </Animated.View>
 
-      {/* Card */}
-      <View style={s.cardWrap} pointerEvents="box-none">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          pointerEvents="box-none"
-          style={{ width: '100%', alignItems: 'center' }}
-        >
-          <Animated.View style={[s.card, contentAnimStyle]}>
+        {/* Content */}
+        <View style={{ flex: 1 }}>
+          <Animated.View
+            style={[
+              s.container,
+              { paddingTop: insets.top + 20 },
+              contentAnimStyle,
+            ]}
+            pointerEvents="auto"
+          >
             {/* Header */}
             <View style={s.header}>
               <Pressable onPress={onDoneWithToast} hitSlop={12} accessibilityLabel="Sluiten" accessibilityRole="button">
@@ -189,124 +205,131 @@ export default function AddDrinkOverlay({
               <View style={{ width: 24 }} />
             </View>
 
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 8 }}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={{ flex: 1 }}
+              keyboardVerticalOffset={-(insets.bottom + 16)}
             >
-              {/* Naam */}
-              <Text style={s.label}>Naam</Text>
-              <TextInput
-                value={nameInput}
-                onChangeText={setNameInput}
-                placeholder="Bier"
-                placeholderTextColor="#6B6B6B"
-                style={s.input}
-                autoCapitalize="sentences"
-                returnKeyType="next"
-              />
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 24 }}
+                style={{ flex: 1 }}
+              >
+                {/* Naam */}
+                <Text style={s.label}>Naam</Text>
+                <TextInput
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  placeholder="Bier"
+                  placeholderTextColor="#6B6B6B"
+                  style={s.input}
+                  autoCapitalize="sentences"
+                  returnKeyType="next"
+                />
 
-              {/* Emoji */}
-              <Text style={s.label}>Emoji</Text>
-              <TextInput
-                value={emojiInput}
-                onChangeText={(v) => setEmojiInput(v.slice(0, 2))}
-                placeholder="🍺"
-                placeholderTextColor="#6B6B6B"
-                style={s.input}
-                maxLength={2}
-              />
+                {/* Emoji */}
+                <Text style={s.label}>Emoji</Text>
+                <TextInput
+                  value={emojiInput}
+                  onChangeText={(v) => setEmojiInput(v.slice(0, 2))}
+                  placeholder="🍺"
+                  placeholderTextColor="#6B6B6B"
+                  style={s.input}
+                  maxLength={2}
+                />
 
-              {isDrinkMode ? (
-                <>
-                  <Text style={s.label}>Prijs</Text>
-                  <View style={s.priceInputWrap}>
-                    <Text style={s.priceEuroPrefix}>€</Text>
-                    <TextInput
-                      value={priceInput}
-                      onChangeText={setPriceInput}
-                      placeholder="1,50"
-                      placeholderTextColor="#6B6B6B"
-                      style={s.priceInput}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={s.label}>Categorie</Text>
-                  <View style={s.catPillRow}>
-                    {activeCategories.map((cat) => {
-                      const color = categoryColors[(cat - 1) % categoryColors.length];
-                      const selected = selectedCategory === cat;
-                      return (
-                        <Pressable
-                          key={cat}
-                          onPress={() => {
-                            setSelectedCategory(cat);
-                            Haptics.selectionAsync();
-                          }}
-                          style={[
-                            s.catPill,
-                            {
-                              backgroundColor: selected ? color : color + '20',
-                              borderColor: color,
-                              borderWidth: selected ? 0 : 1,
-                            },
-                          ]}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                        >
-                          <Text
+                {isDrinkMode ? (
+                  <>
+                    <Text style={s.label}>Prijs</Text>
+                    <View style={s.priceInputWrap}>
+                      <Text style={s.priceEuroPrefix}>€</Text>
+                      <TextInput
+                        value={priceInput}
+                        onChangeText={setPriceInput}
+                        placeholder="1,50"
+                        placeholderTextColor="#6B6B6B"
+                        style={s.priceInput}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={s.label}>Categorie</Text>
+                    <View style={s.catPillRow}>
+                      {activeCategories.map((cat) => {
+                        const color = categoryColors[(cat - 1) % categoryColors.length];
+                        const selected = selectedCategory === cat;
+                        return (
+                          <Pressable
+                            key={cat}
+                            onPress={() => {
+                              setSelectedCategory(cat);
+                              Haptics.selectionAsync();
+                            }}
                             style={[
-                              s.catPillText,
-                              { color: selected ? '#0F0F1E' : color },
+                              s.catPill,
+                              {
+                                backgroundColor: selected ? color : color + '20',
+                                borderColor: color,
+                                borderWidth: selected ? 0 : 1,
+                              },
                             ]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
                           >
-                            {getCategoryName(cat)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </>
-              )}
+                            <Text
+                              style={[
+                                s.catPillText,
+                                { color: selected ? '#0F0F1E' : color },
+                              ]}
+                            >
+                              {getCategoryName(cat)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
 
-              {addedCount > 0 && (
-                <Text style={s.addedCountHint}>
-                  {addedCount === 1 ? '1 drankje toegevoegd' : `${addedCount} drankjes toegevoegd`}
-                </Text>
-              )}
-            </ScrollView>
+                {addedCount > 0 && (
+                  <Text style={s.addedCountHint}>
+                    {addedCount === 1 ? '1 drankje toegevoegd' : `${addedCount} drankjes toegevoegd`}
+                  </Text>
+                )}
+              </ScrollView>
 
-            {/* Footer */}
-            <View style={s.footer}>
-              <Pressable
-                onPress={handleSubmit}
-                disabled={submitDisabled}
-                style={({ pressed }) => [
-                  s.primaryBtn,
-                  submitDisabled && { opacity: 0.45 },
-                  pressed && !submitDisabled && { opacity: 0.85 },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Toevoegen"
-              >
-                <Text style={s.primaryBtnText}>{sending ? 'Bezig...' : 'Toevoegen'}</Text>
-              </Pressable>
-              <Pressable
-                onPress={onDoneWithToast}
-                style={({ pressed }) => [s.ghostBtn, pressed && { opacity: 0.7 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Klaar"
-              >
-                <Text style={s.ghostBtnText}>Klaar</Text>
-              </Pressable>
-            </View>
+              {/* Footer */}
+              <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
+                <Pressable
+                  onPress={handleSubmit}
+                  disabled={submitDisabled}
+                  style={({ pressed }) => [
+                    s.primaryBtn,
+                    submitDisabled && { opacity: 0.45 },
+                    pressed && !submitDisabled && { opacity: 0.85 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Toevoegen"
+                >
+                  <Text style={s.primaryBtnText}>{sending ? 'Bezig...' : 'Toevoegen'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onDoneWithToast}
+                  style={({ pressed }) => [s.ghostBtn, pressed && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Klaar"
+                >
+                  <Text style={s.ghostBtnText}>Klaar</Text>
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
           </Animated.View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
@@ -315,20 +338,9 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.75)',
   },
-  cardWrap: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    maxHeight: '70%',
-    backgroundColor: '#1F1F1F',
-    borderRadius: 24,
+  container: {
+    flex: 1,
     paddingHorizontal: 20,
-    paddingVertical: 24,
   },
   header: {
     flexDirection: 'row',
@@ -405,7 +417,7 @@ const s = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 16,
+    paddingTop: 16,
   },
   primaryBtn: {
     flex: 1,
