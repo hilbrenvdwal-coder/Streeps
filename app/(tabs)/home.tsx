@@ -238,7 +238,14 @@ export default function HomeScreen() {
     if (!myMember.is_active) activateMe();
   }, [selectedGroupId, myMember?.is_active]);
 
-  const { settling, getUnsettledTallies, createSettlement, fetchHistory, history } = useSettlements(selectedGroupId ?? '');
+  const { settling, getUnsettledTallies, createSettlement, fetchHistory, history, groupTotalCents, refreshGroupTotal } = useSettlements(selectedGroupId ?? '');
+
+  // Refresh group total when tallies change (admin only)
+  useEffect(() => {
+    if (group && isAdmin) {
+      refreshGroupTotal(group);
+    }
+  }, [group, isAdmin, recentTallies?.length, refreshGroupTotal]);
 
   // Tally flow state
   const [selectedCategory, setSelectedCategory] = useState<number | null>(1);
@@ -1011,9 +1018,23 @@ export default function HomeScreen() {
             {/* ── Admin actions ── */}
             {isAdmin && (
               <View style={s.adminSection}>
-                <Pressable style={s.adminBtn} onPress={handleOpenSettlement} disabled={settling}>
-                  <Text style={s.adminBtnText}>{settling ? 'Bezig...' : 'Afrekenen'}</Text>
-                </Pressable>
+                <View style={s.settleRow}>
+                  <View style={s.settleTotalBox}>
+                    <Text style={s.settleTotalLabel}>OPENSTAAND</Text>
+                    <Text style={s.settleTotalAmount}>
+                      €{(groupTotalCents / 100).toFixed(2).replace('.', ',')}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={[s.settleBtn, (settling || groupTotalCents === 0) && s.settleBtnDisabled]}
+                    onPress={handleOpenSettlement}
+                    disabled={settling || groupTotalCents === 0}
+                  >
+                    <Text style={[s.settleBtnText, (settling || groupTotalCents === 0) && s.settleBtnTextDisabled]}>
+                      {settling ? 'Bezig...' : 'Afrekenen'}
+                    </Text>
+                  </Pressable>
+                </View>
                 <Pressable style={s.ghostBtn} onPress={async () => { await fetchHistory(); setShowSettlementHistory(true); }}>
                   <Text style={s.ghostBtnText}>Afrekening historie</Text>
                 </Pressable>
@@ -1724,6 +1745,57 @@ const styles = StyleSheet.create({
     backgroundColor: '#00BEAE',
   },
   adminBtnText: { fontFamily: 'Unbounded', color: '#0F0F1E', fontSize: 16, fontWeight: '700' },
+  settleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  settleTotalBox: {
+    flex: 1,
+    height: 52,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 190, 174, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 190, 174, 0.35)',
+    paddingHorizontal: 12,
+  },
+  settleTotalLabel: {
+    fontFamily: 'Unbounded',
+    color: '#A0A0B8',
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  settleTotalAmount: {
+    fontFamily: 'Unbounded',
+    color: '#00BEAE',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  settleBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00BEAE',
+  },
+  settleBtnDisabled: {
+    backgroundColor: '#2D2D44',
+    opacity: 0.6,
+  },
+  settleBtnText: {
+    fontFamily: 'Unbounded',
+    color: '#0F0F1E',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  settleBtnTextDisabled: {
+    color: '#A0A0B8',
+  },
   ghostBtn: {
     height: 48,
     borderRadius: 9999,

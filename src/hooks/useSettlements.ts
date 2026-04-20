@@ -29,6 +29,7 @@ export function useSettlements(groupId: string) {
   const { user } = useAuth();
   const [settling, setSettling] = useState(false);
   const [history, setHistory] = useState<SettlementHistoryItem[]>([]);
+  const [groupTotalCents, setGroupTotalCents] = useState(0);
 
   const getCategoryPrice = useCallback((group: Group, catNum: number): number => {
     switch (catNum) {
@@ -278,11 +279,24 @@ export function useSettlements(groupId: string) {
     }
   }, [groupId]);
 
+  const refreshGroupTotal = useCallback(async (group: Group) => {
+    try {
+      const members = await getUnsettledTallies(group);
+      const total = members.reduce((s, m) => s + m.amount, 0);
+      setGroupTotalCents(total);
+    } catch (e) {
+      // stil falen — geen blocker voor UI
+      console.warn('[useSettlements] refreshGroupTotal failed', e);
+    }
+  }, [getUnsettledTallies]);
+
   return {
     settling,
     history,
+    groupTotalCents,
     getUnsettledTallies,
     createSettlement,
     fetchHistory,
+    refreshGroupTotal,
   };
 }
