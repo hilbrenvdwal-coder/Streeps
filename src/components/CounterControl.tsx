@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, PanResponder, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Animated, Easing, PanResponder, Platform, StyleSheet, Text, View, Pressable } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
 import ReAnimated, {
   useSharedValue,
@@ -292,6 +293,12 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
       {/* ── Minus button ── */}
       <Pressable style={[s.glowWrap, s.minusGlow]} onPress={() => { if (!minusRepeat.fired.current) onDecrement(); }} onPressIn={() => { minus.fadeIn(); minusRepeat.start(); }} onPressOut={() => { minus.fadeOut(); minusRepeat.stop(); }} onResponderTerminate={() => { minusRepeat.stop(); }} hitSlop={10}>
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(minus.opacity, 0.4) as any) as any }]}>
+          <BlurView
+            intensity={30}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+            style={StyleSheet.absoluteFillObject}
+          />
           <Svg width={32} height={32} viewBox="0 0 32 32">
             <Path d="M8 16 L24 16" stroke="#F1F1F1" strokeWidth={4} strokeLinecap="round" />
           </Svg>
@@ -347,6 +354,12 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
       {/* ── Plus button ── */}
       <Pressable style={[s.glowWrap, s.plusGlow]} onPress={() => { if (!plusRepeat.fired.current) onIncrement(); }} onPressIn={() => { plus.fadeIn(); plusRepeat.start(); }} onPressOut={() => { plus.fadeOut(); plusRepeat.stop(); }} onResponderTerminate={() => { plusRepeat.stop(); }} hitSlop={10}>
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(plus.opacity, 0.4) as any) as any }]}>
+          <BlurView
+            intensity={30}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+            style={StyleSheet.absoluteFillObject}
+          />
           <Svg width={32} height={32} viewBox="0 0 32 32">
             <Path d="M16 6 L16 26 M6 16 L26 16" stroke="#F1F1F1" strokeWidth={4} strokeLinecap="round" />
           </Svg>
