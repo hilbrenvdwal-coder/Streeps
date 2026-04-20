@@ -4003,7 +4003,7 @@ export default function ChatScreen() {
             keyExtractor={(c) => c.id}
             refreshing={isManualRefresh}
             onRefresh={handleManualRefresh}
-            contentContainerStyle={{ paddingTop: 32, paddingBottom: 160 }}
+            contentContainerStyle={{ paddingTop: 24, paddingBottom: 160 }}
             showsVerticalScrollIndicator={false}
             viewabilityConfig={viewabilityConfig}
             onViewableItemsChanged={onViewableItemsChanged}
