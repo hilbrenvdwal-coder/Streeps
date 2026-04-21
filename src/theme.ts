@@ -47,6 +47,23 @@ export const aurora = {
   purple: 'rgba(139, 92, 246, 0.25)',
 } as const;
 
+// ─── Aurora Palettes (per tab/screen) ───────────────────────────────────────
+
+/**
+ * Aurora-background palettes per tab/screen.
+ * Used by AuroraPresetView via the `colors` prop.
+ * Order of colors corresponds to the 4 aurora layers (top-left → bottom-right).
+ */
+export const auroraPalettes = {
+  chat:       [brand.magenta, brand.cyan, '#FF00F5', brand.green],
+  explore:    [brand.green, brand.streepsWhite, brand.inactive, brand.green],
+  history:    ['#FF0015', '#FF00F5', brand.streepsWhite, '#FF00F5'],
+  settlement: ['#FF0015', '#FF00F5', brand.streepsWhite, '#FF00F5'],
+  home:       [brand.magenta, brand.cyan, '#FF00F5', brand.green],
+} as const;
+
+export type AuroraPaletteKey = keyof typeof auroraPalettes;
+
 // ─── Category Colors ────────────────────────────────────────────────────────
 
 export const categoryColors = [
