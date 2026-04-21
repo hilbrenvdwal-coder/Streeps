@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Keyboard,
-  Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,11 +15,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { supabase } from '@/src/lib/supabase';
 import { brand, colors, radius, space, typography } from '@/src/theme';
+import { useSwipeDismiss } from '@/src/hooks/useSwipeDismiss';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -135,7 +139,7 @@ const rowStyles = StyleSheet.create({
   },
 });
 
-// ─── Main modal ──────────────────────────────────────────────────────────────
+// ─── Main overlay ────────────────────────────────────────────────────────────
 
 export default function SearchGroupsModal({ visible, onClose, onGroupPress }: Props) {
   const insets = useSafeAreaInsets();
@@ -143,7 +147,10 @@ export default function SearchGroupsModal({ visible, onClose, onGroupPress }: Pr
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<TextInput | null>(null);
+
+  const [show, setShow] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
+  const { swipeX, scrimOpacity, panHandlers } = useSwipeDismiss(onClose, anim);
 
   // Seq-guard zodat stale responses niet over een nieuwere heenkomen.
   const searchSeqRef = useRef(0);
@@ -208,21 +215,31 @@ export default function SearchGroupsModal({ visible, onClose, onGroupPress }: Pr
     };
   }, [query, runSearch]);
 
-  // Reset state bij sluiten.
+  // Open/close animatie + state reset NA sluiten.
   useEffect(() => {
-    if (!visible) {
-      setQuery('');
-      setResults([]);
-      setError(null);
-      setLoading(false);
-      searchSeqRef.current++;
+    if (visible && !show) {
+      swipeX.setValue(0);
+      setShow(true);
+      anim.setValue(0);
+      Animated.spring(anim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
+    } else if (!visible && show) {
+      Animated.timing(anim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(() => {
+        setShow(false);
+        // Reset search state NA animatie zodat lijst niet flickert
+        setQuery('');
+        setResults([]);
+        setError(null);
+        setLoading(false);
+        searchSeqRef.current += 1;
+      });
     }
-  }, [visible]);
+  }, [visible, show, anim, swipeX]);
 
-  const handleClose = useCallback(() => {
-    Keyboard.dismiss();
-    onClose();
-  }, [onClose]);
+  const animateClose = useCallback(() => {
+    Animated.timing(anim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(() => {
+      onClose();
+    });
+  }, [anim, onClose]);
 
   const handleResultPress = useCallback(
     (groupId: string) => {
@@ -238,108 +255,139 @@ export default function SearchGroupsModal({ visible, onClose, onGroupPress }: Pr
   const showNoResults =
     !loading && !showEmptyHint && !error && results.length === 0;
 
+  if (!show) return null;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={handleClose}
-    >
-      <View style={styles.root}>
-        <LinearGradient
-          colors={[brand.bg.from, brand.bg.to]}
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: scrimOpacity }]} pointerEvents="auto">
+        <BlurView
+          intensity={30}
+          tint="dark"
+          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
           style={StyleSheet.absoluteFillObject}
         />
+        <View style={styles.scrim} />
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={() => { Keyboard.dismiss(); animateClose(); }} />
+      </Animated.View>
 
-        {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top + space[2] }]}>
-          <Pressable
-            onPress={handleClose}
-            hitSlop={10}
-            style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
-          >
-            <Ionicons name="close" size={24} color={colors.dark.text.primary} />
-          </Pressable>
-          <TextInput
-            ref={inputRef}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Zoek een groep"
-            placeholderTextColor={brand.inactive}
-            autoFocus
-            autoCorrect={false}
-            autoCapitalize="none"
-            returnKeyType="search"
-            style={styles.input}
-          />
-        </View>
+      <Animated.View
+        style={[
+          styles.content,
+          {
+            paddingTop: insets.top + 12,
+            opacity: anim,
+            transform: [{ translateX: Animated.add(swipeX, anim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] })) }],
+          },
+        ]}
+        pointerEvents="auto"
+        {...panHandlers}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => { Keyboard.dismiss(); animateClose(); }}
+              hitSlop={12}
+              style={styles.backBtn}
+            >
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+            </Pressable>
+            <Text style={styles.title}>Zoeken</Text>
+            <View style={styles.backBtn} />
+          </View>
 
-        {/* Body */}
-        <View style={styles.body}>
-          {showEmptyHint ? (
-            <View style={styles.stateWrap}>
-              <Text style={styles.stateText}>Begin met typen...</Text>
-            </View>
-          ) : loading ? (
-            <View style={styles.stateWrap}>
-              <ActivityIndicator color={brand.inactive} />
-            </View>
-          ) : error ? (
-            <View style={styles.stateWrap}>
-              <Text style={styles.stateText}>{error}</Text>
-            </View>
-          ) : showNoResults ? (
-            <View style={styles.stateWrap}>
-              <Text style={styles.stateText}>Geen groepen gevonden</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={results}
-              keyExtractor={(r) => r.id}
-              renderItem={({ item }) => (
-                <ResultRow item={item} onPress={() => handleResultPress(item.id)} />
-              )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.listContent}
+          {/* Zoekbalk */}
+          <View style={styles.searchWrap}>
+            <Ionicons name="search-outline" size={18} color="#848484" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="Zoek groepen..."
+              placeholderTextColor="#848484"
+              value={query}
+              onChangeText={setQuery}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
             />
-          )}
-        </View>
-      </View>
-    </Modal>
+          </View>
+
+          {/* Body */}
+          <View style={styles.body}>
+            {showEmptyHint ? (
+              <View style={styles.stateWrap}>
+                <Text style={styles.stateText}>Begin met typen...</Text>
+              </View>
+            ) : loading ? (
+              <View style={styles.stateWrap}>
+                <ActivityIndicator color={brand.inactive} />
+              </View>
+            ) : error ? (
+              <View style={styles.stateWrap}>
+                <Text style={styles.stateText}>{error}</Text>
+              </View>
+            ) : showNoResults ? (
+              <View style={styles.stateWrap}>
+                <Text style={styles.stateText}>Geen groepen gevonden</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={results}
+                keyExtractor={(r) => r.id}
+                renderItem={({ item }) => (
+                  <ResultRow item={item} onPress={() => handleResultPress(item.id)} />
+                )}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.listContent}
+              />
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
+  content: { flex: 1, paddingHorizontal: 20 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: space[3],
-    paddingBottom: space[3],
-    gap: space[2],
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  closeBtn: {
-    width: 36,
-    height: 36,
+  backBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.full,
   },
-  pressed: {
-    opacity: 0.6,
+  title: {
+    fontFamily: 'Unbounded',
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius.full,
+    paddingHorizontal: 16,
+    height: 48,
+    marginBottom: 16,
   },
   input: {
     flex: 1,
-    height: 40,
-    paddingHorizontal: space[3],
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     color: colors.dark.text.primary,
     ...typography.body,
     fontFamily: 'Unbounded',
+    padding: 0,
   },
   body: {
     flex: 1,
