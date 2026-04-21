@@ -40,9 +40,20 @@ const HORIZONTAL_PADDING = space[3]; // 12
 const VERTICAL_PADDING = space[2]; // 8
 const TOP_BAR_HEIGHT = AVATAR_SIZE + space[2]; // 32 + 8 = 40
 const BOTTOM_RESERVE = 28; // ruimte voor LIVE-badge rechts-onder
-// Pill approximations — voor clamping/bounds
+// Pill approximations — voor collision-check/bounds
 const PILL_ESTIMATED_WIDTH = 60;
 const PILL_ESTIMATED_HEIGHT = 28;
+
+// Extra rand-buffer zodat pills niet tegen de kaartrand plakken
+const EDGE_BUFFER = 8;
+// Avatar+naam zone reservering (top-left) — breedte × hoogte
+const AVATAR_ZONE_W = 150;
+const AVATAR_ZONE_H = 30;
+// LIVE-badge zone reservering (bottom-right) — breedte × hoogte
+const LIVE_ZONE_W = 80;
+const LIVE_ZONE_H = 30;
+// Max jitter als fractie van celbreedte/hoogte
+const JITTER_FRACTION = 0.15;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -87,33 +98,138 @@ interface PillLayout {
 }
 
 /**
- * Plaats N pills pseudo-random binnen het beschikbare canvas.
- * Canvas is ITEM_HEIGHT hoog × containerWidth breed, maar we reserveren:
- *   - top: TOP_BAR_HEIGHT (avatar+naam)
- *   - bottom: BOTTOM_RESERVE (LIVE-badge rechts-onder)
- *   - sides: HORIZONTAL_PADDING
+ * Kies grid-kolommen en -rijen voor N pills.
+ * Doel: zo vierkant mogelijk, met voorkeur voor meer kolommen dan rijen.
+ *
+ * N=1  → 1×1
+ * N=2  → 2×1
+ * N=3  → 3×1
+ * N=4  → 2×2
+ * N=5-6→ 3×2
+ * N=7-9→ 3×3
+ * N≥10 → 4×ceil(N/4)
+ */
+function chooseGrid(n: number): { cols: number; rows: number } {
+  if (n <= 1) return { cols: 1, rows: 1 };
+  if (n <= 2) return { cols: 2, rows: 1 };
+  if (n <= 3) return { cols: 3, rows: 1 };
+  if (n <= 4) return { cols: 2, rows: 2 };
+  if (n <= 6) return { cols: 3, rows: 2 };
+  if (n <= 9) return { cols: 3, rows: 3 };
+  return { cols: 4, rows: Math.ceil(n / 4) };
+}
+
+/**
+ * Controleer of een punt (cx, cy) — het centrum van een pill — in een
+ * gereserveerde zone valt (top-left avatar of bottom-right LIVE badge).
+ * cx/cy zijn relatief aan de canvas-linkerbovenhoek.
+ */
+function inReservedZone(
+  cx: number,
+  cy: number,
+  canvasW: number,
+  canvasH: number,
+): boolean {
+  // Avatar-naam zone: top-left
+  if (cx < AVATAR_ZONE_W && cy < AVATAR_ZONE_H) return true;
+  // LIVE-badge zone: bottom-right
+  if (
+    cx > canvasW - LIVE_ZONE_W - PILL_ESTIMATED_WIDTH &&
+    cy > canvasH - LIVE_ZONE_H
+  )
+    return true;
+  return false;
+}
+
+/**
+ * Plaats N pills via jittered-grid binnen het beschikbare canvas.
+ *
+ * Canvas-bounds:
+ *   - X: [HORIZONTAL_PADDING + EDGE_BUFFER … containerWidth - HORIZONTAL_PADDING - EDGE_BUFFER - PILL_W]
+ *   - Y: [TOP_BAR_HEIGHT + VERTICAL_PADDING + EDGE_BUFFER … ITEM_HEIGHT - BOTTOM_RESERVE - EDGE_BUFFER - PILL_H]
+ *
+ * Grid-cellen worden gelijkmatig verdeeld; elke pill krijgt het cel-centrum
+ * plus een kleine deterministisch jitter (max JITTER_FRACTION × celafmeting).
+ *
+ * Gereserveerde zones (avatar top-left, LIVE bottom-right) worden gemeden;
+ * indien een cel daarin valt wordt de jitter als tegengesteld gespiegeld.
  */
 function computePillLayouts(
   count: number,
   containerWidth: number,
   seed: string,
 ): PillLayout[] {
+  if (count === 0) return [];
+
   const rng = createRng(seed);
-  const minX = HORIZONTAL_PADDING;
-  const maxX = Math.max(
-    minX + 1,
-    containerWidth - HORIZONTAL_PADDING - PILL_ESTIMATED_WIDTH,
-  );
-  const minY = TOP_BAR_HEIGHT + VERTICAL_PADDING;
-  const maxY = Math.max(
-    minY + 1,
-    ITEM_HEIGHT - BOTTOM_RESERVE - PILL_ESTIMATED_HEIGHT,
-  );
+
+  // Canvas-bounds voor pill-origins (top-left hoek van pill)
+  const canvasX0 = HORIZONTAL_PADDING + EDGE_BUFFER;
+  const canvasX1 = containerWidth - HORIZONTAL_PADDING - EDGE_BUFFER - PILL_ESTIMATED_WIDTH;
+  const canvasY0 = TOP_BAR_HEIGHT + VERTICAL_PADDING + EDGE_BUFFER;
+  const canvasY1 = ITEM_HEIGHT - BOTTOM_RESERVE - EDGE_BUFFER - PILL_ESTIMATED_HEIGHT;
+
+  const canvasW = Math.max(1, canvasX1 - canvasX0);
+  const canvasH = Math.max(1, canvasY1 - canvasY0);
+
+  // N=1: gecentreerd, geen grid nodig
+  if (count === 1) {
+    const x = canvasX0 + canvasW / 2 - PILL_ESTIMATED_WIDTH / 2;
+    const y = canvasY0 + canvasH / 2 - PILL_ESTIMATED_HEIGHT / 2;
+    return [
+      {
+        x,
+        y,
+        ampX: 3 + rng() * 3,
+        ampY: 3 + rng() * 3,
+        duration: 2000 + Math.floor(rng() * 2000),
+        delay: Math.floor(rng() * 1500),
+        phaseX: rng() * Math.PI * 2,
+        phaseY: rng() * Math.PI * 2,
+      },
+    ];
+  }
+
+  const { cols, rows } = chooseGrid(count);
+  const cellW = canvasW / cols;
+  const cellH = canvasH / rows;
+
+  // Max jitter in absolute pt
+  const maxJitterX = cellW * JITTER_FRACTION;
+  const maxJitterY = cellH * JITTER_FRACTION;
 
   const layouts: PillLayout[] = [];
+
   for (let i = 0; i < count; i++) {
-    const x = minX + rng() * (maxX - minX);
-    const y = minY + rng() * (maxY - minY);
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+
+    // Cel-centrum (relatief aan canvas)
+    const cellCenterX = (col + 0.5) * cellW;
+    const cellCenterY = (row + 0.5) * cellH;
+
+    // Deterministisch jitter
+    const jitterX = (rng() * 2 - 1) * maxJitterX;
+    const jitterY = (rng() * 2 - 1) * maxJitterY;
+
+    // Pill top-left (relatief aan canvas-origin)
+    let relX = cellCenterX + jitterX - PILL_ESTIMATED_WIDTH / 2;
+    let relY = cellCenterY + jitterY - PILL_ESTIMATED_HEIGHT / 2;
+
+    // Absolute canvas-ruimte voor reserved-zone check (centrum van pill)
+    const pillCenterX = relX + PILL_ESTIMATED_WIDTH / 2;
+    const pillCenterY = relY + PILL_ESTIMATED_HEIGHT / 2;
+
+    // Als pill in reserved zone: spiegel jitter om cel-centrum
+    if (inReservedZone(pillCenterX + canvasX0, pillCenterY + canvasY0, containerWidth, canvasH)) {
+      relX = cellCenterX - jitterX - PILL_ESTIMATED_WIDTH / 2;
+      relY = cellCenterY - jitterY - PILL_ESTIMATED_HEIGHT / 2;
+    }
+
+    // Clampen zodat pill binnen canvas-bounds blijft
+    const x = canvasX0 + Math.max(0, Math.min(relX, canvasW - PILL_ESTIMATED_WIDTH));
+    const y = canvasY0 + Math.max(0, Math.min(relY, canvasH - PILL_ESTIMATED_HEIGHT));
+
     layouts.push({
       x,
       y,
@@ -127,6 +243,7 @@ function computePillLayouts(
       phaseY: rng() * Math.PI * 2,
     });
   }
+
   return layouts;
 }
 
