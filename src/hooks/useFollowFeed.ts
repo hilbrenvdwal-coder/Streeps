@@ -35,7 +35,7 @@ export interface FeedBucketItem {
   groupName: string;
   groupAvatarUrl: string | null;
   isLive: boolean;
-  drinkCounts: Array<{ emoji: string; count: number; drinkId?: string }>;
+  drinkCounts: Array<{ emoji: string; count: number; drinkId?: string; name?: string }>;
 }
 
 export interface FeedBucket {
@@ -234,7 +234,7 @@ export function useFollowFeed() {
         groupId: string;
         groupName: string;
         groupAvatarUrl: string | null;
-        counts: Map<string, { emoji: string; count: number; drinkId?: string }>;
+        counts: Map<string, { emoji: string; count: number; drinkId?: string; name?: string }>;
       };
       const byGroup = new Map<string, GroupAgg>();
       for (const row of items) {
@@ -260,6 +260,7 @@ export function useFollowFeed() {
             emoji,
             count: 1,
             drinkId: row.drink_id ?? undefined,
+            name: row.drink_name ?? undefined,
           });
         }
       }

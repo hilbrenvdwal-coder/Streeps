@@ -24,6 +24,8 @@ export interface ExploreFeedItemGroup {
 export interface ExploreFeedDrinkCount {
   emoji: string;
   count: number;
+  drinkId?: string;
+  name?: string;
 }
 
 interface ExploreFeedItemProps {
@@ -59,7 +61,7 @@ const PILL_ESTIMATED_WIDTH = 60;
 const PILL_ESTIMATED_HEIGHT = 28;
 
 // Extra rand-buffer zodat pills niet tegen de kaartrand plakken
-const EDGE_BUFFER = 8;
+const EDGE_BUFFER = 12;
 // Avatar+naam zone reservering (top-left) — breedte × hoogte
 const AVATAR_ZONE_W = 150;
 const AVATAR_ZONE_H = 30;
@@ -267,11 +269,33 @@ interface FloatingPillProps {
   layout: PillLayout;
   emoji: string;
   count: number;
+  label?: string;
+  pillId: string;
+  isExpanded: boolean;
+  onPress: () => void;
+  /** Container-breedte voor edge-detectie (label links vs rechts). */
+  containerWidth: number;
 }
 
-function FloatingPill({ layout, emoji, count }: FloatingPillProps) {
+function FloatingPill({
+  layout,
+  emoji,
+  count,
+  label,
+  isExpanded,
+  onPress,
+  containerWidth,
+}: FloatingPillProps) {
   const tx = useRef(new Animated.Value(0)).current;
   const ty = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const labelOpacity = useRef(new Animated.Value(0)).current;
+  const labelTranslateX = useRef(new Animated.Value(-4)).current;
+
+  // Bepaal of label links of rechts van de pill komt (bij te dichte rechterrand).
+  const labelGoesLeft =
+    containerWidth > 0 &&
+    layout.x > containerWidth - HORIZONTAL_PADDING - 180;
 
   useEffect(() => {
     const loopX = Animated.loop(
@@ -330,6 +354,58 @@ function FloatingPill({ layout, emoji, count }: FloatingPillProps) {
     };
   }, [tx, ty, layout.duration, layout.delay]);
 
+  // Expand / collapse animatie.
+  useEffect(() => {
+    if (isExpanded) {
+      Animated.parallel([
+        Animated.timing(scale, {
+          toValue: 1.25,
+          duration: 220,
+          easing: Easing.out(Easing.back(1.4)),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(80),
+          Animated.parallel([
+            Animated.timing(labelOpacity, {
+              toValue: 1,
+              duration: 180,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(labelTranslateX, {
+              toValue: 0,
+              duration: 180,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(labelOpacity, {
+          toValue: 0,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(labelTranslateX, {
+          toValue: -4,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isExpanded, scale, labelOpacity, labelTranslateX]);
+
   const translateX = tx.interpolate({
     inputRange: [-1, 1],
     outputRange: [-layout.ampX, layout.ampX],
@@ -339,20 +415,65 @@ function FloatingPill({ layout, emoji, count }: FloatingPillProps) {
     outputRange: [-layout.ampY, layout.ampY],
   });
 
+  // Bij label-links invertoen we de slide-richting zodat hij vanuit de pill
+  // "uitschuift" in plaats van er vandaan.
+  const labelTranslateXFinal = labelGoesLeft
+    ? labelTranslateX.interpolate({
+        inputRange: [-4, 0],
+        outputRange: [4, 0],
+      })
+    : labelTranslateX;
+
+  const handlePress = (e: GestureResponderEvent) => {
+    // Stop bubbling zodat de parent Pressable geen single-tap naar group-overlay triggert.
+    e?.stopPropagation?.();
+    onPress();
+  };
+
+  const accessibilityLabel = label ? `${label}, ${count}` : `${emoji}, ${count}`;
+
   return (
     <Animated.View
       style={[
-        styles.pill,
+        styles.pillWrap,
         {
           left: layout.x,
           top: layout.y,
-          transform: [{ translateX }, { translateY }],
+          zIndex: isExpanded ? 10 : 1,
+          elevation: isExpanded ? 6 : 0,
+          transform: [{ translateX }, { translateY }, { scale }],
         },
       ]}
-      pointerEvents="none"
     >
-      <Text style={styles.pillEmoji}>{emoji}</Text>
-      <Text style={styles.pillCount}> {count}</Text>
+      <Pressable
+        onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        hitSlop={4}
+        style={styles.pill}
+      >
+        <Text style={styles.pillEmoji}>{emoji}</Text>
+        <Text style={styles.pillCount}> {count}</Text>
+      </Pressable>
+      {label ? (
+        <Animated.Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          pointerEvents="none"
+          style={[
+            styles.pillLabel,
+            labelGoesLeft
+              ? { right: '100%', marginRight: space[1], textAlign: 'right' }
+              : { left: '100%', marginLeft: space[1] },
+            {
+              opacity: labelOpacity,
+              transform: [{ translateX: labelTranslateXFinal }],
+            },
+          ]}
+        >
+          {label}
+        </Animated.Text>
+      ) : null}
     </Animated.View>
   );
 }
@@ -579,6 +700,29 @@ export default function ExploreFeedItem({
   const lastTapRef = useRef(0);
   const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Pill expand state ─────────────────────────────────────────────────────
+  const [expandedPillId, setExpandedPillId] = useState<string | null>(null);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePillPress = useCallback((pillId: string) => {
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    setExpandedPillId(pillId);
+    collapseTimerRef.current = setTimeout(() => {
+      setExpandedPillId(null);
+      collapseTimerRef.current = null;
+    }, 2500);
+  }, []);
+
+  // Cleanup collapse-timer bij unmount.
+  useEffect(() => {
+    return () => {
+      if (collapseTimerRef.current) {
+        clearTimeout(collapseTimerRef.current);
+        collapseTimerRef.current = null;
+      }
+    };
+  }, []);
+
   // ── Burst-animatie state (increment key per burst → forceer remount) ──────
   const [burstKey, setBurstKey] = useState(0);
   const [burstX, setBurstX] = useState(0);
@@ -678,12 +822,18 @@ export default function ExploreFeedItem({
         drinkCounts.map((d, i) => {
           const layout = layouts[i];
           if (!layout) return null;
+          const pillId = d.drinkId ?? `${d.emoji}-${i}`;
           return (
             <FloatingPill
               key={`${d.emoji}-${i}`}
               layout={layout}
               emoji={d.emoji}
               count={d.count}
+              label={d.name}
+              pillId={pillId}
+              isExpanded={expandedPillId === pillId}
+              onPress={() => handlePillPress(pillId)}
+              containerWidth={containerWidth}
             />
           );
         })}
@@ -759,8 +909,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flexShrink: 1,
   },
-  pill: {
+  pillWrap: {
     position: 'absolute',
+  },
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: space[2],
@@ -769,6 +921,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
+  },
+  pillLabel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    maxWidth: 120,
+    color: brand.streepsWhite,
+    fontSize: 12,
+    lineHeight: 28,
+    fontFamily: 'Unbounded',
   },
   pillEmoji: {
     fontSize: 14,
