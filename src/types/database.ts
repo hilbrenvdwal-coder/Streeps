@@ -128,6 +128,7 @@ export interface TallyGift {
   giver_id: string;
   recipient_id: string;
   category: number;
+  drink_id: string | null;
   quantity: number;
   redeemed: number;
   conversation_id: string | null;

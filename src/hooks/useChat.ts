@@ -501,6 +501,7 @@ export function useChatMessages(conversationId: string | null) {
   const sendGift = useCallback(async (
     recipientId: string, recipientName: string, groupId: string,
     category: number, quantity: number, categoryName: string,
+    drinkId?: string | null,
   ) => {
     if (!user || !conversationId) return;
 
@@ -513,7 +514,14 @@ export function useChatMessages(conversationId: string | null) {
       user_id: user.id,
       content,
       message_type: 'gift',
-      metadata: { recipient_id: recipientId, category, quantity, category_name: categoryName },
+      metadata: {
+        recipient_id: recipientId,
+        category,
+        quantity,
+        category_name: categoryName,
+        drink_id: drinkId ?? null,
+        drink_name: drinkId ? categoryName : null,
+      },
       created_at: new Date().toISOString(),
       profile: { full_name: giverName, avatar_url: null },
     }, ...prev]);
@@ -522,6 +530,7 @@ export function useChatMessages(conversationId: string | null) {
       group_id: groupId,
       user_id: user.id,
       category,
+      drink_id: drinkId ?? null,
       added_by: user.id,
     }));
     await supabase.from('tallies').insert(tallyInserts);
@@ -531,6 +540,7 @@ export function useChatMessages(conversationId: string | null) {
       giver_id: user.id,
       recipient_id: recipientId,
       category,
+      drink_id: drinkId ?? null,
       quantity,
       conversation_id: conversationId,
     });
@@ -540,7 +550,14 @@ export function useChatMessages(conversationId: string | null) {
       user_id: user.id,
       content,
       message_type: 'gift',
-      metadata: { recipient_id: recipientId, category, quantity, category_name: categoryName },
+      metadata: {
+        recipient_id: recipientId,
+        category,
+        quantity,
+        category_name: categoryName,
+        drink_id: drinkId ?? null,
+        drink_name: drinkId ? categoryName : null,
+      },
     });
   }, [user, conversationId]);
 
@@ -667,10 +684,13 @@ export async function sendGiftMessage(
   userId: string, userName: string, conversationId: string,
   recipientId: string, recipientName: string, groupId: string,
   category: number, quantity: number, categoryName: string,
+  drinkId?: string | null,
 ) {
   // 1. Tallies for giver (they pay)
   const tallyInserts = Array.from({ length: quantity }, () => ({
-    group_id: groupId, user_id: userId, category, added_by: userId,
+    group_id: groupId, user_id: userId, category,
+    drink_id: drinkId ?? null,
+    added_by: userId,
   }));
   const { error: e1 } = await supabase.from('tallies').insert(tallyInserts);
   if (e1) console.error('Gift tallies insert failed:', e1.message);
@@ -678,7 +698,10 @@ export async function sendGiftMessage(
   // 2. Gift record for recipient (credit)
   const { error: e2 } = await supabase.from('tally_gifts').insert({
     group_id: groupId, giver_id: userId, recipient_id: recipientId,
-    category, quantity, conversation_id: conversationId,
+    category,
+    drink_id: drinkId ?? null,
+    quantity,
+    conversation_id: conversationId,
   });
   if (e2) console.error('Gift record insert failed:', e2.message);
 
@@ -687,7 +710,14 @@ export async function sendGiftMessage(
   const { error: e3 } = await supabase.from('messages').insert({
     conversation_id: conversationId, user_id: userId, content,
     message_type: 'gift',
-    metadata: { recipient_id: recipientId, category, quantity, category_name: categoryName },
+    metadata: {
+      recipient_id: recipientId,
+      category,
+      quantity,
+      category_name: categoryName,
+      drink_id: drinkId ?? null,
+      drink_name: drinkId ? categoryName : null,
+    },
   });
   if (e3) console.error('Gift message insert failed:', e3.message);
 }

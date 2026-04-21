@@ -134,29 +134,26 @@ export function useSettlements(groupId: string) {
     // Fetch credits for all members in this group
     const { data: allGifts } = await supabase
       .from('tally_gifts')
-      .select('recipient_id, category, quantity, redeemed')
+      .select('recipient_id, category, drink_id, quantity, redeemed')
       .eq('group_id', groupId);
 
-    // Build credit map and subtract from amounts
+    // Subtract per-gift-row using drink-level price when available
     if (allGifts) {
-      const creditsByUser: Record<string, Record<number, number>> = {};
       allGifts.forEach((g: any) => {
         const remaining = (g.quantity ?? 0) - (g.redeemed ?? 0);
-        if (remaining > 0) {
-          if (!creditsByUser[g.recipient_id]) creditsByUser[g.recipient_id] = {};
-          creditsByUser[g.recipient_id][g.category] =
-            (creditsByUser[g.recipient_id][g.category] || 0) + remaining;
+        if (remaining <= 0) return;
+        let pricePerUnit: number;
+        if (group.drinks_as_categories && g.drink_id && drinksMap[g.drink_id]) {
+          const d = drinksMap[g.drink_id];
+          pricePerUnit = d.price_override != null ? d.price_override : getCategoryPrice(group, d.category);
+        } else {
+          pricePerUnit = getCategoryPrice(group, g.category);
         }
+        const member = memberMap[g.recipient_id];
+        if (member) member.amount -= remaining * pricePerUnit;
       });
 
       Object.values(memberMap).forEach((member: any) => {
-        const userCredits = creditsByUser[member.user_id];
-        if (!userCredits) return;
-        for (const [cat, creditCount] of Object.entries(userCredits)) {
-          const catNum = parseInt(cat);
-          const price = getCategoryPrice(group, catNum);
-          member.amount -= (creditCount as number) * price;
-        }
         member.amount = Math.max(0, member.amount);
       });
     }

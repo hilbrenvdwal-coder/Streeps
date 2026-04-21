@@ -250,11 +250,21 @@ function GiftAurora() {
 }
 
 // ── Gift overlay (full-screen, consistent with other overlays) ──
+type GiftDrink = { id: string; name: string; emoji: string | null; price_override: number | null; category: number };
+
 function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName, onClose, onSend, cachedData }: {
   conversationId: string; type: 'dm' | 'group'; groupId?: string | null; otherUserId?: string | null; otherUserName?: string;
   onClose: () => void;
-  onSend: (recipientId: string, recipientName: string, groupId: string, category: number, quantity: number, categoryName: string) => void;
-  cachedData?: { group: any; members: any[]; activeCategories: { category: number; name: string }[] };
+  onSend: (
+    recipientId: string,
+    recipientName: string,
+    groupId: string,
+    category: number,
+    quantity: number,
+    labelName: string,
+    drinkId?: string | null,
+  ) => void;
+  cachedData?: { group: any; members: any[]; activeCategories: { category: number; name: string }[]; drinks?: GiftDrink[] };
 }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -263,9 +273,25 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
 
   const [members, setMembers] = useState<any[]>([]);
   const [activeCategories, setActiveCategories] = useState<{ category: number; name: string }[]>([]);
+  const [drinks, setDrinks] = useState<GiftDrink[]>([]);
+  const [groupData, setGroupData] = useState<any | null>(cachedData?.group ?? null);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set(otherUserId ? [otherUserId] : []));
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedDrink, setSelectedDrink] = useState<GiftDrink | null>(null);
   const [quantity, setQuantity] = useState(1);
+
+  const drinkMode = !!groupData?.drinks_as_categories;
+
+  const getCategoryPrice = (group: any, cat: number): number => {
+    if (!group) return 0;
+    switch (cat) {
+      case 1: return group.price_category_1 ?? 0;
+      case 2: return group.price_category_2 ?? 0;
+      case 3: return group.price_category_3 ?? 0;
+      case 4: return group.price_category_4 ?? 0;
+      default: return 0;
+    }
+  };
 
   // Number animation — layer stack (same approach as CounterControl)
   type QtyLayer = { key: number; value: number; opacity: Animated.Value; scale: Animated.Value };
@@ -324,6 +350,13 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
       // Use prefetched data — instant display
       setActiveCategories(cachedData.activeCategories);
       if (cachedData.activeCategories.length > 0) setSelectedCategory(cachedData.activeCategories[0].category);
+      if (cachedData.group) setGroupData(cachedData.group);
+      if (cachedData.drinks) {
+        setDrinks(cachedData.drinks);
+        if (cachedData.group?.drinks_as_categories && cachedData.drinks.length > 0) {
+          setSelectedDrink(cachedData.drinks[0]);
+        }
+      }
       const otherMembers = (cachedData.members || [])
         .filter((m: any) => m.user_id !== user?.id)
         .map((m: any) => m.profile || { id: m.user_id, full_name: 'Onbekend', avatar_url: null });
@@ -339,10 +372,12 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
   const fetchGroupData = async () => {
     if (!groupId || !user) return;
     const [{ data: g }, { data: gm }, { data: drinksData }] = await Promise.all([
-      supabase.from('groups').select('name, name_category_1, name_category_2, name_category_3, name_category_4').eq('id', groupId).single(),
+      supabase.from('groups').select('name, name_category_1, name_category_2, name_category_3, name_category_4, price_category_1, price_category_2, price_category_3, price_category_4, drinks_as_categories').eq('id', groupId).single(),
       supabase.from('group_members').select('user_id').eq('group_id', groupId),
-      supabase.from('drinks').select('category').eq('group_id', groupId).eq('is_available', true),
+      supabase.from('drinks').select('id, name, emoji, price_override, category').eq('group_id', groupId).eq('is_available', true),
     ]);
+
+    if (g) setGroupData(g);
 
     // Active categories: only those with drinks (same logic as home.tsx)
     if (g && drinksData) {
@@ -353,6 +388,16 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
         .map((cat) => ({ category: cat, name: catNames[cat - 1] || `Categorie ${cat}` }));
       setActiveCategories(cats);
       if (cats.length > 0) setSelectedCategory(cats[0].category);
+
+      // Drink-mode: full drinks list
+      if (g.drinks_as_categories) {
+        const drinksFull: GiftDrink[] = drinksData.map((d: any) => ({
+          id: d.id, name: d.name, emoji: d.emoji ?? null,
+          price_override: d.price_override ?? null, category: d.category ?? 1,
+        }));
+        setDrinks(drinksFull);
+        if (drinksFull.length > 0) setSelectedDrink(drinksFull[0]);
+      }
     }
 
     if (gm) {
@@ -386,20 +431,28 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
   };
 
   const handleConfirm = () => {
-    if (selectedRecipients.size === 0 || !groupId || !selectedCategory) return;
-    const cat = activeCategories.find((c) => c.category === selectedCategory);
-    const catName = cat?.name || 'streepje';
-    // Build recipient names for the message
-    const names = members.filter((m) => selectedRecipients.has(m.id)).map((m) => m.full_name);
-    const recipientName = names.length <= 2 ? names.join(' en ') : `${names.length} personen`;
-    // Send for each recipient
-    for (const rid of selectedRecipients) {
-      const rName = members.find((m) => m.id === rid)?.full_name || '?';
-      onSend(rid, rName, groupId, selectedCategory, quantity, catName);
+    if (selectedRecipients.size === 0 || !groupId) return;
+    if (drinkMode) {
+      if (!selectedDrink) return;
+      const labelName = selectedDrink.name;
+      for (const rid of selectedRecipients) {
+        const rName = members.find((m) => m.id === rid)?.full_name || '?';
+        onSend(rid, rName, groupId, selectedDrink.category, quantity, labelName, selectedDrink.id);
+      }
+    } else {
+      if (!selectedCategory) return;
+      const cat = activeCategories.find((c) => c.category === selectedCategory);
+      const catName = cat?.name || 'streepje';
+      for (const rid of selectedRecipients) {
+        const rName = members.find((m) => m.id === rid)?.full_name || '?';
+        onSend(rid, rName, groupId, selectedCategory, quantity, catName, null);
+      }
     }
   };
 
   const selectedCatName = activeCategories.find((c) => c.category === selectedCategory)?.name || 'streepje';
+  const selectedLabelName = drinkMode ? (selectedDrink?.name || 'drankje') : selectedCatName;
+  const confirmDisabled = selectedRecipients.size === 0 || (drinkMode ? !selectedDrink : !selectedCategory);
   const allSelected = members.length > 0 && selectedRecipients.size === members.length;
 
   return (
@@ -471,15 +524,36 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
             </>
           )}
 
-          {/* Categorie */}
-          <Text style={go.sectionHeader}>WELK STREEPJE?</Text>
-          <View style={go.catRow}>
-            {activeCategories.map((cat) => (
-              <Pressable key={cat.category} style={[go.catPill, selectedCategory === cat.category && go.catPillActive]} onPress={() => setSelectedCategory(cat.category)}>
-                <Text style={[go.catPillText, selectedCategory === cat.category && go.catPillTextActive]}>{cat.name}</Text>
-              </Pressable>
-            ))}
-          </View>
+          {/* Categorie / Drank */}
+          <Text style={go.sectionHeader}>{drinkMode ? 'WELKE DRANK?' : 'WELK STREEPJE?'}</Text>
+          {drinkMode ? (
+            <View style={go.catRow}>
+              {drinks.map((d) => {
+                const active = selectedDrink?.id === d.id;
+                const price = d.price_override ?? getCategoryPrice(groupData, d.category);
+                const priceLabel = `€${(price / 100).toFixed(2).replace('.', ',')}`;
+                return (
+                  <Pressable
+                    key={d.id}
+                    style={[go.catPill, active && go.catPillActive]}
+                    onPress={() => setSelectedDrink(d)}
+                  >
+                    <Text style={[go.catPillText, active && go.catPillTextActive]}>
+                      {d.emoji ? `${d.emoji} ` : ''}{d.name} · {priceLabel}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={go.catRow}>
+              {activeCategories.map((cat) => (
+                <Pressable key={cat.category} style={[go.catPill, selectedCategory === cat.category && go.catPillActive]} onPress={() => setSelectedCategory(cat.category)}>
+                  <Text style={[go.catPillText, selectedCategory === cat.category && go.catPillTextActive]}>{cat.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           {/* Hoeveelheid */}
           <Text style={go.sectionHeader}>HOEVEEL?</Text>
@@ -506,9 +580,9 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
           </View>
 
           {/* Bevestig */}
-          <Pressable style={[go.confirmBtn, (selectedRecipients.size === 0 || !selectedCategory) && { opacity: 0.4 }]} onPress={handleConfirm} disabled={selectedRecipients.size === 0 || !selectedCategory}>
+          <Pressable style={[go.confirmBtn, confirmDisabled && { opacity: 0.4 }]} onPress={handleConfirm} disabled={confirmDisabled}>
             <Ionicons name="gift" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={go.confirmText}>Doneer {quantity} {selectedCatName}{selectedRecipients.size > 1 ? ` aan ${selectedRecipients.size}` : ''}</Text>
+            <Text style={go.confirmText}>Doneer {quantity} {selectedLabelName}{selectedRecipients.size > 1 ? ` aan ${selectedRecipients.size}` : ''}</Text>
           </Pressable>
         </ScrollView>
       </Animated.View>
@@ -3027,7 +3101,7 @@ export default function ChatScreen() {
   const [groupAdminMap, setGroupAdminMap] = useState<Record<string, boolean>>({});
   const [drinksAsCategoriesMap, setDrinksAsCategoriesMap] = useState<Record<string, boolean>>({});
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
-  const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
+  const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[]; drinks?: { id: string; name: string; emoji: string | null; price_override: number | null; category: number }[] }>>({}).current;
 
   // Preload messages for visible conversations
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
@@ -3090,7 +3164,7 @@ export default function ChatScreen() {
     const [{ data: g }, { data: gm }, { data: drinksData }] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('user_id, is_admin, joined_at').eq('group_id', groupId),
-      supabase.from('drinks').select('category').eq('group_id', groupId).eq('is_available', true),
+      supabase.from('drinks').select('id, name, emoji, price_override, category').eq('group_id', groupId).eq('is_available', true),
     ]);
     let members: any[] = [];
     if (gm && gm.length > 0) {
@@ -3105,7 +3179,12 @@ export default function ChatScreen() {
     const activeCategories = ([1, 2, 3, 4] as const)
       .filter((cat) => catsWithDrinks.has(cat))
       .map((cat) => ({ category: cat, name: catNames[cat - 1] || `Categorie ${cat}` }));
-    groupProfileCache[groupId] = { group: g, members, activeCategories };
+    // Keep full drinks list for drink-mode gift selection
+    const drinksFull = (drinksData || []).map((d: any) => ({
+      id: d.id, name: d.name, emoji: d.emoji ?? null,
+      price_override: d.price_override ?? null, category: d.category ?? 1,
+    }));
+    groupProfileCache[groupId] = { group: g, members, activeCategories, drinks: drinksFull };
     if (g) {
       setBotEnabledMap((prev) => ({ ...prev, [groupId]: g.bot_enabled !== false }));
       setBotNameMap((prev) => ({ ...prev, [groupId]: g.bot_name ?? BOT_DEFAULT_NAME }));
@@ -3447,7 +3526,7 @@ export default function ChatScreen() {
             otherUserId={currentConv.other_user_id}
             onProfilePress={currentConv.other_user_id ? () => setViewProfileUserId(currentConv.other_user_id) : undefined}
             onGroupPress={currentConv.type === 'group' && currentConv.group_id ? () => setViewGroupId(currentConv.group_id) : undefined}
-            onGiftPress={currentConv.type === 'group' && !(currentConv.group_id && drinksAsCategoriesMap[currentConv.group_id]) ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
+            onGiftPress={currentConv.type === 'group' ? () => { Keyboard.dismiss(); setShowGiftOverlay(true); } : undefined}
             botEnabled={currentConv.group_id ? botEnabledMap[currentConv.group_id] : undefined}
             botName={currentConv.group_id ? botNameMap[currentConv.group_id] : undefined}
             adminOnlyChat={currentConv.group_id ? adminOnlyChatMap[currentConv.group_id] === true : false}
@@ -3471,10 +3550,10 @@ export default function ChatScreen() {
           otherUserName={currentConv.type === 'dm' ? currentConv.name : undefined}
           cachedData={currentConv.group_id ? groupProfileCache[currentConv.group_id] : undefined}
           onClose={() => setShowGiftOverlay(false)}
-          onSend={async (recipientId, recipientName, gId, category, quantity, categoryName) => {
+          onSend={async (recipientId, recipientName, gId, category, quantity, labelName, drinkId) => {
             if (!user) return;
             // Called once per recipient by GiftOverlay
-            await sendGiftMessage(user.id, user.user_metadata?.full_name || 'Iemand', currentConv.id, recipientId, recipientName, gId, category, quantity, categoryName);
+            await sendGiftMessage(user.id, user.user_metadata?.full_name || 'Iemand', currentConv.id, recipientId, recipientName, gId, category, quantity, labelName, drinkId);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setTimeout(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowGiftOverlay(false); }, 100);
           }}
