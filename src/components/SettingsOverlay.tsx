@@ -113,14 +113,14 @@ const LONG_PRESS_DURATION = 500;
 function CategoryBadgeSelector({
   value,
   onChange,
-  colors,
+  catColors,
   enabledCategories,
   getCategoryName,
   onScrollEnable,
 }: {
   value: number;
   onChange: (v: number) => void;
-  colors: readonly string[];
+  catColors: readonly string[];
   enabledCategories: number[];
   getCategoryName?: (cat: number) => string;
   onScrollEnable?: (enabled: boolean) => void;
@@ -153,7 +153,7 @@ function CategoryBadgeSelector({
   useEffect(() => { valueRef.current = value; }, [value]);
   useEffect(() => () => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }, []);
 
-  const color = colors[(value - 1) % colors.length];
+  const color = catColors[(value - 1) % catColors.length];
   const label = getCategoryName?.(value) ?? `Cat ${value}`;
 
   const closeWheel = useCallback(() => {
@@ -293,7 +293,7 @@ function CategoryBadgeSelector({
                   outputRange: [0.82, 0.92, 1, 0.92, 0.82],
                   extrapolate: 'clamp',
                 });
-                const catColor = colors[(cat - 1) % colors.length];
+                const catColor = catColors[(cat - 1) % catColors.length];
                 const catLabel = getCategoryName?.(cat) ?? `Cat ${cat}`;
                 const isCenter = idx === centerIndex;
 
@@ -301,7 +301,7 @@ function CategoryBadgeSelector({
                   <View key={cat}>
                     <Animated.View style={{ height: ITEM_HEIGHT, marginBottom: ITEM_GAP, alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }] }}>
                       <View style={[cbs.badge, { backgroundColor: catColor + '20' }, isCenter && cbs.badgeCenter]}>
-                        <Text style={[cbs.badgeLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                        <Text style={[cbs.badgeLabel, { color: isCenter ? colors.dark.text.primary : catColor }]} numberOfLines={1}>{catLabel}</Text>
                       </View>
                     </Animated.View>
                   </View>
@@ -317,9 +317,10 @@ function CategoryBadgeSelector({
 }
 
 const cbs = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
-  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400' },
-  badgeCenter: { borderWidth: 1, borderColor: '#FFFFFF' },
+  // TODO(theme-migration): borderRadius 10 differs from radius.sm (8) by 2px — kept at 10 for visual fidelity
+  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[3], paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
+  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: fontWeights.regular },
+  badgeCenter: { borderWidth: 1, borderColor: colors.dark.text.primary },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   wheelContainer: {
@@ -334,6 +335,7 @@ function FadeMask({ children }: { children: React.ReactNode }) {
       style={{ flex: 1 }}
       maskElement={
         <View style={{ flex: 1 }}>
+          {/* #000 is inherent to the mask gradient (opaque vs transparent) — not a theme color */}
           <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
           <View style={{ flex: 1, backgroundColor: '#000' }} />
         </View>
@@ -1091,7 +1093,7 @@ export default function SettingsOverlay({
                       <Ionicons
                         name={enabled ? 'checkmark' : 'close'}
                         size={16}
-                        color={enabled ? '#fff' : '#666'}
+                        color={enabled ? colors.dark.text.primary : colors.dark.text.tertiary}
                       />
                     </Pressable>
                   </Animated.View>
@@ -1114,7 +1116,7 @@ export default function SettingsOverlay({
                         value={name}
                         onChangeText={setName}
                         placeholder={`Categorie ${catNum}`}
-                        placeholderTextColor="#848484"
+                        placeholderTextColor={brand.inactive}
                         editable={enabled}
                         maxLength={15}
                       />
@@ -1128,7 +1130,7 @@ export default function SettingsOverlay({
                             onBlur={() => handlePriceBlur(i, price, setPrice)}
                             keyboardType="decimal-pad"
                             placeholder="0,00"
-                            placeholderTextColor="#848484"
+                            placeholderTextColor={brand.inactive}
                             maxLength={5}
                           />
                         </View>
@@ -1164,7 +1166,7 @@ export default function SettingsOverlay({
                     <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '🍺'}</Text>
                     <Text style={[s.drinkName, drinksAsCategories && { flex: 0, marginRight: 8 }]}>{drink.name}</Text>
                     {drinksAsCategories && isAdmin ? (
-                      <View style={[s.catPriceWrapper, { marginLeft: 'auto', marginRight: 8 }]}>
+                      <View style={[s.catPriceWrapper, { marginLeft: 'auto', marginRight: space[2] }]}>
                         <Text style={s.euroSign}>€</Text>
                         <TextInput
                           style={[s.catPriceInput, drinkPriceErrors[drink.id] ? s.catPriceInputError : null]}
@@ -1173,7 +1175,7 @@ export default function SettingsOverlay({
                           onBlur={() => handleDrinkPriceBlurAndSave(drink.id)}
                           keyboardType="decimal-pad"
                           placeholder="0,00"
-                          placeholderTextColor="#848484"
+                          placeholderTextColor={brand.inactive}
                           maxLength={5}
                         />
                       </View>
@@ -1182,10 +1184,11 @@ export default function SettingsOverlay({
                         <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
                       </View>
                     ) : (
-                      <Text style={{ fontFamily: 'Unbounded', fontSize: 13, color: '#848484', flex: 1, textAlign: 'right', marginRight: 8 }}>
+                      <Text style={{ fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive, flex: 1, textAlign: 'right', marginRight: space[2] }}>
                         €{centsToEuroStr(drink.price_override ?? 0)}
                       </Text>
                     )}
+                    {/* TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original */}
                     <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.7 }} accessibilityLabel={`${drink.name} verwijderen`} accessibilityRole="button">
                       <Ionicons name="close-circle" size={20} color="#EB5466" />
                     </Pressable>
@@ -1199,7 +1202,7 @@ export default function SettingsOverlay({
             {/* Add drink inline */}
             <View style={s.divider} />
             <View style={s.addDrinkRow}>
-              <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor="#848484" value={newDrinkName} onChangeText={setNewDrinkName} />
+              <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor={brand.inactive} value={newDrinkName} onChangeText={setNewDrinkName} />
               <View style={[s.addDrinkEmojiWrap, newDrinkEmoji === '' ? s.addDrinkEmojiEmpty : s.addDrinkEmojiFilled]}>
                 {newDrinkEmoji === '' && (
                   <Text style={s.addDrinkEmojiPlaceholder} pointerEvents="none">🍺</Text>
@@ -1207,7 +1210,7 @@ export default function SettingsOverlay({
                 <TextInput style={s.addDrinkEmoji} value={newDrinkEmoji} onChangeText={setNewDrinkEmoji} />
               </View>
               <Pressable onPress={handleAddDrink} hitSlop={4} style={({ pressed }) => [s.addDrinkBtn, pressed && { opacity: 0.7 }]} accessibilityLabel="Drankje toevoegen" accessibilityRole="button">
-                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Ionicons name="add" size={20} color={colors.dark.text.primary} />
               </Pressable>
             </View>
             {/* Category badge selector: hold to expand, drag to pick — hidden in drink-mode */}
@@ -1217,7 +1220,7 @@ export default function SettingsOverlay({
                   <CategoryBadgeSelector
                     value={parseInt(newDrinkCat) || 1}
                     onChange={(v) => setNewDrinkCat(String(v))}
-                    colors={categoryColors}
+                    catColors={categoryColors}
                     enabledCategories={[...enabledCats].sort()}
                     getCategoryName={getCategoryName}
                     onScrollEnable={setScrollEnabled}
@@ -1446,23 +1449,24 @@ export default function SettingsOverlay({
           </View>
 
           {/* Danger zone */}
-          <View style={[s.card, { marginTop: 24 }]}>
+          {/* TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original */}
+          <View style={[s.card, { marginTop: space[6] }]}>
             {isAdmin && (
               <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleRemoveAdmin}>
-                <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: space[3] }} />
                 <Text style={s.dangerRowText}>Admin afstaan</Text>
               </Pressable>
             )}
             {isAdmin && <View style={s.divider} />}
             <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleLeaveGroup}>
-              <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+              <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: space[3] }} />
               <Text style={s.dangerRowText}>Groep verlaten</Text>
             </Pressable>
             {isAdmin && (
               <>
                 <View style={s.divider} />
                 <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
-                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: space[3] }} />
                   <Text style={s.dangerRowText}>Groep verwijderen</Text>
                 </Pressable>
               </>
@@ -1511,65 +1515,68 @@ const s = StyleSheet.create({
   inputText: { fontFamily: 'Unbounded', fontSize: typography.body.fontSize, color: colors.dark.text.primary, height: 52 },
 
   // Categories
-  catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
+  catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], height: 52 },
+  // TODO(theme-migration): borderRadius 10 differs from radius.sm (8) by 2px — kept for visual fidelity
   catToggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const },
   catSectionRow: { flexDirection: 'row' as const, alignItems: 'stretch' as const },
   catTogglesColumn: { width: 52, alignItems: 'center' as const, justifyContent: 'flex-start' as const },
   catToggleWrapper: { height: 52, alignItems: 'center' as const, justifyContent: 'center' as const },
-  catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 52 },
+  catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, height: 52 },
   catPriceWrapper: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingHorizontal: 10,
     height: 40,
     minWidth: 88,
   },
   euroSign: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    marginRight: 4,
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    marginRight: space[1],
   },
   catPriceInput: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'right' as const,
     height: 40,
     width: 56,
     fontVariant: ['tabular-nums'] as any,
   },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original
   catPriceInputError: {
     color: '#EB5466',
   },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original
   priceError: {
     fontFamily: 'Unbounded',
     fontSize: 10,
     color: '#EB5466',
     textAlign: 'right' as const,
-    paddingRight: 16,
-    paddingBottom: 4,
+    paddingRight: space[4],
+    paddingBottom: space[1],
     marginTop: -4,
   },
-  catDisabledLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', width: 72, textAlign: 'right' },
+  catDisabledLabel: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.inactive, width: 72, textAlign: 'right' },
 
   // Drinks
-  drinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 50 },
-  drinkName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1 },
-  emptyText: { fontFamily: 'Unbounded', color: '#848484', padding: 16, fontSize: 14 },
-  addDrinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52, gap: 8 },
-  addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 48 },
-  addDrinkEmojiWrap: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  drinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 50 },
+  drinkName: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, flex: 1 },
+  emptyText: { fontFamily: 'Unbounded', color: brand.inactive, padding: space[4], fontSize: typography.bodySm.fontSize },
+  addDrinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], height: 52, gap: space[2] },
+  addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, height: 48 },
+  addDrinkEmojiWrap: { width: 48, height: 48, borderRadius: radius.sm, justifyContent: 'center', alignItems: 'center' },
   addDrinkEmojiEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.06)' },
   addDrinkEmojiFilled: { borderWidth: 1.5, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.15)' },
   addDrinkEmojiPlaceholder: { position: 'absolute', fontSize: 20, opacity: 0.35, textAlign: 'center' },
-  addDrinkEmoji: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', textAlign: 'center', width: 48, height: 48 },
-  addDrinkBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
-  drinkCatBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
+  addDrinkEmoji: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, textAlign: 'center', width: 48, height: 48 },
+  addDrinkBtn: { width: 36, height: 36, borderRadius: radius.full, backgroundColor: brand.streepsRed, alignItems: 'center', justifyContent: 'center' },
+  drinkCatBadge: { paddingHorizontal: space[2], paddingVertical: space[1], borderRadius: radius.sm, marginRight: space[2] },
   drinkCatBadgeText: { fontFamily: 'Unbounded', fontSize: 11 },
-  catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', textAlign: 'center', paddingBottom: 8, paddingHorizontal: 16 },
+  catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, textAlign: 'center', paddingBottom: space[2], paddingHorizontal: space[4] },
 
   // Auto-trust
   autoTrustRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], paddingVertical: 14 },
@@ -1606,26 +1613,31 @@ const s = StyleSheet.create({
   shareInviteText: { fontFamily: 'Unbounded', fontSize: 13, color: brand.cyan },
 
   // Danger
-  dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
-  dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
+  dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 52 },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original
+  dangerRowText: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: '#EB5466', flex: 1 },
 
   // Chatbot
-  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginLeft: 20, marginTop: 12, marginBottom: 4, letterSpacing: 0.5 },
-  botDimRow: { paddingHorizontal: 16, paddingVertical: 12 },
+  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, marginLeft: space[5], marginTop: space[3], marginBottom: space[1], letterSpacing: 0.5 },
+  botDimRow: { paddingHorizontal: space[4], paddingVertical: space[3] },
+  // TODO(theme-migration): #D9D9D9 is a light grey with no direct token match — kept original
   botDimLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9', marginBottom: 10 },
-  botDimChips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  botDimChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1 },
+  botDimChips: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
+  botDimChip: { paddingHorizontal: 14, paddingVertical: space[2], borderRadius: 18, borderWidth: 1 },
   botDimChipInactive: { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'transparent' },
-  botDimChipActive: { borderColor: '#00BEAE', backgroundColor: 'rgba(0,190,174,0.15)' },
-  botDimChipText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
-  botDimChipTextActive: { color: '#FFFFFF' },
-  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, minHeight: 52 },
-  botToggleLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  botUsageRow: { padding: 16 },
+  botDimChipActive: { borderColor: brand.cyan, backgroundColor: 'rgba(0,190,174,0.15)' },
+  botDimChipText: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.inactive },
+  botDimChipTextActive: { color: colors.dark.text.primary },
+  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 52 },
+  botToggleLabel: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary },
+  botUsageRow: { padding: space[4] },
+  // TODO(theme-migration): #D9D9D9 is a light grey with no direct token match — kept original
   botUsageLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9' },
-  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
-  botUsageBarBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  botUsageBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#00BEAE' },
+  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive },
+  botUsageBarBg: { height: space[2], borderRadius: radius.xs, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  botUsageBarFill: { height: '100%', borderRadius: radius.xs, backgroundColor: brand.cyan },
+  // TODO(theme-migration): #FF3B30 (iOS system red) differs from semantic.error (#FF5272) by perceptually distinct red — kept original
   botUsageBarFillFull: { backgroundColor: '#FF3B30' },
-  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: 8 },
+  // TODO(theme-migration): #FF3B30 (iOS system red) differs from semantic.error (#FF5272) by perceptually distinct red — kept original
+  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: space[2] },
 });

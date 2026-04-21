@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 9, height: 9, borderRadius: 4.5 },
   info: { flex: 1 },
-  name: { fontFamily: 'Unbounded', fontSize: 20, fontWeight: '400', color: '#FFFFFF' },
+  name: { fontFamily: 'Unbounded', fontSize: 20, fontWeight: '400' },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
