@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
+import { LiveBadge } from '@/src/components/LiveBadge';
 import { brand, colors, radius, space, typography } from '@/src/theme';
 
 export interface ExploreFeedItemGroup {
@@ -31,16 +32,6 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** Inline mini-LIVE-badge (wordt in Golf 2 vervangen door LiveBadge-import). */
-function MiniLiveBadge() {
-  return (
-    <View style={styles.liveBadge}>
-      <View style={styles.liveDot} />
-      <Text style={styles.liveText}>LIVE</Text>
-    </View>
-  );
-}
-
 export default function ExploreFeedItem({
   group,
   isLive,
@@ -68,7 +59,7 @@ export default function ExploreFeedItem({
         <Text style={styles.name} numberOfLines={1}>
           {group.name}
         </Text>
-        {isLive && <MiniLiveBadge />}
+        {isLive && <LiveBadge size="sm" />}
       </View>
 
       {drinkCounts.length > 0 && (
@@ -136,25 +127,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: brand.inactive,
-  },
-  liveBadge: {
-    backgroundColor: 'rgba(0,254,150,0.15)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  liveDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: brand.green,
-  },
-  liveText: {
-    fontSize: 9,
-    color: brand.green,
-    fontWeight: '700',
   },
 });

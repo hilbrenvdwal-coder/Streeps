@@ -1,11 +1,13 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, View, Text, Dimensions } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, View, Text, Dimensions, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme, type Theme, auroraPalettes } from '@/src/theme';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import ExploreFeed from '@/src/components/ExploreFeed';
+import SearchGroupsModal from '@/src/components/SearchGroupsModal';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
@@ -16,6 +18,13 @@ export default function ExploreScreen() {
   const t = getTheme(mode);
   const styles = useMemo(() => createStyles(t), [mode]);
   const insets = useSafeAreaInsets();
+  const [searchVisible, setSearchVisible] = useState(false);
+
+  // TODO(Phase 3 B3): open GroupProfileOverlay op de explore-tab zelf.
+  // Voor nu loggen we alleen — de overlay zit nu aan chat.tsx gekoppeld.
+  const handleGroupPress = (groupId: string) => {
+    console.log('[explore] open group', groupId);
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -28,20 +37,30 @@ export default function ExploreScreen() {
           <AuroraPresetView preset="header" colors={[...auroraPalettes.explore]} animated />
         </View>
 
-        {/* Title */}
-        <Text style={styles.title}>Verkennen</Text>
+        {/* Header: Title + search icon */}
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Verkennen</Text>
+          <Pressable
+            onPress={() => setSearchVisible(true)}
+            hitSlop={12}
+            style={({ pressed }) => [styles.searchBtn, pressed && styles.searchBtnPressed]}
+          >
+            <Ionicons name="search-outline" size={24} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
 
       {/* Feed */}
       <View style={styles.feedWrap}>
-        <ExploreFeed
-          onGroupPress={(groupId) => {
-            // TODO(Phase 3 B1): open GroupProfileOverlay via chat.tsx integration.
-            // For now, placeholder logging — deferred to a later merge.
-            console.log('[explore] open group', groupId);
-          }}
-        />
+        <ExploreFeed onGroupPress={handleGroupPress} />
       </View>
+
+      {/* Search modal */}
+      <SearchGroupsModal
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+        onGroupPress={handleGroupPress}
+      />
     </View>
   );
 }
@@ -56,14 +75,28 @@ function createStyles(t: Theme) {
       zIndex: 0,
     },
 
-    // Title
+    // Header row
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: s(21),
+      paddingTop: s(10),
+    },
     title: {
       fontFamily: 'Unbounded',
       fontSize: 24,
       fontWeight: '400',
       color: '#FFFFFF',
-      paddingHorizontal: s(21),
-      paddingTop: s(10),
+    },
+    searchBtn: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    searchBtnPressed: {
+      opacity: 0.6,
     },
 
     feedWrap: {

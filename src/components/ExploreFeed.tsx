@@ -1,15 +1,21 @@
-import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { Fragment } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { brand, space, typography } from '@/src/theme';
+import { brand, colors, space, typography } from '@/src/theme';
 import { useFollows } from '@/src/hooks/useFollows';
-import FollowedGroupRow from '@/src/components/FollowedGroupRow';
+import { useFollowFeed } from '@/src/hooks/useFollowFeed';
+import ExploreAvatarRow from '@/src/components/ExploreAvatarRow';
+import ExploreFeedItem from '@/src/components/ExploreFeedItem';
+import ExploreFeedSectionHeader from '@/src/components/ExploreFeedSectionHeader';
+import ExploreSuggestionRow from '@/src/components/ExploreSuggestionRow';
 
 interface ExploreFeedProps {
   onGroupPress: (groupId: string) => void;
 }
 
-function EmptyState() {
+// ─── Empty states ────────────────────────────────────────────────────────────
+
+function NoFollowsState() {
   return (
     <View style={styles.emptyWrap}>
       <Ionicons
@@ -18,7 +24,7 @@ function EmptyState() {
         color={brand.inactive}
         style={styles.emptyIcon}
       />
-      <Text style={styles.emptyTitle}>Nog niks gevolgd</Text>
+      <Text style={styles.emptyTitle}>Volg eerst een groep</Text>
       <Text style={styles.emptySubtext}>
         Volg groepen via het profiel van je vrienden.
       </Text>
@@ -26,38 +32,164 @@ function EmptyState() {
   );
 }
 
+function NoActivityState() {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>Nog geen activiteit</Text>
+      <Text style={styles.emptySubtext}>
+        Er is recent niks te zien in de groepen die je volgt.
+      </Text>
+    </View>
+  );
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
 export default function ExploreFeed({ onGroupPress }: ExploreFeedProps) {
-  const { followedGroups, loading, refresh, unfollow } = useFollows();
+  const { followedGroups, follow, loading: followsLoading, refresh: refreshFollows } = useFollows();
+  const {
+    buckets,
+    suggestions,
+    liveGroupIds,
+    loading: feedLoading,
+    refresh: refreshFeed,
+    removeSuggestion,
+  } = useFollowFeed();
+
+  const loading = followsLoading || feedLoading;
+
+  const handleRefresh = React.useCallback(async () => {
+    await Promise.all([refreshFollows(), refreshFeed()]);
+  }, [refreshFollows, refreshFeed]);
+
+  const hasFollowedGroups = followedGroups.length > 0;
+  const hasBuckets = buckets.length > 0;
+  const hasSuggestions = suggestions.length > 0;
+
+  // Als de user niemand volgt EN er zijn geen suggesties: volledige empty state.
+  if (!loading && !hasFollowedGroups && !hasSuggestions) {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.emptyScrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={handleRefresh}
+            tintColor={brand.inactive}
+          />
+        }
+      >
+        <NoFollowsState />
+      </ScrollView>
+    );
+  }
 
   return (
-    <FlatList
-      data={followedGroups}
-      keyExtractor={(g) => g.id}
-      renderItem={({ item }) => (
-        <FollowedGroupRow
-          group={item}
-          onPress={() => onGroupPress(item.id)}
-          onUnfollow={() => {
-            unfollow(item.id).catch((err) => {
-              console.error('[ExploreFeed] unfollow failed:', err);
-            });
-          }}
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={handleRefresh}
+          tintColor={brand.inactive}
         />
+      }
+    >
+      {/* Avatar-rij — alleen tonen als er gevolgde groepen zijn */}
+      {hasFollowedGroups && (
+        <View style={styles.avatarRowWrap}>
+          <ExploreAvatarRow
+            groups={followedGroups.map((g) => ({
+              id: g.id,
+              name: g.name,
+              avatarUrl: g.avatarUrl,
+            }))}
+            onGroupPress={onGroupPress}
+            liveGroupIds={liveGroupIds}
+          />
+        </View>
       )}
-      refreshing={loading}
-      onRefresh={refresh}
-      ListEmptyComponent={<EmptyState />}
-      contentContainerStyle={styles.listContent}
-    />
+
+      {/* Suggesties — verberg sectie compleet als leeg */}
+      {hasSuggestions && (
+        <>
+          <ExploreFeedSectionHeader
+            label="Misschien leuk om te volgen"
+            variant="muted"
+          />
+          {suggestions.map((s, i) => (
+            <Fragment key={s.groupId}>
+              {i > 0 && <View style={styles.separator} />}
+              <ExploreSuggestionRow
+                suggestion={{
+                  groupId: s.groupId,
+                  name: s.name,
+                  avatarUrl: s.avatarUrl,
+                  friendNames: s.friendNames,
+                  friendCount: s.friendCount,
+                  friendsRelation: s.friendsRelation,
+                }}
+                onFollow={async () => {
+                  try {
+                    await follow(s.groupId);
+                    removeSuggestion(s.groupId);
+                  } catch (err) {
+                    console.error('[ExploreFeed] follow failed:', err);
+                    throw err; // AnimatedFollowButton verwacht throw voor rollback
+                  }
+                }}
+                onOpen={() => onGroupPress(s.groupId)}
+              />
+            </Fragment>
+          ))}
+        </>
+      )}
+
+      {/* Feed — buckets */}
+      {hasBuckets ? (
+        buckets.map((bucket) => (
+          <Fragment key={bucket.key}>
+            <ExploreFeedSectionHeader label={bucket.label} />
+            {bucket.items.map((item, i) => (
+              <Fragment key={item.groupId + ':' + bucket.key}>
+                {i > 0 && <View style={styles.separator} />}
+                <ExploreFeedItem
+                  group={{
+                    id: item.groupId,
+                    name: item.groupName,
+                    avatarUrl: item.groupAvatarUrl,
+                  }}
+                  isLive={item.isLive}
+                  drinkCounts={item.drinkCounts}
+                  onPress={() => onGroupPress(item.groupId)}
+                />
+              </Fragment>
+            ))}
+          </Fragment>
+        ))
+      ) : hasFollowedGroups ? (
+        <NoActivityState />
+      ) : null}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  listContent: {
+  scrollContent: {
     paddingTop: space[3],
     paddingBottom: 160,
-    paddingHorizontal: space[4],
-    gap: space[2],
+  },
+  emptyScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  avatarRowWrap: {
+    paddingBottom: space[2],
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.dark.border.default,
+    marginHorizontal: space[3],
   },
   emptyWrap: {
     alignItems: 'center',

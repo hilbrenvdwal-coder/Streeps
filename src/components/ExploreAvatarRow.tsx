@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
-import { brand, colors, radius, space, typography } from '@/src/theme';
+import { LiveBadge } from '@/src/components/LiveBadge';
+import { colors, radius, space, typography } from '@/src/theme';
 
 export interface ExploreAvatarRowGroup {
   id: string;
@@ -19,20 +20,6 @@ interface ExploreAvatarRowProps {
 
 const AVATAR_SIZE = 64;
 const ITEM_MAX_WIDTH = 68;
-
-/**
- * Inline mini-variant van de LiveBadge (wordt in Golf 2 vervangen door
- * import van `@/src/components/LiveBadge`). rgba() is bewust toegestaan voor
- * de halo-achtergrond.
- */
-function MiniLiveBadge() {
-  return (
-    <View style={styles.liveBadge}>
-      <View style={styles.liveDot} />
-      <Text style={styles.liveText}>LIVE</Text>
-    </View>
-  );
-}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -74,7 +61,7 @@ export default function ExploreAvatarRow({
               )}
               {isLive && (
                 <View style={styles.liveBadgeWrap} pointerEvents="none">
-                  <MiniLiveBadge />
+                  <LiveBadge size="md" />
                 </View>
               )}
             </View>
@@ -124,25 +111,5 @@ const styles = StyleSheet.create({
     marginTop: space[1],
     maxWidth: ITEM_MAX_WIDTH,
     textAlign: 'center',
-  },
-  liveBadge: {
-    backgroundColor: 'rgba(0,254,150,0.15)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  liveDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: brand.green,
-  },
-  liveText: {
-    fontSize: 9,
-    color: brand.green,
-    fontWeight: '700',
   },
 });
