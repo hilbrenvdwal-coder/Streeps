@@ -38,7 +38,7 @@ const STRIDE = (LAST_CENTER - FIRST_CENTER) / (TAB_COUNT - 1);
 const PILL_POSITIONS = Array.from({ length: TAB_COUNT },
   (_, i) => FIRST_CENTER + i * STRIDE - PILL_W / 2);
 const ICON_X = Array.from({ length: TAB_COUNT },
-  (_, i) => FIRST_CENTER + i * STRIDE - 24);
+  (_, i) => FIRST_CENTER + i * STRIDE);
 
 const PILL_LEFTS = PILL_POSITIONS.map((x) => scale(x));
 
