@@ -27,6 +27,7 @@ import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
+import { brand, colors, radius, space, typography, fontWeights } from '@/src/theme';
 import { BOT_DIMENSIONS, BOT_DEFAULTS, BOT_MONTHLY_LIMIT, type BotSettings } from '../constants/botSettings';
 
 interface Member {
@@ -1004,13 +1005,13 @@ export default function SettingsOverlay({
         {/* Header */}
         <View style={s.header}>
           <Pressable onPress={handleClose} hitSlop={12} style={({ pressed }) => [{ marginRight: 12 }, pressed && { opacity: 0.7 }]} accessibilityLabel="Sluiten" accessibilityRole="button">
-            <Ionicons name="close" size={24} color="#FFFFFF" />
+            <Ionicons name="close" size={24} color={colors.dark.text.primary} />
           </Pressable>
           <Text style={s.headerTitle}>Instellingen</Text>
           <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving} style={({ pressed }) => [{ marginLeft: 'auto' }, pressed && { opacity: 0.7 }]}>
             <View style={s.saveBtnRow}>
               {savedOk && (
-                <Ionicons name="checkmark" size={16} color="#00BEAE" style={{ marginRight: 4 }} />
+                <Ionicons name="checkmark" size={16} color={brand.cyan} style={{ marginRight: 4 }} />
               )}
               <Text style={[s.saveText, isSaving && { opacity: 0.5 }]}>
                 {savedOk ? 'Opgeslagen' : 'Opslaan'}
@@ -1040,10 +1041,10 @@ export default function SettingsOverlay({
                 value={groupName}
                 onChangeText={setGroupName}
                 placeholder="Groepsnaam"
-                placeholderTextColor="#848484"
+                placeholderTextColor={brand.inactive}
                 maxLength={20}
               />
-              <Ionicons name="create-outline" size={18} color="#848484" style={{ marginLeft: 8 }} />
+              <Ionicons name="create-outline" size={18} color={brand.inactive} style={{ marginLeft: 8 }} />
             </View>
           </View>
 
@@ -1061,8 +1062,8 @@ export default function SettingsOverlay({
                     value={drinksAsCategories}
                     onValueChange={handleToggleDrinksAsCategories}
                     disabled={dacToggling}
-                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
-                    thumbColor="#FFFFFF"
+                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: brand.cyan }}
+                    thumbColor={colors.dark.text.primary}
                   />
                 </View>
               </View>
@@ -1242,8 +1243,8 @@ export default function SettingsOverlay({
                     await supabase.from('groups').update({ auto_trust_members: val }).eq('id', groupId);
                     refresh();
                   }}
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: brand.cyan }}
+                  thumbColor={colors.dark.text.primary}
                 />
               </View>
             </View>
@@ -1267,7 +1268,7 @@ export default function SettingsOverlay({
                       <Text style={s.memberName}>{name}</Text>
                       {member.is_admin && <Text style={s.adminBadge}>Admin</Text>}
                     </View>
-                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#848484" />
+                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={brand.inactive} />
                   </Pressable>
                   {/* Expanded: tally counts + admin actions */}
                   {isExpanded && (
@@ -1298,7 +1299,7 @@ export default function SettingsOverlay({
                                 accessibilityLabel="Streepje toevoegen"
                                 accessibilityRole="button"
                               >
-                                <Ionicons name="add" size={16} color="#00BEAE" />
+                                <Ionicons name="add" size={16} color={brand.cyan} />
                               </Pressable>
                             )}
                             {removeTally && count > 0 && (
@@ -1336,7 +1337,7 @@ export default function SettingsOverlay({
                       {!isSelf && (
                         <View style={s.memberActions}>
                           <Pressable onPress={() => handleToggleAdmin(member.user_id, name, member.is_admin)} style={({ pressed }) => [s.memberActionBtn, pressed && { opacity: 0.7 }]}>
-                            <Ionicons name={member.is_admin ? 'shield' : 'shield-outline'} size={18} color="#00BEAE" />
+                            <Ionicons name={member.is_admin ? 'shield' : 'shield-outline'} size={18} color={brand.cyan} />
                             <Text style={s.memberActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
                           </Pressable>
                           <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={({ pressed }) => [s.memberActionBtnDanger, pressed && { opacity: 0.7 }]}>
@@ -1439,7 +1440,7 @@ export default function SettingsOverlay({
                 } catch {}
               }}
             >
-              <Ionicons name="share-outline" size={18} color="#00BEAE" />
+              <Ionicons name="share-outline" size={18} color={brand.cyan} />
               <Text style={s.shareInviteText}>Deel uitnodiging</Text>
             </Pressable>
           </View>
@@ -1482,31 +1483,32 @@ export default function SettingsOverlay({
 
 const s = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: space[5] },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: '400', color: '#FFFFFF' },
-  saveText: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '600', color: '#00BEAE' },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: space[4] },
+  headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: fontWeights.regular, color: colors.dark.text.primary },
+  saveText: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, fontWeight: fontWeights.semibold, color: brand.cyan },
   saveBtnRow: { flexDirection: 'row' as const, alignItems: 'center' as const },
 
   // Avatar
-  avatarSection: { alignItems: 'center', marginBottom: 8 },
-  avatar: { width: 80, height: 80, borderRadius: 40 },
-  avatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 28, fontWeight: '600', color: '#333' },
-  avatarAction: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', marginTop: 8 },
+  avatarSection: { alignItems: 'center', marginBottom: space[2] },
+  avatar: { width: 80, height: 80, borderRadius: radius.full },
+  avatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 28, fontWeight: fontWeights.semibold, color: '#333' },
+  avatarAction: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan, marginTop: space[2] },
 
   // Section
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '400', color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
+  sectionHeader: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, fontWeight: fontWeights.regular, color: brand.inactive, marginLeft: space[1], marginTop: space[6], marginBottom: space[2] },
 
   // Card
+  // TODO(theme-migration): borderRadius 25 differs from radius['2xl'] (24) by 1px — kept at 25 for visual fidelity
   card: { borderRadius: 25, overflow: 'hidden' },
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
+  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: space[4] },
 
   // Inputs
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
-  inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.md, marginHorizontal: space[3], marginVertical: space[2] },
+  inputText: { fontFamily: 'Unbounded', fontSize: typography.body.fontSize, color: colors.dark.text.primary, height: 52 },
 
   // Categories
   catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
@@ -1570,37 +1572,38 @@ const s = StyleSheet.create({
   catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', textAlign: 'center', paddingBottom: 8, paddingHorizontal: 16 },
 
   // Auto-trust
-  autoTrustRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  autoTrustLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  autoTrustHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginTop: 4 },
+  autoTrustRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], paddingVertical: 14 },
+  autoTrustLabel: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary },
+  autoTrustHint: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, marginTop: space[1] },
 
   // Members
-  memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 56 },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
-  memberAvatarFallback: { backgroundColor: '#F1F1F1' },
-  memberAvatarText: { fontSize: 14, fontWeight: '600', color: '#333' },
-  memberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  adminBadge: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', marginTop: 1 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 56 },
+  memberAvatar: { width: 36, height: 36, borderRadius: radius.full, marginRight: space[3], alignItems: 'center', justifyContent: 'center' },
+  memberAvatarFallback: { backgroundColor: brand.streepsWhite },
+  memberAvatarText: { fontSize: typography.bodySm.fontSize, fontWeight: fontWeights.semibold, color: '#333' },
+  memberName: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary },
+  adminBadge: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan, marginTop: 1 },
 
   // Expanded member
-  memberExpanded: { paddingHorizontal: 16, paddingBottom: 12 },
+  memberExpanded: { paddingHorizontal: space[4], paddingBottom: space[3] },
   tallyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  tallyDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-  tallyLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#FFFFFF', flex: 1 },
-  tallyCount: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', fontWeight: '600', marginRight: 8, minWidth: 24, textAlign: 'right' },
-  tallyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
-  memberActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(0,217,163,0.1)' },
-  memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', flexShrink: 1 },
-  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(235,84,102,0.1)' },
-  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466', flexShrink: 1 },
+  tallyDot: { width: 8, height: 8, borderRadius: radius.xs, marginRight: 10 },
+  tallyLabel: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: colors.dark.text.primary, flex: 1 },
+  tallyCount: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, fontWeight: fontWeights.semibold, marginRight: space[2], minWidth: 24, textAlign: 'right' },
+  tallyBtn: { width: 36, height: 36, borderRadius: radius.full, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: space[1] },
+  memberActions: { flexDirection: 'row', gap: space[2], marginTop: space[2] },
+  memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: radius.full, paddingHorizontal: space[2], backgroundColor: 'rgba(0,217,163,0.1)' },
+  memberActionText: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan, flexShrink: 1 },
+  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: radius.full, paddingHorizontal: space[2], backgroundColor: 'rgba(235,84,102,0.1)' },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by ~perceptually distinct red — kept original
+  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: '#EB5466', flexShrink: 1 },
 
   // Invite
-  inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, minHeight: 52 },
-  inviteCode: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', flex: 1, letterSpacing: 2 },
-  refreshText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE' },
-  shareInviteRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 20, minHeight: 48, gap: 10 },
-  shareInviteText: { fontFamily: 'Unbounded', fontSize: 13, color: '#00BEAE' },
+  inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[5], minHeight: 52 },
+  inviteCode: { fontFamily: 'Unbounded', fontSize: typography.body.fontSize, color: colors.dark.text.primary, flex: 1, letterSpacing: 2 },
+  refreshText: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan },
+  shareInviteRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: space[5], minHeight: 48, gap: 10 },
+  shareInviteText: { fontFamily: 'Unbounded', fontSize: 13, color: brand.cyan },
 
   // Danger
   dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },

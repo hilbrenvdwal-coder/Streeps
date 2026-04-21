@@ -9,6 +9,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { colors } from '@/src/theme';
 
 /**
  * CategoryRow — pill-shaped category selector button.
@@ -86,7 +87,7 @@ export default function CategoryRow({
     color: interpolateColor(
       selectedProgress.value,
       [0, 1],
-      [color, '#0F0F1E']
+      [color, colors.dark.background.primary]
     ),
     fontWeight: '400' as const,
   }));
