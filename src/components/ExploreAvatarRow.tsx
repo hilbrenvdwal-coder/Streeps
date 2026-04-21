@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { LiveBadge } from '@/src/components/LiveBadge';
-import { colors, radius, space, typography } from '@/src/theme';
+import { colors, radius } from '@/src/theme';
 
 export interface ExploreAvatarRowGroup {
   id: string;
@@ -18,14 +18,11 @@ interface ExploreAvatarRowProps {
   liveGroupIds?: Set<string>;
 }
 
-const AVATAR_SIZE = 64;
-const ITEM_MAX_WIDTH = 68;
+const AVATAR_SIZE = 52;
+const ITEM_WIDTH = 64;
 
 function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return (name.trim()[0] ?? '?').toUpperCase();
 }
 
 export default function ExploreAvatarRow({
@@ -66,7 +63,7 @@ export default function ExploreAvatarRow({
               )}
             </View>
             <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
-              {group.name}
+              {group.name.split(' ')[0]}
             </Text>
           </Pressable>
         );
@@ -77,12 +74,12 @@ export default function ExploreAvatarRow({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: space[4],
-    gap: space[3],
+    paddingHorizontal: 20,
+    gap: 16,
   },
   item: {
     alignItems: 'center',
-    maxWidth: ITEM_MAX_WIDTH,
+    width: ITEM_WIDTH,
   },
   itemPressed: {
     opacity: 0.7,
@@ -106,11 +103,11 @@ const styles = StyleSheet.create({
     right: -4,
   },
   name: {
-    ...typography.caption,
     fontFamily: 'Unbounded',
-    color: colors.dark.text.primary,
-    marginTop: space[1],
-    maxWidth: ITEM_MAX_WIDTH,
+    fontSize: 11,
+    color: '#FFFFFF',
+    marginTop: 6,
+    width: ITEM_WIDTH,
     textAlign: 'center',
   },
 });
