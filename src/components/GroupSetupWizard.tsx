@@ -30,7 +30,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
-import { categoryColors } from '@/src/theme';
+import { categoryColors, colors, brand, space, radius, typography, fontWeights, semantic } from '@/src/theme';
 
 const TOTAL_STEPS = 4;
 
@@ -344,7 +344,7 @@ export default function GroupSetupWizard({
         {groupAvatarUrl ? (
           <Image source={{ uri: groupAvatarUrl }} style={ws.avatarImage} transition={200} cachePolicy="memory-disk" />
         ) : (
-          <Ionicons name="camera" size={40} color="#848484" />
+          <Ionicons name="camera" size={40} color={brand.inactive} />
         )}
         {uploadingAvatar && (
           <View style={ws.avatarOverlay}>
@@ -367,8 +367,8 @@ export default function GroupSetupWizard({
         <Switch
           value={autoTrust}
           onValueChange={setAutoTrust}
-          trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
-          thumbColor="#FFFFFF"
+          trackColor={{ false: 'rgba(255,255,255,0.1)', true: brand.cyan }}
+          thumbColor={colors.dark.text.primary}
         />
       </View>
     </View>
@@ -406,11 +406,11 @@ export default function GroupSetupWizard({
                   onBlur={() => handleUpdateDrinkPrice(drink.id, drink.priceStr)}
                   keyboardType="decimal-pad"
                   placeholder="0,00"
-                  placeholderTextColor="#848484"
+                  placeholderTextColor={brand.inactive}
                 />
               </View>
               <Pressable onPress={() => handleRemoveDrink(drink.id)} hitSlop={8}>
-                <Ionicons name="close-circle" size={20} color="#EB5466" />
+                <Ionicons name="close-circle" size={20} color="#EB5466" /* TODO(theme-migration): #EB5466 vs semantic.error #FF5272 — hue-adjacent red, R:-20 G:0 B:-12 delta, keep exact for visual fidelity */ />
               </Pressable>
             </View>
           </React.Fragment>
@@ -432,7 +432,7 @@ export default function GroupSetupWizard({
           <TextInput
             style={ws.addDrinkInput}
             placeholder="Naam"
-            placeholderTextColor="#848484"
+            placeholderTextColor={brand.inactive}
             value={newDrinkName}
             onChangeText={setNewDrinkName}
             returnKeyType="done"
@@ -446,12 +446,12 @@ export default function GroupSetupWizard({
               onChangeText={setNewDrinkPrice}
               keyboardType="decimal-pad"
               placeholder="0,00"
-              placeholderTextColor="#848484"
+              placeholderTextColor={brand.inactive}
             />
           </View>
           <Reanimated.View style={addBtnAnimStyle}>
             <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
-              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Ionicons name="add" size={20} color={colors.dark.text.primary} />
             </Pressable>
           </Reanimated.View>
         </View>
@@ -472,11 +472,11 @@ export default function GroupSetupWizard({
 
       <View style={ws.inviteActions}>
         <Pressable style={ws.inviteBtn} onPress={handleCopy}>
-          <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="copy-outline" size={20} color={colors.dark.text.primary} />
           <Text style={ws.inviteBtnText}>Kopieer</Text>
         </Pressable>
-        <Pressable style={[ws.inviteBtn, { backgroundColor: '#00BEAE' }]} onPress={handleShare}>
-          <Ionicons name="share-outline" size={20} color="#FFFFFF" />
+        <Pressable style={[ws.inviteBtn, { backgroundColor: brand.cyan }]} onPress={handleShare}>
+          <Ionicons name="share-outline" size={20} color={colors.dark.text.primary} />
           <Text style={ws.inviteBtnText}>Deel</Text>
         </Pressable>
       </View>
@@ -487,7 +487,7 @@ export default function GroupSetupWizard({
   const renderStep4 = () => (
     <View style={ws.stepContent}>
       <View style={ws.doneIcon}>
-        <Ionicons name="checkmark-circle" size={80} color="#00BEAE" />
+        <Ionicons name="checkmark-circle" size={80} color={brand.cyan} />
       </View>
       <Text style={ws.doneTitle}>Klaar!</Text>
       <Text style={ws.doneSubtitle}>{groupName} is helemaal ingesteld</Text>
@@ -510,11 +510,11 @@ export default function GroupSetupWizard({
       // Morph button: "Overslaan" (grey) when no photo, "Volgende" (teal) when photo
       const morphBg = morphBtnAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ['rgba(255,255,255,0.08)', '#00BEAE'],
+        outputRange: ['rgba(255,255,255,0.08)', brand.cyan],
       });
       const morphTextColor = morphBtnAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ['#848484', '#FFFFFF'],
+        outputRange: [brand.inactive, colors.dark.text.primary],
       });
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -537,7 +537,7 @@ export default function GroupSetupWizard({
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={ws.backBtn} onPress={handleBack}>
-          <Ionicons name="chevron-back" size={18} color="#848484" />
+          <Ionicons name="chevron-back" size={18} color={brand.inactive} />
           <Text style={ws.backBtnText}>Terug</Text>
         </Pressable>
         <Pressable style={[ws.nextBtn, { flex: 1 }]} onPress={handleNext}>
@@ -602,43 +602,43 @@ export default function GroupSetupWizard({
 
 const ws = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: space[5] },
 
   // Progress
-  progressWrap: { marginBottom: 24 },
+  progressWrap: { marginBottom: space[6] },
   progressBar: {
     height: 4,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     backgroundColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   progressFill: {
     height: 4,
-    borderRadius: 4,
-    backgroundColor: '#00BEAE',
+    borderRadius: radius.xs,
+    backgroundColor: brand.cyan,
   },
   progressText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#848484',
-    marginTop: 8,
+    fontSize: typography.caption.fontSize,
+    color: brand.inactive,
+    marginTop: space[2],
   },
 
   // Step container
   stepContainer: { flex: 1 },
-  stepContent: { flex: 1, alignItems: 'center', paddingTop: 20 },
+  stepContent: { flex: 1, alignItems: 'center', paddingTop: space[5] },
   stepTitle: {
     fontFamily: 'Unbounded',
-    fontSize: 24,
+    fontSize: 24, // TODO(theme-migration): typography.heading2 is 22 (-2 delta) but fontWeight differs ('400' vs semibold) — keep literal for fidelity
     fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    color: colors.dark.text.primary,
+    marginBottom: space[2],
   },
   stepSubtitle: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    marginBottom: 32,
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    marginBottom: space[8],
   },
 
   // Step 1: Avatar
@@ -666,14 +666,14 @@ const ws = StyleSheet.create({
   },
   uploadingText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#FFFFFF',
+    fontSize: typography.caption.fontSize,
+    color: colors.dark.text.primary,
   },
   avatarHint: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#00BEAE',
-    marginTop: 12,
+    fontSize: typography.caption.fontSize,
+    color: brand.cyan,
+    marginTop: space[3],
   },
 
   // Step 2: Categories
@@ -681,8 +681,8 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    paddingVertical: 14, // TODO(theme-migration): 14 not on 4px grid (space[3]=12 or space[4]=16, ±2 delta) — keep exact
+    paddingHorizontal: space[1],
     minHeight: 72,
   },
   catRowDisabled: {
@@ -691,37 +691,37 @@ const ws = StyleSheet.create({
   catNameInput: {
     fontFamily: 'Unbounded',
     flex: 1,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     height: 44,
   },
   catPriceWrapper: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
+    borderRadius: 10, // TODO(theme-migration): 10 between radius.sm=8 and radius.md=12, keep for compact price-wrapper look
     paddingHorizontal: 10,
     height: 40,
   },
   euroSign: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
     marginRight: 2,
   },
   catPriceInput: {
     fontFamily: 'Unbounded',
     width: 52,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'right' as const,
     height: 40,
   },
   catDisabledText: {
     fontFamily: 'Unbounded',
     flex: 1,
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
   },
 
   // Auto-trust
@@ -729,19 +729,19 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    paddingVertical: 14, // TODO(theme-migration): 14 not on 4px grid — keep to match catRow rhythm
+    paddingHorizontal: space[1],
   },
   autoTrustLabel: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
   },
   autoTrustHint: {
     fontFamily: 'Unbounded',
-    fontSize: 11,
-    color: '#848484',
-    marginTop: 4,
+    fontSize: 11, // TODO(theme-migration): 11 matches typography.overline.fontSize but no uppercase/letterSpacing intended here — keep literal
+    color: brand.inactive,
+    marginTop: space[1],
   },
 
   // Step 3: Drinks
@@ -752,35 +752,35 @@ const ws = StyleSheet.create({
   drinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: space[3],
+    paddingHorizontal: space[1],
   },
   drinkEmoji: {
     fontSize: 20,
-    marginRight: 12,
+    marginRight: space[3],
   },
   drinkName: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     flex: 1,
   },
   addDrinkRow: {
     flexDirection: 'column',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    gap: 8,
+    paddingVertical: space[2],
+    paddingHorizontal: space[1],
+    gap: space[2],
     width: '100%',
   },
   addDrinkInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: space[2],
   },
   addDrinkEmojiWrap: {
     width: 40,
     height: 44,
-    borderRadius: 12,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -803,8 +803,8 @@ const ws = StyleSheet.create({
   },
   addDrinkEmoji: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'center',
     width: 40,
     height: 44,
@@ -812,18 +812,18 @@ const ws = StyleSheet.create({
   addDrinkInput: {
     fontFamily: 'Unbounded',
     flex: 1,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     height: 44,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    paddingHorizontal: space[3],
   },
   addDrinkBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FF004D',
+    backgroundColor: brand.streepsRed,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -831,55 +831,55 @@ const ws = StyleSheet.create({
   // Step 4: Invite
   inviteCodeWrap: {
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 32,
-    marginBottom: 24,
+    borderRadius: radius.lg,
+    paddingVertical: space[6],
+    paddingHorizontal: space[8],
+    marginBottom: space[6],
   },
   inviteCodeText: {
     fontFamily: 'Unbounded',
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: 28, // TODO(theme-migration): 28 not in typography scale (heading1=26, display=32) — keep for invite-code emphasis
+    fontWeight: fontWeights.bold,
+    color: colors.dark.text.primary,
     letterSpacing: 6,
     textAlign: 'center',
   },
   inviteActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: space[3],
   },
   inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: space[2],
     height: 48,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+    paddingHorizontal: space[6],
+    borderRadius: radius['2xl'],
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   inviteBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
 
   // Step 5: Done
   doneIcon: {
-    marginBottom: 16,
-    marginTop: 40,
+    marginBottom: space[4],
+    marginTop: space[10],
   },
   doneTitle: {
     fontFamily: 'Unbounded',
-    fontSize: 32,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: typography.display.fontSize,
+    fontWeight: '400', // TODO(theme-migration): typography.display is bold (700), keeping '400' for wizard done-screen softer look
+    color: colors.dark.text.primary,
+    marginBottom: space[2],
   },
   doneSubtitle: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
     textAlign: 'center',
   },
 
@@ -894,13 +894,13 @@ const ws = StyleSheet.create({
   // by greedy flex:1 siblings or a keyboard push.
   bottomBar: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    left: space[5],
+    right: space[5],
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingTop: 16,
+    gap: space[3],
+    paddingTop: space[4],
   },
   backBtn: {
     flex: 1,
@@ -909,14 +909,14 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: space[1],
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   backBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: fontWeights.medium,
+    color: brand.inactive,
   },
   morphBtn: {
     flex: 1,
@@ -927,8 +927,8 @@ const ws = StyleSheet.create({
   },
   morphBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: fontWeights.semibold,
   },
   nextBtn: {
     flex: 1,
@@ -936,13 +936,13 @@ const ws = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   nextBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
   beginBtn: {
     flex: 1,
@@ -950,12 +950,12 @@ const ws = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   beginBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.body.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
 });
