@@ -1004,9 +1004,11 @@ export default function HomeScreen() {
                         <View style={s.drinkRow}>
                           <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
                           <Text style={s.drinkName}>{drink.name}</Text>
-                          <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
-                            <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
-                          </View>
+                          {!isDrinkMode && (
+                            <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                              <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                            </View>
+                          )}
                         </View>
                       </AnimatedCard>
                     );
@@ -1020,9 +1022,11 @@ export default function HomeScreen() {
                             <View style={s.drinkRow}>
                               <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
                               <Text style={s.drinkName}>{drink.name}</Text>
-                              <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
-                                <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
-                              </View>
+                              {!isDrinkMode && (
+                                <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                                  <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                                </View>
+                              )}
                             </View>
                           </AnimatedCard>
                         );
