@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  GestureResponderEvent,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { LiveBadge } from '@/src/components/LiveBadge';
-import { colors, radius, space, typography } from '@/src/theme';
+import { brand, colors, radius, space, typography } from '@/src/theme';
 
 export interface ExploreFeedItemGroup {
   id: string;
@@ -30,6 +33,10 @@ interface ExploreFeedItemProps {
   onPress: () => void;
   /** Optionele stabiele seed voor pill-positionering (bijv. bucket-key). */
   seedKey?: string;
+  /** Session-only like-state, beheerd door parent. */
+  liked: boolean;
+  /** Toggle-callback; bepaalt zelf of het een like of unlike is. */
+  onToggleLike: () => void;
 }
 
 // ─── Layout-constants ────────────────────────────────────────────────────────
@@ -40,6 +47,13 @@ const HORIZONTAL_PADDING = space[3]; // 12
 const VERTICAL_PADDING = space[2]; // 8
 const TOP_BAR_HEIGHT = AVATAR_SIZE + space[2]; // 32 + 8 = 40
 const BOTTOM_RESERVE = 28; // ruimte voor LIVE-badge rechts-onder
+// Double-tap window (ms) — Instagram-achtige drempel
+const DOUBLE_TAP_MS = 280;
+// Like-knop icon-afmetingen (voor fly-to target-berekening)
+const LIKE_ICON_SIZE = 22;
+const LIKE_HIT_SLOP = 8;
+// Heart burst icon size
+const BURST_ICON_SIZE = 96;
 // Pill approximations — voor collision-check/bounds
 const PILL_ESTIMATED_WIDTH = 60;
 const PILL_ESTIMATED_HEIGHT = 28;
@@ -343,6 +357,200 @@ function FloatingPill({ layout, emoji, count }: FloatingPillProps) {
   );
 }
 
+// ─── HeartBurst ─────────────────────────────────────────────────────────────
+
+interface HeartBurstProps {
+  /** Tap-positie (relatief aan item-container) waar burst verschijnt. */
+  x: number;
+  y: number;
+  /** Doel-positie (midden van like-knop, relatief aan container). */
+  targetX: number;
+  targetY: number;
+  onComplete: () => void;
+}
+
+/**
+ * Instagram-stijl dubbele-tik hart:
+ *  1. (0-400ms)   scale 0 → 1.3 → 1.0, opacity 0 → 1 — verschijnt op tap-punt
+ *  2. (400-500ms) hold
+ *  3. (500-900ms) vliegt naar like-knop (target), krimpt & fade
+ *
+ * Twee gestapelde iconen (streepsRed + magenta, kleine X-offset) geven een
+ * chromatische glitch-vibe.
+ */
+function HeartBurst({ x, y, targetX, targetY, onComplete }: HeartBurstProps) {
+  const scale = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const fly = useRef(new Animated.Value(0)).current; // 0 = op tap-punt, 1 = op target
+
+  useEffect(() => {
+    Animated.sequence([
+      // Fase 1: appear met overshoot
+      Animated.parallel([
+        Animated.timing(scale, {
+          toValue: 1.3,
+          duration: 250,
+          easing: Easing.out(Easing.back(2)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(scale, {
+        toValue: 1.0,
+        duration: 150,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+      // Fase 2: hold
+      Animated.delay(100),
+      // Fase 3: fly to target + shrink + fade
+      Animated.parallel([
+        Animated.timing(fly, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 0.3,
+          duration: 400,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      onComplete();
+    });
+    // We willen dit precies éénmaal laten lopen per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Burst vertrekt bij tap-punt (x, y) en eindigt bij target.
+  // De View zit ge-"center-anchor"d: we plaatsen de top-left op (x - ICON/2, y - ICON/2)
+  // en animeren translateX/Y van 0 naar (target - tap).
+  const dx = targetX - x;
+  const dy = targetY - y;
+
+  const translateX = fly.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, dx],
+  });
+  const translateY = fly.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, dy],
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Animated.View
+        style={[
+          styles.burstWrap,
+          {
+            left: x - BURST_ICON_SIZE / 2,
+            top: y - BURST_ICON_SIZE / 2,
+            opacity,
+            transform: [{ translateX }, { translateY }, { scale }],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        {/* Laag 1: streepsRed (licht links) */}
+        <Ionicons
+          name="heart"
+          size={BURST_ICON_SIZE}
+          color={brand.streepsRed}
+          style={[styles.burstIcon, { transform: [{ translateX: -2 }] }]}
+        />
+        {/* Laag 2: magenta (licht rechts) */}
+        <Ionicons
+          name="heart"
+          size={BURST_ICON_SIZE}
+          color={brand.magenta}
+          style={[styles.burstIcon, { transform: [{ translateX: 2 }] }]}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── LikeButton ─────────────────────────────────────────────────────────────
+
+interface LikeButtonProps {
+  liked: boolean;
+  onPress: () => void;
+}
+
+function LikeButton({ liked, onPress }: LikeButtonProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    // Scale-bounce bij elke flip
+    Animated.sequence([
+      Animated.spring(scale, {
+        toValue: 0.8,
+        useNativeDriver: true,
+        damping: 14,
+        stiffness: 260,
+      }),
+      Animated.spring(scale, {
+        toValue: 1.15,
+        useNativeDriver: true,
+        damping: 10,
+        stiffness: 220,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 12,
+        stiffness: 200,
+      }),
+    ]).start();
+  }, [liked, scale]);
+
+  const handlePress = (e: GestureResponderEvent) => {
+    // Stop bubbling zodat de parent-Pressable geen tap registreert
+    e?.stopPropagation?.();
+    if (liked) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    onPress();
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      hitSlop={LIKE_HIT_SLOP}
+      style={styles.likeBtnWrap}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Ionicons
+          name={liked ? 'heart' : 'heart-outline'}
+          size={LIKE_ICON_SIZE}
+          color={liked ? brand.magenta : brand.streepsWhite}
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export default function ExploreFeedItem({
@@ -351,9 +559,11 @@ export default function ExploreFeedItem({
   drinkCounts,
   onPress,
   seedKey,
+  liked,
+  onToggleLike,
 }: ExploreFeedItemProps) {
   // Wordt ingevuld door onLayout; default valt terug op een redelijke breedte.
-  const [containerWidth, setContainerWidth] = React.useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   const seed = `${group.id}:${seedKey ?? ''}:${drinkCounts.length}`;
 
@@ -365,9 +575,79 @@ export default function ExploreFeedItem({
     [drinkCounts.length, containerWidth, seed],
   );
 
+  // ── Double-tap detectie ────────────────────────────────────────────────────
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Burst-animatie state (increment key per burst → forceer remount) ──────
+  const [burstKey, setBurstKey] = useState(0);
+  const [burstX, setBurstX] = useState(0);
+  const [burstY, setBurstY] = useState(0);
+
+  // Target voor fly-to = midden van like-knop.
+  // Knop staat op: left=HORIZONTAL_PADDING, bottom=space[2], icon-size=22.
+  // → centerX = HORIZONTAL_PADDING + LIKE_ICON_SIZE/2
+  // → centerY = ITEM_HEIGHT - space[2] - LIKE_ICON_SIZE/2
+  const likeTargetX = HORIZONTAL_PADDING + LIKE_ICON_SIZE / 2;
+  const likeTargetY = ITEM_HEIGHT - space[2] - LIKE_ICON_SIZE / 2;
+
+  // Cleanup: pending single-tap timer afbreken bij unmount
+  useEffect(() => {
+    return () => {
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const triggerBurst = useCallback((x: number, y: number) => {
+    setBurstX(x);
+    setBurstY(y);
+    setBurstKey((k) => k + 1);
+  }, []);
+
+  const handleDoubleTap = useCallback(
+    (x: number, y: number) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      // Like als nog niet geliked; burst speelt altijd af (ook al-geliked =
+      // Instagram-style bevestiging, geen unlike).
+      if (!liked) {
+        onToggleLike();
+      }
+      triggerBurst(x, y);
+    },
+    [liked, onToggleLike, triggerBurst],
+  );
+
+  const handlePress = useCallback(
+    (e: GestureResponderEvent) => {
+      const now = Date.now();
+      const { locationX, locationY } = e.nativeEvent;
+
+      if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+        // Double tap: cancel pending single-tap en trigger burst
+        if (singleTapTimerRef.current) {
+          clearTimeout(singleTapTimerRef.current);
+          singleTapTimerRef.current = null;
+        }
+        lastTapRef.current = 0;
+        handleDoubleTap(locationX, locationY);
+        return;
+      }
+      lastTapRef.current = now;
+      // Defer single-tap action (opent overlay) met DOUBLE_TAP_MS
+      singleTapTimerRef.current = setTimeout(() => {
+        singleTapTimerRef.current = null;
+        onPress();
+      }, DOUBLE_TAP_MS);
+    },
+    [handleDoubleTap, onPress],
+  );
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
@@ -413,6 +693,28 @@ export default function ExploreFeedItem({
         <View style={styles.liveBadgeWrap} pointerEvents="none">
           <LiveBadge size="sm" />
         </View>
+      )}
+
+      {/* Like-knop links onder (Pressable vangt eigen tap, parent niet) */}
+      <View style={styles.likeBtnAbsolute}>
+        <LikeButton liked={liked} onPress={onToggleLike} />
+      </View>
+
+      {/* Heart-burst overlay — remount per burst via key */}
+      {burstKey > 0 && (
+        <HeartBurst
+          key={burstKey}
+          x={burstX}
+          y={burstY}
+          targetX={likeTargetX}
+          targetY={likeTargetY}
+          onComplete={() => {
+            // Laat burstKey staan; volgende burst increment hem verder.
+            // Component unmount automatisch doordat we hem op-key niet meer
+            // renderen — maar omdat burstKey > 0 blijft, blijft hij in de tree.
+            // Dat is OK: opacity is 0, pointerEvents=none.
+          }}
+        />
       )}
     </Pressable>
   );
@@ -482,5 +784,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: HORIZONTAL_PADDING,
     bottom: space[2],
+  },
+  likeBtnAbsolute: {
+    position: 'absolute',
+    left: HORIZONTAL_PADDING,
+    bottom: space[2],
+    // Ensure the button sits visually & tap-prioritized above the row
+    zIndex: 2,
+  },
+  likeBtnWrap: {
+    width: LIKE_ICON_SIZE,
+    height: LIKE_ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  burstWrap: {
+    position: 'absolute',
+    width: BURST_ICON_SIZE,
+    height: BURST_ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  burstIcon: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
 });

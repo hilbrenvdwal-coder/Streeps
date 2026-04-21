@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { brand, colors, space, typography } from '@/src/theme';
@@ -57,6 +57,21 @@ export default function ExploreFeed({ onGroupPress }: ExploreFeedProps) {
   } = useFollowFeed();
 
   const loading = followsLoading || feedLoading;
+
+  // Session-only likes: bevat keys `${groupId}:${bucketKey}` voor geliked items.
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+
+  const toggleLike = useCallback((key: string) => {
+    setLiked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   const handleRefresh = React.useCallback(async () => {
     await Promise.all([refreshFollows(), refreshFeed()]);
@@ -150,21 +165,26 @@ export default function ExploreFeed({ onGroupPress }: ExploreFeedProps) {
         buckets.map((bucket) => (
           <Fragment key={bucket.key}>
             <ExploreFeedSectionHeader label={bucket.label} />
-            {bucket.items.map((item) => (
-              <Fragment key={item.groupId + ':' + bucket.key}>
-                <ExploreFeedItem
-                  group={{
-                    id: item.groupId,
-                    name: item.groupName,
-                    avatarUrl: item.groupAvatarUrl,
-                  }}
-                  isLive={item.isLive}
-                  drinkCounts={item.drinkCounts}
-                  onPress={() => onGroupPress(item.groupId)}
-                  seedKey={bucket.key}
-                />
-              </Fragment>
-            ))}
+            {bucket.items.map((item) => {
+              const itemKey = `${item.groupId}:${bucket.key}`;
+              return (
+                <Fragment key={itemKey}>
+                  <ExploreFeedItem
+                    group={{
+                      id: item.groupId,
+                      name: item.groupName,
+                      avatarUrl: item.groupAvatarUrl,
+                    }}
+                    isLive={item.isLive}
+                    drinkCounts={item.drinkCounts}
+                    onPress={() => onGroupPress(item.groupId)}
+                    seedKey={bucket.key}
+                    liked={liked.has(itemKey)}
+                    onToggleLike={() => toggleLike(itemKey)}
+                  />
+                </Fragment>
+              );
+            })}
           </Fragment>
         ))
       ) : hasFollowedGroups ? (
