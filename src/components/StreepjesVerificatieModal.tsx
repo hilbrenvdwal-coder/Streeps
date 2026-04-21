@@ -392,8 +392,8 @@ const s = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    // TODO(theme-migration): infoCard bg #1A1A1C mapped to colors.dark.surface.default (#252540); +10 luminance shift + hue moves neutral -> bluish, exceeds 4px perceptual threshold
-    backgroundColor: colors.dark.surface.default,
+    // TODO(theme-migration): neutral dark card bg, matches FollowedGroupRow pattern (no theme token for this neutral grey)
+    backgroundColor: '#1F1F1F',
     borderRadius: radius.lg,
     padding: space[4],
     marginBottom: space[6],
