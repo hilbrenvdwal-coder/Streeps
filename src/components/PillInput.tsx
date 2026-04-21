@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, Pressable, type TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { radius, colors } from '@/src/theme';
 
 interface PillInputProps extends Omit<TextInputProps, 'style'> {
   isPassword?: boolean;
@@ -40,7 +41,8 @@ export default function PillInput({ isPassword, style, ...props }: PillInputProp
 const styles = StyleSheet.create({
   wrapper: {
     height: 50,
-    borderRadius: 9999,
+    borderRadius: radius.full,
+    // TODO(theme-migration): components.input.pill.backgroundColor is '#E8E8F0' — differs from Figma login pill '#D9D9D9' by visible hue/luminance. Kept hardcoded.
     backgroundColor: '#D9D9D9',
     flexDirection: 'row',
     alignItems: 'center',
@@ -49,8 +51,9 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // TODO(theme-migration): no matching typography token for fontSize 15 (body=16, bodySm=14); keeping custom to avoid hierarchy shift.
     fontSize: 15,
-    color: '#1A1A2E',
+    color: colors.dark.text.inverse,
     height: 50,
   },
   eye: {

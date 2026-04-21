@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { brand, colors, components } from '@/src/theme';
 
 /**
  * Custom NavBar — Figma node 30:255, glassy look
@@ -80,7 +81,7 @@ export default function CustomNavBar({ state, navigation }: any) {
     width: rightEdge.value - leftEdge.value,
     height: pillHeight.value,
     top: 14 + (PILL_H - pillHeight.value) / 2,
-    borderRadius: 44,
+    borderRadius: components.navBar.pillRadius,
   }));
 
   const icons: Array<{ name: keyof typeof Ionicons.glyphMap; nameFocused: keyof typeof Ionicons.glyphMap }> = [
@@ -138,7 +139,7 @@ export default function CustomNavBar({ state, navigation }: any) {
               <Ionicons
                 name={isFocused ? icon.nameFocused : icon.name}
                 size={20}
-                color={isFocused ? '#FFFFFF' : '#878787'}
+                color={isFocused ? colors.dark.text.primary : brand.inactive}
               />
             </Pressable>
           );
@@ -170,8 +171,8 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: 'absolute',
-    backgroundColor: '#FF0085',
-    shadowColor: '#FF0085',
+    backgroundColor: brand.magenta,
+    shadowColor: brand.magenta,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 9.4,
