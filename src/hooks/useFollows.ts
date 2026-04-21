@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -51,6 +51,11 @@ function pickGroup(groups: GroupRow | GroupRow[] | null | undefined): GroupRow |
 export function useFollows() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  // useId() returns a stable, unique string per component instance (survives
+  // re-renders, changes only on unmount/remount). This prevents Supabase from
+  // reusing a shared channel-name when multiple instances of useFollows() are
+  // mounted at the same time (e.g. ExploreFeed + GroupProfileOverlay).
+  const instanceId = useId();
 
   const [followedGroups, setFollowedGroups] = useState<FollowedGroup[]>([]);
   const [explicitFollowIds, setExplicitFollowIds] = useState<Set<string>>(new Set());
@@ -224,7 +229,7 @@ export function useFollows() {
     // We consolidate all three tables onto one channel to avoid any risk of
     // channel-name reuse across effect re-runs (e.g. StrictMode double-mount).
     const channel = supabase
-      .channel(`follows:user:${userId}`)
+      .channel(`follows:user:${userId}:${instanceId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -252,7 +257,7 @@ export function useFollows() {
         tallyRefetchTimerRef.current = null;
       }
     };
-  }, [userId, fetchAll, scheduleTallyRefetch]);
+  }, [userId, instanceId, fetchAll, scheduleTallyRefetch]);
 
   // ---- Mutations ----
 
