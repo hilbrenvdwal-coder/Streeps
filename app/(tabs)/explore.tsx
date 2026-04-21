@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from '@/components/useColorScheme';
 import { getTheme, type Theme, auroraPalettes } from '@/src/theme';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
+import ExploreFeed from '@/src/components/ExploreFeed';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
@@ -31,9 +32,15 @@ export default function ExploreScreen() {
         <Text style={styles.title}>Verkennen</Text>
       </View>
 
-      {/* Placeholder content */}
-      <View style={styles.placeholderWrap}>
-        <Text style={styles.placeholderText}>Binnenkort...</Text>
+      {/* Feed */}
+      <View style={styles.feedWrap}>
+        <ExploreFeed
+          onGroupPress={(groupId) => {
+            // TODO(Phase 3 B1): open GroupProfileOverlay via chat.tsx integration.
+            // For now, placeholder logging — deferred to a later merge.
+            console.log('[explore] open group', groupId);
+          }}
+        />
       </View>
     </View>
   );
@@ -59,16 +66,8 @@ function createStyles(t: Theme) {
       paddingTop: s(10),
     },
 
-    placeholderWrap: {
+    feedWrap: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingBottom: 120,
-    },
-    placeholderText: {
-      fontFamily: 'Unbounded',
-      fontSize: 18,
-      color: '#848484',
     },
   });
 }
