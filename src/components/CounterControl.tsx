@@ -9,7 +9,7 @@ import ReAnimated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { brand, radius, typography } from '@/src/theme';
+import { animation, brand, radius, typography } from '@/src/theme';
 
 /**
  * Counter Control — native translation of "Counter" group from Home_fixed_v4.svg
@@ -36,7 +36,11 @@ interface CounterControlProps {
    * The component does NOT cycle state itself — parent handles it.
    */
   onSwipeCycle?: (direction: 'next' | 'prev') => void;
-  /** Disables the swipe gesture entirely when true. */
+  /**
+   * Disables all interactions (plus/minus/submit presses and swipe gesture) when true.
+   * The entire control is rendered at reduced opacity to signal the disabled state.
+   * Use this when no drinks exist in the group so the button cannot be "lit up".
+   */
   disabled?: boolean;
 }
 
@@ -290,9 +294,16 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
   }, [onSubmit]);
 
   return (
-    <ReAnimated.View style={[s.row, swipeStyle]} {...panResponder.panHandlers}>
+    <ReAnimated.View style={[s.row, swipeStyle, disabled && { opacity: animation.disabled.opacity }]} {...panResponder.panHandlers}>
       {/* ── Minus button ── */}
-      <Pressable style={[s.glowWrap, s.minusGlow]} onPress={() => { if (!minusRepeat.fired.current) onDecrement(); }} onPressIn={() => { minus.fadeIn(); minusRepeat.start(); }} onPressOut={() => { minus.fadeOut(); minusRepeat.stop(); }} onResponderTerminate={() => { minusRepeat.stop(); }} hitSlop={10}>
+      <Pressable
+        style={[s.glowWrap, s.minusGlow]}
+        onPress={() => { if (disabled || minusRepeat.fired.current) return; onDecrement(); }}
+        onPressIn={() => { if (disabled) return; minus.fadeIn(); minusRepeat.start(); }}
+        onPressOut={() => { if (disabled) return; minus.fadeOut(); minusRepeat.stop(); }}
+        onResponderTerminate={() => { minusRepeat.stop(); }}
+        hitSlop={10}
+      >
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(minus.opacity, 0.4) as any) as any }]}>
           <BlurView
             intensity={90}
@@ -307,7 +318,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
       </Pressable>
 
       {/* ── Counter display (tap to submit) ── */}
-      <Pressable style={[s.displayGlow]} onPress={handleSubmitPress}>
+      <Pressable style={[s.displayGlow]} onPress={disabled ? undefined : handleSubmitPress}>
         <View style={s.displayInner}>
           {/* Outer thick ring — category color, opacity pulses */}
           {/* Outer thick ring — category color, center-stroked, with glow */}
@@ -353,7 +364,14 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
       </Pressable>
 
       {/* ── Plus button ── */}
-      <Pressable style={[s.glowWrap, s.plusGlow]} onPress={() => { if (!plusRepeat.fired.current) onIncrement(); }} onPressIn={() => { plus.fadeIn(); plusRepeat.start(); }} onPressOut={() => { plus.fadeOut(); plusRepeat.stop(); }} onResponderTerminate={() => { plusRepeat.stop(); }} hitSlop={10}>
+      <Pressable
+        style={[s.glowWrap, s.plusGlow]}
+        onPress={() => { if (disabled || plusRepeat.fired.current) return; onIncrement(); }}
+        onPressIn={() => { if (disabled) return; plus.fadeIn(); plusRepeat.start(); }}
+        onPressOut={() => { if (disabled) return; plus.fadeOut(); plusRepeat.stop(); }}
+        onResponderTerminate={() => { plusRepeat.stop(); }}
+        hitSlop={10}
+      >
         <Animated.View style={[s.btnInner, s.btnClean, { opacity: Animated.add(0.6, Animated.multiply(plus.opacity, 0.4) as any) as any }]}>
           <BlurView
             intensity={90}

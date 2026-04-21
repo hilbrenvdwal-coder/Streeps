@@ -708,6 +708,7 @@ export default function HomeScreen() {
           ? (selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined)
           : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined)
         }
+        disabled={isDrinkMode ? drinkCategories.length === 0 : activeCategories.length === 0}
       />
       {!isDrinkMode && selectedCategory && credits[selectedCategory] > 0 && (
         <View style={s.creditBadge}>
