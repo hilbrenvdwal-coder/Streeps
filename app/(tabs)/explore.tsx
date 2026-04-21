@@ -8,6 +8,7 @@ import { getTheme, type Theme, auroraPalettes } from '@/src/theme';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import ExploreFeed from '@/src/components/ExploreFeed';
 import SearchGroupsModal from '@/src/components/SearchGroupsModal';
+import GroupProfileOverlay from '@/src/components/GroupProfileOverlay';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
@@ -19,11 +20,20 @@ export default function ExploreScreen() {
   const styles = useMemo(() => createStyles(t), [mode]);
   const insets = useSafeAreaInsets();
   const [searchVisible, setSearchVisible] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
-  // TODO(Phase 3 B3): open GroupProfileOverlay op de explore-tab zelf.
-  // Voor nu loggen we alleen — de overlay zit nu aan chat.tsx gekoppeld.
+  // Explore → GroupProfileOverlay: open direct vanuit feed. Vanuit de
+  // search-modal sluiten we eerst de modal zodat de overlay daaroverheen
+  // kan animeren i.p.v. achter de Modal-laag te verdwijnen.
   const handleGroupPress = (groupId: string) => {
-    console.log('[explore] open group', groupId);
+    setSelectedGroupId(groupId);
+  };
+
+  const handleSearchGroupPress = (groupId: string) => {
+    setSearchVisible(false);
+    // Kleine delay zodat de modal eerst dichtvaagt; voorkomt een
+    // visuele "spring" wanneer de overlay opent.
+    setTimeout(() => setSelectedGroupId(groupId), 200);
   };
 
   return (
@@ -59,7 +69,14 @@ export default function ExploreScreen() {
       <SearchGroupsModal
         visible={searchVisible}
         onClose={() => setSearchVisible(false)}
-        onGroupPress={handleGroupPress}
+        onGroupPress={handleSearchGroupPress}
+      />
+
+      {/* Group profile overlay (full-screen, slide-in). */}
+      <GroupProfileOverlay
+        visible={selectedGroupId !== null}
+        groupId={selectedGroupId}
+        onClose={() => setSelectedGroupId(null)}
       />
     </View>
   );
