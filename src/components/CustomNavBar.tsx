@@ -26,11 +26,19 @@ const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
 const scale = (v: number) => (v / DESIGN_W) * SCREEN_W;
 
-const TAB_ORDER = ['activiteit', 'home', 'chat'];
+const TAB_ORDER = ['geschiedenis', 'rekening', 'home', 'chat', 'explore'];
 
-const PILL_POSITIONS = [24, 155, 286];
-const PILL_W = 80;
-const ICON_X = [48 + 16, 179 + 16, 310 + 16];
+const TAB_COUNT = 5;
+const SIDE_MARGIN = 20;
+const PILL_W = 56;
+const FIRST_CENTER = SIDE_MARGIN + PILL_W / 2;
+const LAST_CENTER = DESIGN_W - SIDE_MARGIN - PILL_W / 2;
+const STRIDE = (LAST_CENTER - FIRST_CENTER) / (TAB_COUNT - 1);
+
+const PILL_POSITIONS = Array.from({ length: TAB_COUNT },
+  (_, i) => FIRST_CENTER + i * STRIDE - PILL_W / 2);
+const ICON_X = Array.from({ length: TAB_COUNT },
+  (_, i) => FIRST_CENTER + i * STRIDE - 24);
 
 const PILL_LEFTS = PILL_POSITIONS.map((x) => scale(x));
 
@@ -46,7 +54,7 @@ export default function CustomNavBar({ state, navigation }: any) {
 
   const activeRouteName = state.routes[state.index]?.name;
   const visibleIndex = TAB_ORDER.indexOf(activeRouteName);
-  const activeTab = visibleIndex >= 0 ? visibleIndex : 1;
+  const activeTab = visibleIndex >= 0 ? visibleIndex : 2;
 
   const prevTab = useRef(activeTab);
   const leftEdge = useSharedValue(PILL_LEFTS[activeTab]);
@@ -85,9 +93,11 @@ export default function CustomNavBar({ state, navigation }: any) {
   }));
 
   const icons: Array<{ name: keyof typeof Ionicons.glyphMap; nameFocused: keyof typeof Ionicons.glyphMap }> = [
-    { name: 'people-outline', nameFocused: 'people' },
-    { name: 'home-outline', nameFocused: 'home' },
+    { name: 'time-outline',        nameFocused: 'time' },
+    { name: 'wallet-outline',      nameFocused: 'wallet' },
+    { name: 'home-outline',        nameFocused: 'home' },
     { name: 'chatbubbles-outline', nameFocused: 'chatbubbles' },
+    { name: 'compass-outline',     nameFocused: 'compass' },
   ];
 
   return (

@@ -48,9 +48,16 @@ export default function TabLayout() {
         options={{ href: null }}
       />
       <Tabs.Screen
-        name="activiteit"
+        name="geschiedenis"
         options={{
-          title: 'Activiteit',
+          title: 'Geschiedenis',
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="rekening"
+        options={{
+          title: 'Rekening',
           headerShown: false,
         }}
       />
@@ -69,6 +76,13 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Berichten',
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Verkennen',
           headerShown: false,
         }}
       />

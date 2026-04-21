@@ -1,37 +1,28 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
-  FlatList,
-  ActivityIndicator,
   RefreshControl,
   Pressable,
   Dimensions,
-  Animated,
-  Easing,
   Alert,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, type Theme } from '@/src/theme';
+import { getTheme, type Theme, auroraPalettes } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
-import { useHistory, formatTimeAgo } from '@/src/hooks/useHistory';
+import { formatTimeAgo } from '@/src/hooks/useHistory';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import * as Haptics from 'expo-haptics';
-import { AnimatedCard } from '@/src/components/AnimatedCard';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
 const s = (v: number) => (v / DESIGN_W) * SCREEN_W;
-
-const ACTIVITEIT_AURORA_COLORS = ['#FF0015', '#FF00F5', '#F1F1F1', '#FF00F5'];
 
 interface GroupBill {
   group_id: string;
@@ -53,61 +44,17 @@ interface SettlementRecord {
   admin_name: string;
 }
 
-const TABS = [
-  { key: 'geschiedenis' as const, label: 'Geschiedenis' },
-  { key: 'rekening' as const, label: 'Rekening' },
-];
-
-export default function ActiviteitScreen() {
+export default function RekeningScreen() {
   const mode = useColorScheme();
   const t = getTheme(mode);
   const styles = useMemo(() => createStyles(t), [mode]);
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [tab, setTab] = useState<'rekening' | 'geschiedenis'>('geschiedenis');
-  const SCREEN_W = Dimensions.get('window').width;
-
-  // ── Swipeable pager ──
-  const pagerRef = useRef<ScrollView>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-
-  // ── Animated tab indicator (driven by scroll position) ──
-  const tabLayouts = useRef<{ x: number; w: number }[]>([]).current;
-  const tabReady = useRef(false);
-  const [tabLayoutsReady, setTabLayoutsReady] = useState(false);
-
-  const onTabLayout = useCallback((index: number, x: number, w: number) => {
-    tabLayouts[index] = { x, w };
-    if (tabLayouts.filter(Boolean).length === TABS.length && !tabReady.current) {
-      tabReady.current = true;
-      setTabLayoutsReady(true);
-    }
-  }, []);
-
-  // Interpolate indicator position from scroll offset
-  const tabX = tabLayoutsReady && tabLayouts[0] && tabLayouts[1]
-    ? scrollX.interpolate({ inputRange: [0, SCREEN_W], outputRange: [tabLayouts[0].x, tabLayouts[1].x], extrapolate: 'clamp' })
-    : new Animated.Value(0);
-  const tabW = tabLayoutsReady && tabLayouts[0] && tabLayouts[1]
-    ? scrollX.interpolate({ inputRange: [0, SCREEN_W], outputRange: [tabLayouts[0].w, tabLayouts[1].w], extrapolate: 'clamp' })
-    : new Animated.Value(0);
-
-  const activeTabIndex = TABS.findIndex((t) => t.key === tab);
-
-  const handleTabPress = (index: number) => {
-    setTab(TABS[index].key);
-    pagerRef.current?.scrollTo({ x: index * SCREEN_W, animated: true });
-  };
-
-  // ── Bill data ──
   const [bills, setBills] = useState<GroupBill[]>([]);
   const [pendingSettlements, setPendingSettlements] = useState<SettlementRecord[]>([]);
   const [pastSettlements, setPastSettlements] = useState<SettlementRecord[]>([]);
   const [billLoading, setBillLoading] = useState(true);
-
-  // ── History data ──
-  const { history, loading: historyLoading, refresh: refreshHistory, loadMore, loadingMore } = useHistory();
 
   const fetchBills = useCallback(async () => {
     if (!user) return;
@@ -272,142 +219,28 @@ export default function ActiviteitScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={['#0E0D1C', '#202020']} style={StyleSheet.absoluteFillObject} />
 
-      {/* Status bar spacer + aurora + title + tab switcher are fixed at top */}
+      {/* Status bar spacer + aurora + title */}
       <View style={{ paddingTop: insets.top }}>
         {/* Aurora */}
         <View style={styles.auroraWrap} pointerEvents="none">
-          <AuroraPresetView preset="header" colors={ACTIVITEIT_AURORA_COLORS} animated />
+          <AuroraPresetView preset="header" colors={[...auroraPalettes.settlement]} animated />
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>Activiteit</Text>
-
-        {/* Tab switcher */}
-        <View style={styles.tabBar}>
-          <Animated.View style={[styles.tabIndicator, { left: tabX, width: tabW }]} />
-          {TABS.map((t, i) => {
-            const activeOpacity = scrollX.interpolate({
-              inputRange: [0, SCREEN_W],
-              outputRange: i === 0 ? [1, 0] : [0, 1],
-              extrapolate: 'clamp',
-            });
-            return (
-              <Pressable
-                key={t.key}
-                style={styles.tabBtn}
-                onPress={() => handleTabPress(i)}
-                onLayout={(e) => onTabLayout(i, e.nativeEvent.layout.x, e.nativeEvent.layout.width)}
-              >
-                <Text style={styles.tabText}>{t.label}</Text>
-                <Animated.Text style={[styles.tabText, styles.tabTextActive, { position: 'absolute', opacity: activeOpacity }]}>
-                  {t.label}
-                </Animated.Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Text style={styles.title}>Rekening</Text>
       </View>
 
-      {/* Swipeable content pager */}
-      <Animated.ScrollView
-        ref={pagerRef as any}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
-        onMomentumScrollEnd={(e) => {
-          const page = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
-          if (TABS[page]) setTab(TABS[page].key);
-        }}
-        style={{ flex: 1 }}
-      >
-        {/* Page 0: Geschiedenis */}
-        <View style={{ width: SCREEN_W, flex: 1 }}>
-          <MaskedView
-            style={{ flex: 1 }}
-            maskElement={
-              <View style={{ flex: 1 }}>
-                <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
-                <View style={{ flex: 1, backgroundColor: '#000' }} />
-              </View>
-            }
-          >
-          <FlatList
-            data={history}
-            keyExtractor={(item) => item.id}
-            onRefresh={refreshHistory}
-            refreshing={historyLoading}
-            contentContainerStyle={styles.historyScrollContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              historyLoading
-                ? <ActivityIndicator size="large" color="#FF004D" style={{ marginTop: 80 }} />
-                : <Text style={styles.emptyText}>Nog geen streepjes gezet</Text>
-            }
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.3}
-            ListFooterComponent={
-              loadingMore
-                ? <ActivityIndicator size="small" color="#FF004D" style={{ paddingVertical: 24 }} />
-                : null
-            }
-            renderItem={({ item, index }) => {
-              const catColor = t.categoryColors[(item.category - 1) % 4];
-              const catLabel = item.type === 'gift_sent'
-                ? `Gedoneerd · ${item.drinks_as_categories && item.drink_name ? item.drink_name : `Cat ${item.category}`}`
-                : (item.drinks_as_categories && item.drink_name
-                    ? `${item.drink_emoji ? item.drink_emoji + ' ' : ''}${item.drink_name}`
-                    : `Categorie ${item.category}`);
-              const displayCount = item.type === 'gift_sent'
-                ? (item.gift_quantity ?? 1)
-                : (item.count ?? 1);
-              return (
-                <AnimatedCard index={index} enabled={index < 15}>
-                <View style={[
-                  styles.historyCard,
-                  item.removed && { opacity: 0.4 },
-                ]}>
-                  {/* Left: count container */}
-                  <View style={styles.historyCountBox}>
-                    <Text style={styles.historyCountText}>{displayCount}</Text>
-                    {item.type === 'gift_sent' && (
-                      <View style={styles.giftIconOverlay}>
-                        <Ionicons name="gift" size={14} color="#00BEAE" />
-                      </View>
-                    )}
-                  </View>
-                  {/* Right: badge + meta */}
-                  <View style={styles.historyRight}>
-                    <View style={[styles.historyCatBadge, { backgroundColor: catColor + '20' }]}>
-                      <Text style={[styles.historyCatBadgeText, { color: catColor }]}>{catLabel}</Text>
-                    </View>
-                    <Text style={styles.historyMeta}>
-                      {item.group_name} · {formatTimeAgo(item.created_at)}
-                    </Text>
-                  </View>
-                </View>
-                </AnimatedCard>
-              );
-            }}
-          />
-          </MaskedView>
-        </View>
-
-        {/* Page 1: Rekening */}
-        <View style={{ width: SCREEN_W, flex: 1 }}>
-          <MaskedView
-            style={{ flex: 1 }}
-            maskElement={
-              <View style={{ flex: 1 }}>
-                <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
-                <View style={{ flex: 1, backgroundColor: '#000' }} />
-              </View>
-            }
-          >
+      {/* Rekening content */}
+      <View style={{ flex: 1 }}>
+        <MaskedView
+          style={{ flex: 1 }}
+          maskElement={
+            <View style={{ flex: 1 }}>
+              <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
+              <View style={{ flex: 1, backgroundColor: '#000' }} />
+            </View>
+          }
+        >
           <ScrollView
             refreshControl={<RefreshControl refreshing={billLoading} onRefresh={fetchBills} tintColor="#FF004D" />}
             contentContainerStyle={styles.scrollContent}
@@ -557,17 +390,14 @@ export default function ActiviteitScreen() {
               </>
             )}
           </ScrollView>
-          </MaskedView>
-        </View>
-      </Animated.ScrollView>
+        </MaskedView>
+      </View>
     </View>
   );
 }
 
 function createStyles(t: Theme) {
   return StyleSheet.create({
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
     // Aurora
     auroraWrap: {
       position: 'absolute',
@@ -586,48 +416,9 @@ function createStyles(t: Theme) {
       paddingTop: s(10),
     },
 
-    // ── Tab switcher (from SVG: rx=25, h=50, bg=rgba(78,78,78,0.4)) ──
-    tabBar: {
-      flexDirection: 'row',
-      marginHorizontal: s(25),
-      marginTop: s(16),
-      height: s(50),
-      borderRadius: 25,
-      backgroundColor: 'rgba(78, 78, 78, 0.4)',
-      padding: s(5),
-      alignItems: 'center',
-    },
-    tabIndicator: {
-      position: 'absolute',
-      top: s(5),
-      bottom: s(5),
-      borderRadius: 20,
-      backgroundColor: 'rgba(255, 0, 77, 0.19)',
-    },
-    tabBtn: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100%',
-      borderRadius: 20,
-    },
-    tabText: {
-      fontFamily: 'Unbounded',
-      fontSize: 14,
-      fontWeight: '500',
-      color: '#848484',
-    },
-    tabTextActive: {
-      color: '#FF004D',
-    },
-
     // ── Scroll content ──
     scrollContent: {
       paddingHorizontal: s(23),
-      paddingTop: s(16),
-      paddingBottom: 120,
-    },
-    historyScrollContent: {
       paddingTop: s(16),
       paddingBottom: 120,
     },
@@ -741,64 +532,6 @@ function createStyles(t: Theme) {
       fontSize: 12,
       fontWeight: '600',
       color: '#FFFFFF',
-    },
-    catDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      marginRight: 10,
-    },
-
-    // ── History card (matches confirmatie modal info card) ──
-    historyCard: {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      backgroundColor: 'transparent',
-      padding: 16,
-      marginBottom: 0,
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(255,255,255,0.06)',
-    },
-    historyCountBox: {
-      width: 64,
-      height: 64,
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-    },
-    giftIconOverlay: {
-      position: 'absolute' as const,
-      top: 2,
-      right: 2,
-      backgroundColor: 'rgba(0, 190, 174, 0.15)',
-      borderRadius: 10,
-      padding: 3,
-    },
-    historyCountText: {
-      fontFamily: 'Unbounded-SemiBold',
-      fontSize: 36,
-      color: '#FFFFFF',
-    },
-    historyRight: {
-      flex: 1,
-      marginLeft: 16,
-      justifyContent: 'space-evenly' as const,
-      height: 64,
-    },
-    historyCatBadge: {
-      alignSelf: 'flex-start' as const,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 7,
-    },
-    historyCatBadgeText: {
-      fontFamily: 'Unbounded',
-      fontSize: 11,
-      fontWeight: '500' as const,
-    },
-    historyMeta: {
-      fontFamily: 'Unbounded',
-      color: '#848484',
-      fontSize: 11,
     },
 
     // ── Empty state ──
