@@ -219,7 +219,11 @@ export function useFollows() {
 
     if (!userId) return;
 
-    const followsChannel = supabase
+    // All .on() calls must be chained BEFORE .subscribe() — Supabase Realtime
+    // does not allow adding postgres_changes callbacks after subscribe().
+    // We consolidate all three tables onto one channel to avoid any risk of
+    // channel-name reuse across effect re-runs (e.g. StrictMode double-mount).
+    const channel = supabase
       .channel(`follows:user:${userId}`)
       .on('postgres_changes', {
         event: '*',
@@ -227,21 +231,13 @@ export function useFollows() {
         table: 'group_follows',
         filter: `user_id=eq.${userId}`,
       }, () => fetchAll())
-      .subscribe();
-
-    const membersChannel = supabase
-      .channel(`follows-members:user:${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'group_members',
         filter: `user_id=eq.${userId}`,
       }, () => fetchAll())
-      .subscribe();
-
-    // Tally events are a firehose; debounce to avoid rerender storms.
-    const talliesChannel = supabase
-      .channel(`follows-tallies:user:${userId}`)
+      // Tally events are a firehose; debounce to avoid rerender storms.
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -250,9 +246,7 @@ export function useFollows() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(followsChannel);
-      supabase.removeChannel(membersChannel);
-      supabase.removeChannel(talliesChannel);
+      supabase.removeChannel(channel);
       if (tallyRefetchTimerRef.current) {
         clearTimeout(tallyRefetchTimerRef.current);
         tallyRefetchTimerRef.current = null;
