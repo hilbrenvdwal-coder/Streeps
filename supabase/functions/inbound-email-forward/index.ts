@@ -1,6 +1,6 @@
-// Receives Resend inbound webhooks and forwards parsed emails to a fixed
-// Gmail address via Resend's outbound API. Lets us use `contact@streeps.app`
-// as a contact address without running a real inbox.
+// Receives Resend inbound webhooks, fetches the full email body via
+// GET /emails/receiving/{id}, and forwards it to a fixed Gmail address
+// via Resend's outbound API. Defensive From display name handling.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +25,35 @@ function extractEmail(raw: unknown): string {
   return String(raw)
 }
 
+function parseFromField(raw: string): { name: string, email: string } {
+  const match = raw.match(/^(.*?)\s*<([^>]+)>\s*$/)
+  if (match) {
+    return {
+      name: (match[1] || '').trim().replace(/^["']|["']$/g, ''),
+      email: match[2].trim(),
+    }
+  }
+  return { name: '', email: raw.trim() }
+}
+
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+
+function normalizeMessageId(id: string): string {
+  const trimmed = id.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('<') && trimmed.endsWith('>')) return trimmed
+  return `<${trimmed}>`
+}
+
+// RFC 5322 safe display name: strip quotes/brackets/newlines, keep ASCII.
+function safeDisplayName(name: string): string {
+  return name
+    .replace(/[<>"\\\r\n\t]/g, '')
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim()
+    .slice(0, 50)
 }
 
 Deno.serve(async (req) => {
@@ -38,51 +65,75 @@ Deno.serve(async (req) => {
     return new Response('method not allowed', { status: 405, headers: corsHeaders })
   }
 
-  if (!RESEND_API_KEY) {
-    console.error('Missing RESEND_API_KEY env var')
-    return new Response('server misconfigured', { status: 500, headers: corsHeaders })
-  }
-  if (!FORWARD_TO) {
-    console.error('Missing FORWARD_TO_EMAIL env var')
+  if (!RESEND_API_KEY || !FORWARD_TO) {
     return new Response('server misconfigured', { status: 500, headers: corsHeaders })
   }
 
   try {
     const body = await req.json() as Record<string, unknown>
-    console.log('[inbound-email-forward] webhook received:', JSON.stringify(body).slice(0, 500))
-
-    // Resend inbound payload — support a few possible shapes
     const data = (body.data ?? body) as Record<string, unknown>
 
-    const fromRaw = data.from ?? data.sender
-    const from = extractEmail(fromRaw)
+    const rawFrom = typeof data.from === 'string' ? data.from : extractEmail(data.from ?? data.sender)
+    const parsed = parseFromField(rawFrom)
+    const senderEmail = parsed.email
     const to = extractEmail(data.to)
     const subject = typeof data.subject === 'string' ? data.subject : '(geen onderwerp)'
-    const text = typeof data.text === 'string' ? data.text : ''
-    const html = typeof data.html === 'string' ? data.html : ''
+    const emailId = typeof data.email_id === 'string' ? data.email_id : (typeof data.id === 'string' ? data.id : '')
+    const originalMessageId = typeof data.message_id === 'string' ? normalizeMessageId(data.message_id) : ''
 
-    if (!from) {
-      console.error('[inbound-email-forward] missing from field in payload')
-      return new Response('invalid payload: no sender', { status: 400, headers: corsHeaders })
+    if (!senderEmail || !emailId) {
+      return new Response('invalid payload: missing from or email_id', { status: 400, headers: corsHeaders })
     }
 
-    // Build forwarded email body
-    const forwardHeader =
-      `<div style="background:#F4F4F8;border-left:3px solid #FF0085;padding:12px 16px;margin-bottom:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#4A4A68;">` +
-      `<strong style="color:#0E0D1C;">Inkomende mail via contact@streeps.app</strong><br/>` +
-      `<strong>Van:</strong> ${esc(from)}<br/>` +
-      `<strong>Aan:</strong> ${esc(to || 'contact@streeps.app')}<br/>` +
-      `<strong>Onderwerp:</strong> ${esc(subject)}` +
-      `</div>`
+    const fetchRes = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
+    })
 
-    const forwardedHtml = html || `<pre style="white-space:pre-wrap;font-family:-apple-system,sans-serif;">${esc(text)}</pre>`
-    const finalHtml = forwardHeader + forwardedHtml
-    const finalText =
-      `--- Inkomende mail via contact@streeps.app ---\n` +
-      `Van: ${from}\n` +
-      `Aan: ${to || 'contact@streeps.app'}\n` +
-      `Onderwerp: ${subject}\n\n` +
-      (text || '(geen plain text body)')
+    if (!fetchRes.ok) {
+      const errText = await fetchRes.text()
+      console.error('[inbound] fetch failed:', fetchRes.status, errText)
+      return new Response(`fetch failed: ${fetchRes.status}`, { status: 500, headers: corsHeaders })
+    }
+
+    const fullEmail = await fetchRes.json() as Record<string, unknown>
+    const fetchedText = typeof fullEmail.text === 'string' ? fullEmail.text : ''
+    const fetchedHtml = typeof fullEmail.html === 'string' ? fullEmail.html : ''
+
+    const fullFromRaw = typeof fullEmail.from === 'string' ? fullEmail.from : rawFrom
+    const fullParsed = parseFromField(fullFromRaw)
+    const rawName = fullParsed.name || parsed.name || senderEmail.split('@')[0] || ''
+    const cleanName = safeDisplayName(rawName)
+    const senderEmailFinal = fullParsed.email || senderEmail
+
+    const bodyHtml = fetchedHtml
+      ? fetchedHtml
+      : fetchedText
+        ? `<pre style="white-space:pre-wrap;font-family:-apple-system,sans-serif;">${esc(fetchedText)}</pre>`
+        : '<p style="color:#999;"><em>(lege mail)</em></p>'
+
+    const bodyText = fetchedText || '(geen plain text body)'
+
+    const displayName = cleanName
+      ? `"${cleanName} via Streeps"`
+      : '"Streeps Contact"'
+    const displayFrom = `${displayName} <${FORWARD_FROM}>`
+
+    console.log('[inbound] sending with From:', displayFrom, 'reply_to:', senderEmailFinal)
+
+    const outboundPayload: Record<string, unknown> = {
+      from: displayFrom,
+      to: [FORWARD_TO],
+      reply_to: senderEmailFinal,
+      subject: subject,
+      html: bodyHtml,
+      text: bodyText,
+    }
+    if (originalMessageId) {
+      outboundPayload.headers = {
+        'In-Reply-To': originalMessageId,
+        'References': originalMessageId,
+      }
+    }
 
     const sendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -90,31 +141,23 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: `Streeps Contact <${FORWARD_FROM}>`,
-        to: [FORWARD_TO],
-        reply_to: from,
-        subject: `[Streeps] ${subject}`,
-        html: finalHtml,
-        text: finalText,
-      }),
+      body: JSON.stringify(outboundPayload),
     })
 
+    const sendResBody = await sendRes.text()
     if (!sendRes.ok) {
-      const errText = await sendRes.text()
-      console.error('[inbound-email-forward] Resend send error:', sendRes.status, errText)
-      return new Response(`forward failed: ${sendRes.status}`, { status: 500, headers: corsHeaders })
+      console.error('[inbound] send error:', sendRes.status, sendResBody)
+      return new Response(`forward failed: ${sendRes.status} ${sendResBody}`, { status: 500, headers: corsHeaders })
     }
 
-    const result = await sendRes.json()
-    console.log('[inbound-email-forward] forwarded ok:', result.id ?? 'no id')
+    console.log('[inbound] send response:', sendResBody)
 
-    return new Response(JSON.stringify({ ok: true, forwarded_to: FORWARD_TO }), {
+    return new Response(JSON.stringify({ ok: true, resend: sendResBody }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    console.error('[inbound-email-forward] error:', err)
+    console.error('[inbound] error:', err)
     return new Response(`error: ${String(err)}`, { status: 500, headers: corsHeaders })
   }
 })

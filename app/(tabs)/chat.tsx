@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   StyleSheet, View, Text, Pressable, FlatList, TextInput,
   Dimensions, Animated, Easing, ScrollView, Alert, Platform, PanResponder,
-  Keyboard, Share, ActivityIndicator, Switch, Modal, InteractionManager,
+  Keyboard, ActivityIndicator, Switch, Modal, InteractionManager,
   AppState, KeyboardAvoidingView,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -12,24 +12,27 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, streepsMagenta, brand } from '@/src/theme';
+import { getTheme, streepsMagenta, brand, colors as themeColors, radius as themeRadius, space as themeSpace, typography as themeTypography } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { useConversations, useChatMessages, useContacts, startDM, sendGiftMessage, type ConversationPreview } from '@/src/hooks/useChat';
+import { useFollows } from '@/src/hooks/useFollows';
 import { useNavBarAnim } from './_layout';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaskedView from '@react-native-masked-view/masked-view';
-import Svg, { Path, G } from 'react-native-svg';
+import BotIcon from '@/src/components/BotIcon';
+import GroupProfileOverlay from '@/src/components/GroupProfileOverlay';
+import { useSwipeDismiss } from '@/src/hooks/useSwipeDismiss';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import ImageLightbox, { type ImageLayout } from '@/src/components/ImageLightbox';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import { preloadConversation, scheduleUnload, cancelUnload } from '@/src/hooks/useMessagePreloadCache';
-import { BOT_UUID, BOT_DEFAULT_NAME, MAX_BOT_NAME_LENGTH } from '@/src/constants/bot';
-import { BOT_DIMENSIONS, BOT_DEFAULTS, BOT_MONTHLY_LIMIT, type BotSettings } from '@/src/constants/botSettings';
+import { BOT_UUID, BOT_DEFAULT_NAME } from '@/src/constants/bot';
+import { type BotSettings } from '@/src/constants/botSettings';
 import FeedbackOverlay from '@/src/components/FeedbackOverlay';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -129,43 +132,6 @@ function usePressScale() {
 }
 
 // ── Swipe-to-dismiss hook for overlays ──
-function useSwipeDismiss(onDismiss: () => void, overlayAnim?: Animated.Value) {
-  const swipeX = useRef(new Animated.Value(0)).current;
-  const scrimOpacity = useMemo(() => {
-    if (!overlayAnim) return swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.3, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' });
-    return Animated.multiply(
-      overlayAnim,
-      swipeX.interpolate({ inputRange: [0, SCREEN_W * 0.3, SCREEN_W], outputRange: [1, 1, 0], extrapolate: 'clamp' })
-    );
-  }, [overlayAnim, swipeX]);
-  const pan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gs) => gs.dx > 10 && gs.moveX < 80 && Math.abs(gs.dy) < 25,
-      onPanResponderMove: (_, gs) => { if (gs.dx > 0) swipeX.setValue(gs.dx); },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dx > 80 || gs.vx > 0.5) {
-          const remaining = SCREEN_W - gs.dx;
-          const velocity = Math.max(gs.vx, 0.5);
-          const duration = Math.min(remaining / velocity, 300);
-          const anims: Animated.CompositeAnimation[] = [
-            Animated.timing(swipeX, { toValue: SCREEN_W, duration, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-          ];
-          if (overlayAnim) {
-            anims.push(Animated.timing(overlayAnim, { toValue: 0, duration, easing: Easing.out(Easing.ease), useNativeDriver: true }));
-          }
-          Animated.parallel(anims).start(() => {
-            swipeX.setValue(0);
-            onDismiss();
-          });
-        } else {
-          Animated.spring(swipeX, { toValue: 0, damping: 20, stiffness: 300, useNativeDriver: true }).start();
-        }
-      },
-    })
-  ).current;
-  return { swipeX, scrimOpacity, panHandlers: pan.panHandlers };
-}
-
 // ── Top fade mask wrapper ──
 function FadeMask({ children }: { children: React.ReactNode }) {
   return (
@@ -284,11 +250,21 @@ function GiftAurora() {
 }
 
 // ── Gift overlay (full-screen, consistent with other overlays) ──
+type GiftDrink = { id: string; name: string; emoji: string | null; price_override: number | null; category: number };
+
 function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName, onClose, onSend, cachedData }: {
   conversationId: string; type: 'dm' | 'group'; groupId?: string | null; otherUserId?: string | null; otherUserName?: string;
   onClose: () => void;
-  onSend: (recipientId: string, recipientName: string, groupId: string, category: number, quantity: number, categoryName: string) => void;
-  cachedData?: { group: any; members: any[]; activeCategories: { category: number; name: string }[] };
+  onSend: (
+    recipientId: string,
+    recipientName: string,
+    groupId: string,
+    category: number,
+    quantity: number,
+    labelName: string,
+    drinkId?: string | null,
+  ) => void;
+  cachedData?: { group: any; members: any[]; activeCategories: { category: number; name: string }[]; drinks?: GiftDrink[] };
 }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -297,9 +273,25 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
 
   const [members, setMembers] = useState<any[]>([]);
   const [activeCategories, setActiveCategories] = useState<{ category: number; name: string }[]>([]);
+  const [drinks, setDrinks] = useState<GiftDrink[]>([]);
+  const [groupData, setGroupData] = useState<any | null>(cachedData?.group ?? null);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set(otherUserId ? [otherUserId] : []));
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedDrink, setSelectedDrink] = useState<GiftDrink | null>(null);
   const [quantity, setQuantity] = useState(1);
+
+  const drinkMode = !!groupData?.drinks_as_categories;
+
+  const getCategoryPrice = (group: any, cat: number): number => {
+    if (!group) return 0;
+    switch (cat) {
+      case 1: return group.price_category_1 ?? 0;
+      case 2: return group.price_category_2 ?? 0;
+      case 3: return group.price_category_3 ?? 0;
+      case 4: return group.price_category_4 ?? 0;
+      default: return 0;
+    }
+  };
 
   // Number animation — layer stack (same approach as CounterControl)
   type QtyLayer = { key: number; value: number; opacity: Animated.Value; scale: Animated.Value };
@@ -358,6 +350,13 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
       // Use prefetched data — instant display
       setActiveCategories(cachedData.activeCategories);
       if (cachedData.activeCategories.length > 0) setSelectedCategory(cachedData.activeCategories[0].category);
+      if (cachedData.group) setGroupData(cachedData.group);
+      if (cachedData.drinks) {
+        setDrinks(cachedData.drinks);
+        if (cachedData.group?.drinks_as_categories && cachedData.drinks.length > 0) {
+          setSelectedDrink(cachedData.drinks[0]);
+        }
+      }
       const otherMembers = (cachedData.members || [])
         .filter((m: any) => m.user_id !== user?.id)
         .map((m: any) => m.profile || { id: m.user_id, full_name: 'Onbekend', avatar_url: null });
@@ -373,10 +372,12 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
   const fetchGroupData = async () => {
     if (!groupId || !user) return;
     const [{ data: g }, { data: gm }, { data: drinksData }] = await Promise.all([
-      supabase.from('groups').select('name, name_category_1, name_category_2, name_category_3, name_category_4').eq('id', groupId).single(),
+      supabase.from('groups').select('name, name_category_1, name_category_2, name_category_3, name_category_4, price_category_1, price_category_2, price_category_3, price_category_4, drinks_as_categories').eq('id', groupId).single(),
       supabase.from('group_members').select('user_id').eq('group_id', groupId),
-      supabase.from('drinks').select('category').eq('group_id', groupId).eq('is_available', true),
+      supabase.from('drinks').select('id, name, emoji, price_override, category').eq('group_id', groupId).eq('is_available', true),
     ]);
+
+    if (g) setGroupData(g);
 
     // Active categories: only those with drinks (same logic as home.tsx)
     if (g && drinksData) {
@@ -387,6 +388,16 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
         .map((cat) => ({ category: cat, name: catNames[cat - 1] || `Categorie ${cat}` }));
       setActiveCategories(cats);
       if (cats.length > 0) setSelectedCategory(cats[0].category);
+
+      // Drink-mode: full drinks list
+      if (g.drinks_as_categories) {
+        const drinksFull: GiftDrink[] = drinksData.map((d: any) => ({
+          id: d.id, name: d.name, emoji: d.emoji ?? null,
+          price_override: d.price_override ?? null, category: d.category ?? 1,
+        }));
+        setDrinks(drinksFull);
+        if (drinksFull.length > 0) setSelectedDrink(drinksFull[0]);
+      }
     }
 
     if (gm) {
@@ -420,20 +431,28 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
   };
 
   const handleConfirm = () => {
-    if (selectedRecipients.size === 0 || !groupId || !selectedCategory) return;
-    const cat = activeCategories.find((c) => c.category === selectedCategory);
-    const catName = cat?.name || 'streepje';
-    // Build recipient names for the message
-    const names = members.filter((m) => selectedRecipients.has(m.id)).map((m) => m.full_name);
-    const recipientName = names.length <= 2 ? names.join(' en ') : `${names.length} personen`;
-    // Send for each recipient
-    for (const rid of selectedRecipients) {
-      const rName = members.find((m) => m.id === rid)?.full_name || '?';
-      onSend(rid, rName, groupId, selectedCategory, quantity, catName);
+    if (selectedRecipients.size === 0 || !groupId) return;
+    if (drinkMode) {
+      if (!selectedDrink) return;
+      const labelName = selectedDrink.name;
+      for (const rid of selectedRecipients) {
+        const rName = members.find((m) => m.id === rid)?.full_name || '?';
+        onSend(rid, rName, groupId, selectedDrink.category, quantity, labelName, selectedDrink.id);
+      }
+    } else {
+      if (!selectedCategory) return;
+      const cat = activeCategories.find((c) => c.category === selectedCategory);
+      const catName = cat?.name || 'streepje';
+      for (const rid of selectedRecipients) {
+        const rName = members.find((m) => m.id === rid)?.full_name || '?';
+        onSend(rid, rName, groupId, selectedCategory, quantity, catName, null);
+      }
     }
   };
 
   const selectedCatName = activeCategories.find((c) => c.category === selectedCategory)?.name || 'streepje';
+  const selectedLabelName = drinkMode ? (selectedDrink?.name || 'drankje') : selectedCatName;
+  const confirmDisabled = selectedRecipients.size === 0 || (drinkMode ? !selectedDrink : !selectedCategory);
   const allSelected = members.length > 0 && selectedRecipients.size === members.length;
 
   return (
@@ -505,15 +524,36 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
             </>
           )}
 
-          {/* Categorie */}
-          <Text style={go.sectionHeader}>WELK STREEPJE?</Text>
-          <View style={go.catRow}>
-            {activeCategories.map((cat) => (
-              <Pressable key={cat.category} style={[go.catPill, selectedCategory === cat.category && go.catPillActive]} onPress={() => setSelectedCategory(cat.category)}>
-                <Text style={[go.catPillText, selectedCategory === cat.category && go.catPillTextActive]}>{cat.name}</Text>
-              </Pressable>
-            ))}
-          </View>
+          {/* Categorie / Drank */}
+          <Text style={go.sectionHeader}>{drinkMode ? 'WELKE DRANK?' : 'WELK STREEPJE?'}</Text>
+          {drinkMode ? (
+            <View style={go.catRow}>
+              {drinks.map((d) => {
+                const active = selectedDrink?.id === d.id;
+                const price = d.price_override ?? getCategoryPrice(groupData, d.category);
+                const priceLabel = `€${(price / 100).toFixed(2).replace('.', ',')}`;
+                return (
+                  <Pressable
+                    key={d.id}
+                    style={[go.catPill, active && go.catPillActive]}
+                    onPress={() => setSelectedDrink(d)}
+                  >
+                    <Text style={[go.catPillText, active && go.catPillTextActive]}>
+                      {d.emoji ? `${d.emoji} ` : ''}{d.name} · {priceLabel}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={go.catRow}>
+              {activeCategories.map((cat) => (
+                <Pressable key={cat.category} style={[go.catPill, selectedCategory === cat.category && go.catPillActive]} onPress={() => setSelectedCategory(cat.category)}>
+                  <Text style={[go.catPillText, selectedCategory === cat.category && go.catPillTextActive]}>{cat.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           {/* Hoeveelheid */}
           <Text style={go.sectionHeader}>HOEVEEL?</Text>
@@ -540,9 +580,9 @@ function GiftOverlay({ conversationId, type, groupId, otherUserId, otherUserName
           </View>
 
           {/* Bevestig */}
-          <Pressable style={[go.confirmBtn, (selectedRecipients.size === 0 || !selectedCategory) && { opacity: 0.4 }]} onPress={handleConfirm} disabled={selectedRecipients.size === 0 || !selectedCategory}>
+          <Pressable style={[go.confirmBtn, confirmDisabled && { opacity: 0.4 }]} onPress={handleConfirm} disabled={confirmDisabled}>
             <Ionicons name="gift" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={go.confirmText}>Doneer {quantity} {selectedCatName}{selectedRecipients.size > 1 ? ` aan ${selectedRecipients.size}` : ''}</Text>
+            <Text style={go.confirmText}>Doneer {quantity} {selectedLabelName}{selectedRecipients.size > 1 ? ` aan ${selectedRecipients.size}` : ''}</Text>
           </Pressable>
         </ScrollView>
       </Animated.View>
@@ -882,7 +922,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
             </Animated.View>
             <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400} style={{ flexShrink: 1 }}>
               <Animated.View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }, { maxWidth: undefined, alignSelf: 'auto', opacity: bubbleOpacity }]}>
-                <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{renderMessageText(item.content)}</Text>
+                <Text style={[dt.bubbleText, { color: '#1A1A1A' }]}>{renderMessageText(item.content)}</Text>
                 {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
               </Animated.View>
             </Pressable>
@@ -890,7 +930,7 @@ const ChatBubble = React.memo(({ item, nextCreatedAt, isMine, type, conversation
         ) : (
           <Pressable onPress={handlePress} onLongPress={onLongPress} delayLongPress={400}>
             <View style={[dt.bubble, dt.bubbleMine, hasLikes && { marginBottom: 18 }]}>
-              <Text style={[dt.bubbleText, { color: '#FFFFFF' }]}>{renderMessageText(item.content)}</Text>
+              <Text style={[dt.bubbleText, { color: '#1A1A1A' }]}>{renderMessageText(item.content)}</Text>
               {hasLikes && <HeartBadge count={likedBy.length} isMine={isMine} />}
             </View>
           </Pressable>
@@ -960,77 +1000,6 @@ function CameraOverlay({ visible, onClose, onSend }: { visible: boolean; onClose
       onImageCaptured={(uri) => { onSend(uri); onClose(); }}
       square={false}
     />
-  );
-}
-
-const AnimatedG = Animated.createAnimatedComponent(G);
-
-function BotIcon({ size = 22, color = '#FFFFFF' }: { size?: number; color?: string }) {
-  const eyeX = useRef(new Animated.Value(0)).current;
-  const eyeY = useRef(new Animated.Value(0)).current;
-  const blinkOpacity = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    let lookAnim: Animated.CompositeAnimation | null = null;
-    let blinkAnim: Animated.CompositeAnimation | null = null;
-    const handle = InteractionManager.runAfterInteractions(() => {
-    const look = Animated.loop(Animated.sequence([
-      Animated.delay(1200),
-      Animated.timing(eyeX, { toValue: 2.5, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-      Animated.delay(1000),
-      Animated.timing(eyeX, { toValue: 0, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-      Animated.delay(800),
-      Animated.parallel([
-        Animated.timing(eyeX, { toValue: -2.5, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-        Animated.timing(eyeY, { toValue: -1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-      ]),
-      Animated.delay(1200),
-      Animated.parallel([
-        Animated.timing(eyeX, { toValue: 0, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-        Animated.timing(eyeY, { toValue: 0, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-      ]),
-      Animated.delay(2000),
-      Animated.parallel([
-        Animated.timing(eyeX, { toValue: -2.5, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-        Animated.timing(eyeY, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-      ]),
-      Animated.delay(1000),
-      Animated.parallel([
-        Animated.timing(eyeX, { toValue: 0, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-        Animated.timing(eyeY, { toValue: 0, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: false }),
-      ]),
-      Animated.delay(2500),
-    ]));
-
-    const blink = Animated.loop(Animated.sequence([
-      Animated.delay(3000),
-      Animated.timing(blinkOpacity, { toValue: 0, duration: 70, useNativeDriver: false }),
-      Animated.timing(blinkOpacity, { toValue: 1, duration: 70, useNativeDriver: false }),
-      Animated.delay(5000),
-      Animated.timing(blinkOpacity, { toValue: 0, duration: 70, useNativeDriver: false }),
-      Animated.timing(blinkOpacity, { toValue: 1, duration: 70, useNativeDriver: false }),
-      Animated.delay(2500),
-    ]));
-
-    look.start();
-    blink.start();
-    lookAnim = look;
-    blinkAnim = blink;
-    });
-    return () => { handle.cancel(); lookAnim?.stop(); blinkAnim?.stop(); };
-  }, []);
-
-  return (
-    <Svg width={size} height={size} viewBox="3.87 -1.5 31 33">
-      <Path
-        d="M 19.37,0 c -8.544,0 -15.5,6.955 -15.5,15.5 V 26.3 c 0,2.594 2.103,4.697 4.697,4.697 3.956,0 7.001,0 10.802,0 8.544,0 15.5,-6.955 15.5,-15.5 0,-8.544 -6.955,-15.5 -15.5,-15.5 z m 0,2.814 c 7.022,0 12.689,5.663 12.689,12.689 0,7.021 -5.663,12.689 -12.689,12.689 H 9.507 A 2.824,2.824 45 0 1 6.676,25.362 v -9.862 c 0,-7.021 5.663,-12.689 12.689,-12.689 z"
-        fill={color}
-      />
-      <AnimatedG translateX={eyeX} translateY={eyeY} opacity={blinkOpacity}>
-        <Path d="M 16.353,11.175 v 6" stroke={color} strokeWidth={3.132} strokeLinecap="round" fill="none" />
-        <Path d="M 24.353,11.175 v 6" stroke={color} strokeWidth={3.132} strokeLinecap="round" fill="none" />
-      </AnimatedG>
-    </Svg>
   );
 }
 
@@ -1418,7 +1387,7 @@ const dt = StyleSheet.create({
   headerLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#00FE96' },
   headerLiveText: { fontFamily: 'Unbounded', fontSize: 9, fontWeight: '700', color: '#00FE96', letterSpacing: 0.5 },
   bubble: { maxWidth: '82%', marginBottom: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#FF0085', borderBottomRightRadius: 4 },
+  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#D9D9D9', borderBottomRightRadius: 4 },
   bubbleOther: { alignSelf: 'flex-start', backgroundColor: 'rgba(78,78,78,0.3)', borderBottomLeftRadius: 4 },
   bubbleSender: { fontFamily: 'Unbounded', fontSize: 11, color: '#00BEAE', marginBottom: 4, marginLeft: 28 },
   bubbleAvatar: { width: 20, height: 20, borderRadius: 10, marginRight: 8 },
@@ -1766,9 +1735,14 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const { swipeX: upSwipeX, scrimOpacity: upScrimOpacity, panHandlers: upPan } = useSwipeDismiss(onClose, anim);
+  const { isFollowing, follow, unfollow, followedGroups } = useFollows();
 
   const [profile, setProfile] = useState<any>(null);
   const [sharedGroups, setSharedGroups] = useState<any[]>([]);
+  // All groups the friend is a member of (for "Volg"-entrypoint). Only contains
+  // public-safe metadata: id/name/avatar/member_count. NEVER exposes the member
+  // list, tallies or any tally data from groups the current user is not in.
+  const [theirGroups, setTheirGroups] = useState<Array<{ id: string; name: string; avatar_url: string | null; member_count: number }>>([]);
   const [friendshipStatus, setFriendshipStatus] = useState<string | null>(null);
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
 
@@ -1809,6 +1783,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
       // Clear stale state FIRST — prevents flash of old profile when switching users
       setProfile(null);
       setSharedGroups([]);
+      setTheirGroups([]);
       setFriendshipStatus(null);
       setFriendshipId(null);
       // Use cached data immediately if available
@@ -1817,11 +1792,13 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
         setSharedGroups(cachedData.sharedGroups);
         setFriendshipStatus(cachedData.friendshipStatus);
         setFriendshipId(cachedData.friendshipId);
-      } else {
-        fetchIdRef.current += 1;
-        const myFetchId = fetchIdRef.current;
-        fetchProfile(myFetchId);
       }
+      // Always fetch — cachedData doesn't include `theirGroups`, and we want
+      // fresh friendship/group state. `fetchProfile` is a no-op re-setter if
+      // the data matches what cachedData already provided.
+      fetchIdRef.current += 1;
+      const myFetchId = fetchIdRef.current;
+      fetchProfile(myFetchId);
       setShow(true);
       anim.setValue(0);
       Animated.spring(anim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
@@ -1832,9 +1809,14 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
 
   const fetchProfile = async (fetchId: number) => {
     if (!userId || !user) return;
-    const [{ data: p }, { data: theirGroups }, { data: myGroups }, { data: f }] = await Promise.all([
+    // Query A-D run in parallel: profile, friend's memberships (with group
+    // metadata), my memberships (for `sharedGroups` back-compat), friendship.
+    const [{ data: p }, { data: theirMemberships }, { data: myGroups }, { data: f }] = await Promise.all([
       supabase.from('profiles').select('id, full_name, avatar_url').eq('id', userId).single(),
-      supabase.from('group_members').select('group_id').eq('user_id', userId),
+      supabase
+        .from('group_members')
+        .select('group_id, groups(id, name, avatar_url)')
+        .eq('user_id', userId),
       supabase.from('group_members').select('group_id').eq('user_id', user.id),
       supabase.from('friendships').select('id, status, user_id')
         .or(`and(user_id.eq.${user.id},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${user.id})`)
@@ -1842,15 +1824,51 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
     ]);
     if (fetchId !== fetchIdRef.current) return;
     setProfile(p);
+
+    // Normalise the `groups(...)` PostgREST join (can be object or array).
+    type GroupRow = { id: string; name: string; avatar_url: string | null };
+    const pickGroup = (g: GroupRow | GroupRow[] | null | undefined): GroupRow | null => {
+      if (!g) return null;
+      if (Array.isArray(g)) return g[0] ?? null;
+      return g;
+    };
+    const friendGroups: GroupRow[] = ((theirMemberships ?? []) as Array<{ group_id: string; groups: GroupRow | GroupRow[] | null }>)
+      .map((row) => pickGroup(row.groups))
+      .filter((g): g is GroupRow => g !== null);
+
+    // Legacy `sharedGroups` output — still used elsewhere as a quick fallback.
     const myGroupIds = new Set((myGroups || []).map((g) => g.group_id));
-    const sharedIds = (theirGroups || []).filter((g) => myGroupIds.has(g.group_id)).map((g) => g.group_id);
-    if (sharedIds.length > 0) {
-      const { data: groups } = await supabase.from('groups').select('id, name').in('id', sharedIds);
+    const sharedGroupsData = friendGroups
+      .filter((g) => myGroupIds.has(g.id))
+      .map(({ id, name }) => ({ id, name }));
+    setSharedGroups(sharedGroupsData);
+
+    // Enrich with member counts for the follow-entrypoint list. One batched
+    // query: fetch all `group_members` rows for the friend's groups, then
+    // count client-side. Avoids N+1 per group.
+    const friendGroupIds = friendGroups.map((g) => g.id);
+    if (friendGroupIds.length > 0) {
+      const { data: memberRows } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .in('group_id', friendGroupIds);
       if (fetchId !== fetchIdRef.current) return;
-      setSharedGroups(groups || []);
+      const counts = new Map<string, number>();
+      for (const row of (memberRows ?? []) as { group_id: string }[]) {
+        counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
+      }
+      setTheirGroups(
+        friendGroups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          avatar_url: g.avatar_url ?? null,
+          member_count: counts.get(g.id) ?? 0,
+        })),
+      );
     } else {
-      setSharedGroups([]);
+      setTheirGroups([]);
     }
+
     const status = f?.status === 'pending' && f.user_id !== user.id ? 'pending_incoming' : (f?.status ?? null);
     setFriendshipStatus(status);
     setFriendshipId(f?.id ?? null);
@@ -1921,22 +1939,47 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
           </View>
           <Text style={up.displayName}>{profile?.full_name || 'Onbekend'}</Text>
 
-          {/* Shared groups */}
-          {sharedGroups.length > 0 && (
-            <>
-              <Text style={up.sectionHeader}>GEDEELDE GROEPEN</Text>
-              <View style={up.card}>
-                {sharedGroups.map((g, i) => (
-                  <React.Fragment key={g.id}>
-                    {i > 0 && <View style={up.divider} />}
-                    <View style={up.groupRow}>
-                      <Text style={up.groupName}>{g.name}</Text>
-                    </View>
-                  </React.Fragment>
-                ))}
-              </View>
-            </>
-          )}
+          {/* Groups the friend is a member of — entrypoint to follow */}
+          {theirGroups.length > 0 && (() => {
+            const firstName = (profile?.full_name || '').trim().split(/\s+/)[0] || 'VRIEND';
+            return (
+              <>
+                <Text style={up.sectionHeader}>{`GROEPEN VAN ${firstName.toUpperCase()}`}</Text>
+                <View style={up.card}>
+                  {theirGroups.map((g, i) => {
+                    const followedEntry = followedGroups.find((fg) => fg.id === g.id);
+                    const isMember = followedEntry?.isMember === true;
+                    const isFollowed = isFollowing(g.id);
+                    return (
+                      <React.Fragment key={g.id}>
+                        {i > 0 && <View style={up.divider} />}
+                        <FriendGroupRow
+                          group={g}
+                          isMember={isMember}
+                          isFollowed={isFollowed}
+                          onFollow={() => follow(g.id).catch(() => undefined)}
+                          onUnfollow={() => {
+                            Alert.alert(
+                              'Niet meer volgen?',
+                              `Stop met het volgen van ${g.name}?`,
+                              [
+                                { text: 'Annuleren', style: 'cancel' },
+                                {
+                                  text: 'Niet meer volgen',
+                                  style: 'destructive',
+                                  onPress: () => { unfollow(g.id).catch(() => undefined); },
+                                },
+                              ],
+                            );
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
+              </>
+            );
+          })()}
 
           {/* Friend status / add button */}
           <AnimatedFriendButton
@@ -1985,6 +2028,121 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
     </View>
   );
 }
+
+// Row component used inside `UserProfileOverlay` for the friend's groups list.
+// Not extracted to a separate file per scope — visually inspired by
+// FollowedGroupRow but simpler (no last-activity subline, no navigation on tap).
+function FriendGroupRow({
+  group,
+  isMember,
+  isFollowed,
+  onFollow,
+  onUnfollow,
+}: {
+  group: { id: string; name: string; avatar_url: string | null; member_count: number };
+  isMember: boolean;
+  isFollowed: boolean;
+  onFollow: () => void;
+  onUnfollow: () => void;
+}) {
+  const avatarSize = 40;
+  return (
+    <View style={friendGroupRow.row}>
+      {group.avatar_url ? (
+        <Image
+          source={{ uri: group.avatar_url }}
+          style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
+          transition={200}
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <AvatarPlaceholder
+          size={avatarSize}
+          label={group.name[0]?.toUpperCase() ?? '?'}
+          borderRadius={avatarSize / 2}
+          fontSize={16}
+        />
+      )}
+      <View style={friendGroupRow.middle}>
+        <Text style={friendGroupRow.name} numberOfLines={1}>{group.name}</Text>
+        <Text style={friendGroupRow.sub} numberOfLines={1}>{`${group.member_count} leden`}</Text>
+      </View>
+      {isMember ? (
+        <Text style={friendGroupRow.inlineInactiveText}>Jij zit erin</Text>
+      ) : isFollowed ? (
+        <Pressable
+          onPress={onUnfollow}
+          hitSlop={8}
+          style={({ pressed }) => [friendGroupRow.followingPill, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Niet meer volgen"
+        >
+          <Text style={friendGroupRow.followingPillText}>Volgend</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={onFollow}
+          hitSlop={8}
+          style={({ pressed }) => [friendGroupRow.followBtn, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Volg ${group.name}`}
+        >
+          <Text style={friendGroupRow.followBtnText}>Volg</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const friendGroupRow = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: themeSpace[4],
+    paddingVertical: themeSpace[3],
+    gap: themeSpace[3],
+  },
+  middle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: themeColors.dark.text.primary,
+  },
+  sub: {
+    ...themeTypography.caption,
+    color: brand.inactive,
+    marginTop: 2,
+  },
+  inlineInactiveText: {
+    fontFamily: 'Unbounded',
+    fontSize: 12,
+    color: brand.inactive,
+  },
+  followingPill: {
+    paddingHorizontal: themeSpace[3],
+    paddingVertical: themeSpace[1],
+    borderRadius: themeRadius.full,
+    borderWidth: 1,
+    borderColor: brand.cyan,
+  },
+  followingPillText: {
+    ...themeTypography.captionMedium,
+    color: brand.cyan,
+  },
+  followBtn: {
+    paddingHorizontal: themeSpace[4],
+    paddingVertical: themeSpace[2],
+    borderRadius: themeRadius.full,
+    backgroundColor: brand.cyan,
+  },
+  followBtnText: {
+    ...themeTypography.captionMedium,
+    color: themeColors.dark.text.primary,
+  },
+});
 
 const up = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
@@ -2125,728 +2283,6 @@ function AnimatedFriendButton({ status, onAdd, onCancel, onAccept, onRemove, use
   );
 }
 
-// ── Group profile overlay ──
-function BotDimensionChooser({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: { key: string; label: string }[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <View style={gp.botDimRow}>
-      <Text style={gp.botDimLabel}>{label}</Text>
-      <View style={gp.botDimChips}>
-        {options.map((opt) => {
-          const active = opt.key === value;
-          return (
-            <Pressable
-              key={opt.key}
-              onPress={() => onChange(opt.key)}
-              style={({ pressed }) => [
-                gp.botDimChip,
-                active ? gp.botDimChipActive : gp.botDimChipInactive,
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Text style={[gp.botDimChipText, active && gp.botDimChipTextActive]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange, onTallyAnnouncementsChange, onSettlementAnnouncementsChange, onBotWelcomeChange, onBotSettingsChange }: {
-  visible: boolean; groupId: string | null; onClose: () => void;
-  onViewProfile: (userId: string) => void;
-  cachedData?: { group: any; members: any[]; activeCategories?: any[] };
-  onBotToggle?: (groupId: string, enabled: boolean) => void;
-  onBotNameChange?: (groupId: string, newName: string) => void;
-  onAdminOnlyChatChange?: (groupId: string, enabled: boolean) => void;
-  onTallyAnnouncementsChange?: (groupId: string, enabled: boolean) => void;
-  onSettlementAnnouncementsChange?: (groupId: string, enabled: boolean) => void;
-  onBotWelcomeChange?: (groupId: string, enabled: boolean) => void;
-  onBotSettingsChange?: (groupId: string, settings: BotSettings) => void;
-}) {
-  const { user } = useAuth();
-  const insets = useSafeAreaInsets();
-  const [show, setShow] = useState(false);
-  const anim = useRef(new Animated.Value(0)).current;
-  const { swipeX: gpSwipeX, scrimOpacity: gpScrimOpacity, panHandlers: gpPan } = useSwipeDismiss(onClose, anim);
-
-  const [group, setGroup] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
-  const [botEnabled, setBotEnabled] = useState(true);
-  const [botNameDraft, setBotNameDraft] = useState('');
-  const [savingBotName, setSavingBotName] = useState(false);
-  const [tallyAnnouncementsEnabled, setTallyAnnouncementsEnabled] = useState(false);
-  const [settlementAnnouncementsEnabled, setSettlementAnnouncementsEnabled] = useState(false);
-  const [botWelcomeEnabled, setBotWelcomeEnabled] = useState(false);
-  const [botSettings, setBotSettings] = useState<BotSettings>({});
-  const [initialBotSettings, setInitialBotSettings] = useState<BotSettings>({});
-  const [adminOnlyChat, setAdminOnlyChat] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [draftName, setDraftName] = useState('');
-  const [savingName, setSavingName] = useState(false);
-  const [leaving, setLeaving] = useState(false);
-  const nameInputRef = useRef<TextInput>(null);
-  const pendingSaveRef = useRef<BotSettings | null>(null);
-
-  const isAdmin = members.some((m) => m.user_id === user?.id && m.is_admin);
-
-  // Debounced auto-save for bot personality settings
-  useEffect(() => {
-    if (!groupId) return;
-    if (JSON.stringify(botSettings) === JSON.stringify(initialBotSettings)) {
-      pendingSaveRef.current = null;
-      return;
-    }
-    pendingSaveRef.current = botSettings;
-    const timeout = setTimeout(async () => {
-      const { error } = await supabase.from('groups').update({ bot_settings: botSettings }).eq('id', groupId);
-      if (!error) {
-        setInitialBotSettings(botSettings);
-        setGroup((g: any) => (g ? { ...g, bot_settings: botSettings } : g));
-        onBotSettingsChange?.(groupId, botSettings);
-        pendingSaveRef.current = null;
-      }
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [botSettings, initialBotSettings, groupId, onBotSettingsChange]);
-
-  // Flush pending bot_settings save on unmount
-  useEffect(() => {
-    return () => {
-      const pending = pendingSaveRef.current;
-      if (pending && groupId) {
-        supabase.from('groups').update({ bot_settings: pending }).eq('id', groupId).then(() => {
-          onBotSettingsChange?.(groupId, pending);
-        });
-      }
-    };
-  }, [groupId, onBotSettingsChange]);
-
-  const handleSaveName = async () => {
-    const trimmed = draftName.trim();
-    const currentName = group?.name ?? '';
-    if (!trimmed || trimmed === currentName || savingName) {
-      setEditingName(false);
-      return;
-    }
-    setSavingName(true);
-    const { error } = await supabase.from('groups').update({ name: trimmed }).eq('id', groupId);
-    setSavingName(false);
-    setEditingName(false);
-    if (error) {
-      Alert.alert('Fout', 'Kon groepsnaam niet opslaan.');
-      return;
-    }
-    setGroup((g: any) => (g ? { ...g, name: trimmed } : g));
-  };
-
-  const handleLeaveGroup = () => {
-    Alert.alert(
-      'Groep verlaten',
-      `Weet je zeker dat je "${group?.name ?? ''}" wilt verlaten?`,
-      [
-        { text: 'Annuleer', style: 'cancel' },
-        {
-          text: 'Verlaten',
-          style: 'destructive',
-          onPress: async () => {
-            if (!groupId) return;
-            setLeaving(true);
-            const { error } = await supabase.rpc('leave_group', { p_group_id: groupId });
-            setLeaving(false);
-            if (error) {
-              if (error.message?.includes('last admin')) {
-                Alert.alert(
-                  'Kan niet verlaten',
-                  'Je bent de laatste admin. Maak eerst iemand anders admin voordat je de groep verlaat.'
-                );
-              } else {
-                Alert.alert('Fout', error.message || 'Kon groep niet verlaten.');
-              }
-              return;
-            }
-            onClose?.();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleToggleBot = async (value: boolean) => {
-    setBotEnabled(value);
-    if (groupId) {
-      await supabase.from('groups').update({ bot_enabled: value }).eq('id', groupId);
-      onBotToggle?.(groupId, value);
-    }
-  };
-
-  const handleSaveBotName = async () => {
-    if (!groupId || savingBotName) return;
-    const trimmed = botNameDraft.trim();
-    const current = group?.bot_name ?? BOT_DEFAULT_NAME;
-    if (!trimmed || trimmed === current) {
-      setBotNameDraft(current);
-      return;
-    }
-    setSavingBotName(true);
-    const { error } = await supabase.from('groups').update({ bot_name: trimmed }).eq('id', groupId);
-    setSavingBotName(false);
-    if (error) {
-      Alert.alert('Fout', 'Kon botnaam niet opslaan.');
-      setBotNameDraft(current);
-      return;
-    }
-    setGroup((g: any) => (g ? { ...g, bot_name: trimmed } : g));
-    onBotNameChange?.(groupId, trimmed);
-  };
-
-  const handleToggleTallyAnnouncements = async (value: boolean) => {
-    setTallyAnnouncementsEnabled(value);
-    if (!groupId) return;
-    const { error } = await supabase.from('groups').update({ tally_announcements_enabled: value }).eq('id', groupId);
-    if (error) {
-      setTallyAnnouncementsEnabled(!value);
-      Alert.alert('Fout', 'Kon instelling niet opslaan.');
-      return;
-    }
-    setGroup((g: any) => (g ? { ...g, tally_announcements_enabled: value } : g));
-    onTallyAnnouncementsChange?.(groupId, value);
-  };
-
-  const handleToggleSettlementAnnouncements = async (value: boolean) => {
-    setSettlementAnnouncementsEnabled(value);
-    if (!groupId) return;
-    const { error } = await supabase.from('groups').update({ settlement_announcements_enabled: value }).eq('id', groupId);
-    if (error) {
-      setSettlementAnnouncementsEnabled(!value);
-      Alert.alert('Fout', 'Kon instelling niet opslaan.');
-      return;
-    }
-    setGroup((g: any) => (g ? { ...g, settlement_announcements_enabled: value } : g));
-    onSettlementAnnouncementsChange?.(groupId, value);
-  };
-
-  const handleToggleBotWelcome = async (value: boolean) => {
-    setBotWelcomeEnabled(value);
-    if (!groupId) return;
-    const { error } = await supabase.from('groups').update({ bot_welcome_enabled: value }).eq('id', groupId);
-    if (error) {
-      setBotWelcomeEnabled(!value);
-      Alert.alert('Fout', 'Kon instelling niet opslaan.');
-      return;
-    }
-    setGroup((g: any) => (g ? { ...g, bot_welcome_enabled: value } : g));
-    onBotWelcomeChange?.(groupId, value);
-  };
-
-  const handleToggleAdminOnly = async (value: boolean) => {
-    setAdminOnlyChat(value);
-    if (!groupId) return;
-    const { error } = await supabase.from('groups').update({ admin_only_chat: value }).eq('id', groupId);
-    if (error) {
-      setAdminOnlyChat(!value);
-      Alert.alert('Fout', 'Kon instelling niet opslaan.');
-      return;
-    }
-    setGroup((g: any) => (g ? { ...g, admin_only_chat: value } : g));
-    onAdminOnlyChatChange?.(groupId, value);
-  };
-
-  const animateClose = useCallback(() => {
-    Animated.timing(anim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(({ finished }) => {
-      if (finished) { setShow(false); onClose(); }
-    });
-  }, [onClose]);
-
-  useEffect(() => {
-    if (visible && groupId) {
-      gpSwipeX.setValue(0);
-      if (cachedData) {
-        setGroup(cachedData.group);
-        setMembers(cachedData.members);
-        setBotEnabled(cachedData.group?.bot_enabled !== false);
-        setBotNameDraft(cachedData.group?.bot_name ?? BOT_DEFAULT_NAME);
-        setTallyAnnouncementsEnabled(cachedData.group?.tally_announcements_enabled === true);
-        setSettlementAnnouncementsEnabled(cachedData.group?.settlement_announcements_enabled === true);
-        setBotWelcomeEnabled(cachedData.group?.bot_welcome_enabled === true);
-        setAdminOnlyChat(cachedData.group?.admin_only_chat === true);
-        const loadedBotSettings: BotSettings = ((cachedData.group as any)?.bot_settings ?? {}) as BotSettings;
-        setBotSettings(loadedBotSettings);
-        setInitialBotSettings(loadedBotSettings);
-      } else {
-        fetchGroup();
-      }
-      setShow(true);
-      anim.setValue(0);
-      Animated.spring(anim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
-    } else if (show) {
-      Animated.timing(anim, { toValue: 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }).start(({ finished }) => { if (finished) setShow(false); });
-    }
-  }, [visible, groupId]);
-
-  const fetchGroup = async () => {
-    if (!groupId) return;
-    const [{ data: g }, { data: gm }] = await Promise.all([
-      supabase.from('groups').select('*').eq('id', groupId).single(),
-      supabase.from('group_members').select('user_id, is_admin, joined_at').eq('group_id', groupId),
-    ]);
-    setGroup(g);
-    setBotEnabled(g?.bot_enabled !== false);
-    setBotNameDraft(g?.bot_name ?? BOT_DEFAULT_NAME);
-    setTallyAnnouncementsEnabled(g?.tally_announcements_enabled === true);
-    setSettlementAnnouncementsEnabled(g?.settlement_announcements_enabled === true);
-    setBotWelcomeEnabled(g?.bot_welcome_enabled === true);
-    setAdminOnlyChat(g?.admin_only_chat === true);
-    const loadedBotSettings: BotSettings = ((g as any)?.bot_settings ?? {}) as BotSettings;
-    setBotSettings(loadedBotSettings);
-    setInitialBotSettings(loadedBotSettings);
-    if (gm && gm.length > 0) {
-      const userIds = gm.map((m: any) => m.user_id);
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
-      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-      setMembers(gm.map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) })));
-    }
-  };
-
-  const handleShare = async () => {
-    if (!group) return;
-    try {
-      await Share.share({ message: `Join ${group.name} op Streeps!\nhttps://streeps.app/join/${group.invite_code}` });
-    } catch {}
-  };
-
-  if (!show || !groupId) return null;
-
-  const createdDate = group?.created_at
-    ? new Date(group.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '';
-
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: gpScrimOpacity }]} pointerEvents="auto">
-        <BlurView intensity={30} tint="dark" experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined} style={StyleSheet.absoluteFillObject} />
-        <View style={gp.scrim} />
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={animateClose} />
-      </Animated.View>
-      <Animated.View style={[gp.content, {
-        paddingTop: insets.top + 12,
-        opacity: anim,
-        transform: [{ translateX: Animated.add(gpSwipeX, anim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] })) }],
-      }]} pointerEvents="auto" {...gpPan}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
-        <View style={gp.header}>
-          <Pressable onPress={animateClose} hitSlop={12}>
-            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-          </Pressable>
-          <Text style={gp.title}>Groep</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-          {/* Avatar */}
-          <View style={gp.avatarSection}>
-            {group?.avatar_url ? (
-              <Image source={{ uri: group.avatar_url }} style={gp.avatar} transition={200} cachePolicy="memory-disk" />
-            ) : (
-              <AvatarPlaceholder size={105} label={group?.name?.[0]?.toUpperCase() ?? '?'} borderRadius={9999} fontSize={36} />
-            )}
-          </View>
-          {editingName && isAdmin ? (
-            <View style={gp.nameEditRow}>
-              <TextInput
-                ref={nameInputRef}
-                style={gp.nameInput}
-                value={draftName}
-                onChangeText={setDraftName}
-                maxLength={20}
-                placeholder="Groepsnaam"
-                placeholderTextColor="#848484"
-                returnKeyType="done"
-                onSubmitEditing={handleSaveName}
-                onBlur={handleSaveName}
-                autoFocus
-                textAlign="center"
-              />
-              {savingName && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginLeft: 6 }} />}
-            </View>
-          ) : (
-            <Pressable
-              onPress={() => {
-                if (isAdmin) {
-                  setDraftName(group?.name ?? '');
-                  setEditingName(true);
-                  setTimeout(() => nameInputRef.current?.focus(), 50);
-                }
-              }}
-              disabled={!isAdmin}
-              style={({ pressed }) => pressed && isAdmin ? { opacity: 0.6 } : undefined}
-            >
-              <View style={gp.nameDisplayRow}>
-                <Text style={gp.displayName}>{group?.name || ''}</Text>
-                {isAdmin && <Ionicons name="pencil" size={14} color="#848484" style={{ marginLeft: 6 }} />}
-              </View>
-            </Pressable>
-          )}
-          <Text style={gp.memberCount}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
-
-          {/* Leden */}
-          <Text style={gp.sectionHeader}>LEDEN</Text>
-          <View style={gp.card}>
-            {members.map((m, i) => (
-              <React.Fragment key={m.user_id}>
-                {i > 0 && <View style={gp.divider} />}
-                <Pressable style={gp.memberRow} onPress={() => { if (m.user_id !== user?.id) onViewProfile(m.user_id); }}>
-                  {m.profile?.avatar_url ? (
-                    <Image source={{ uri: m.profile.avatar_url }} style={gp.memberAvatar} transition={200} cachePolicy="memory-disk" />
-                  ) : (
-                    <AvatarPlaceholder size={36} label={m.profile?.full_name?.[0]?.toUpperCase() ?? '?'} borderRadius={18} fontSize={14} style={gp.memberAvatar} />
-                  )}
-                  <Text style={gp.memberName} numberOfLines={1}>{m.profile?.full_name || 'Onbekend'}</Text>
-                  {m.user_id === user?.id && <Text style={gp.youBadge}>Jij</Text>}
-                  {m.is_admin && (
-                    <View style={gp.adminBadge}>
-                      <Text style={gp.adminBadgeText}>Admin</Text>
-                    </View>
-                  )}
-                  {m.user_id !== user?.id && <Ionicons name="chevron-forward" size={16} color="#848484" />}
-                </Pressable>
-              </React.Fragment>
-            ))}
-          </View>
-
-          {/* Uitnodigen */}
-          <Text style={gp.sectionHeader}>UITNODIGEN</Text>
-          <View style={gp.card}>
-            <View style={gp.inviteRow}>
-              <Ionicons name="key-outline" size={20} color="#FFFFFF" style={{ marginRight: 12, width: 20 }} />
-              <Text style={gp.inviteCode}>{group?.invite_code || ''}</Text>
-            </View>
-            <View style={gp.divider} />
-            <Pressable style={gp.inviteRow} onPress={handleShare}>
-              <Ionicons name="share-outline" size={20} color="#00BEAE" style={{ marginRight: 12, width: 20 }} />
-              <Text style={gp.shareText}>Deel uitnodiging</Text>
-            </Pressable>
-          </View>
-
-          {/* Instellingen (admin only) */}
-          {isAdmin && (
-            <>
-              <Text style={gp.sectionHeader}>INSTELLINGEN</Text>
-              <View style={gp.card}>
-                <View style={gp.settingRow}>
-                  <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
-                    <BotIcon size={20} color="#FFFFFF" />
-                  </View>
-                  <Text style={gp.settingLabel}>Bot (@bot)</Text>
-                  <Switch
-                    value={botEnabled}
-                    onValueChange={handleToggleBot}
-                    trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
-                    thumbColor="#FFFFFF"
-                    style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
-                  />
-                </View>
-                {botEnabled && (
-                  <>
-                    <View style={gp.divider} />
-                    <View style={gp.settingRow}>
-                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="text-outline" size={18} color="#D9D9D9" />
-                      </View>
-                      <Text style={gp.settingLabel}>Botnaam</Text>
-                      <TextInput
-                        style={gp.botNameInput}
-                        value={botNameDraft}
-                        onChangeText={setBotNameDraft}
-                        onBlur={handleSaveBotName}
-                        onSubmitEditing={handleSaveBotName}
-                        returnKeyType="done"
-                        maxLength={MAX_BOT_NAME_LENGTH}
-                        placeholder={BOT_DEFAULT_NAME}
-                        placeholderTextColor="#848484"
-                        textAlign="right"
-                      />
-                    </View>
-                    <View style={gp.divider} />
-                    <View style={gp.settingRow}>
-                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="megaphone-outline" size={18} color="#D9D9D9" />
-                      </View>
-                      <Text style={gp.settingLabel}>Streepjes aankondigen</Text>
-                      <Switch
-                        value={tallyAnnouncementsEnabled}
-                        onValueChange={handleToggleTallyAnnouncements}
-                        trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
-                        thumbColor="#FFFFFF"
-                        style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
-                      />
-                    </View>
-                    <View style={gp.divider} />
-                    <View style={gp.settingRow}>
-                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="receipt-outline" size={18} color="#D9D9D9" />
-                      </View>
-                      <Text style={gp.settingLabel}>Afrekening aankondigen</Text>
-                      <Switch
-                        value={settlementAnnouncementsEnabled}
-                        onValueChange={handleToggleSettlementAnnouncements}
-                        trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
-                        thumbColor="#FFFFFF"
-                        style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
-                      />
-                    </View>
-                    <View style={gp.divider} />
-                    <View style={gp.settingRow}>
-                      <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="hand-right-outline" size={18} color="#D9D9D9" />
-                      </View>
-                      <Text style={gp.settingLabel}>Welkom bericht</Text>
-                      <Switch
-                        value={botWelcomeEnabled}
-                        onValueChange={handleToggleBotWelcome}
-                        trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
-                        thumbColor="#FFFFFF"
-                        style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
-                      />
-                    </View>
-                  </>
-                )}
-                <View style={gp.divider} />
-                <View style={gp.settingRow}>
-                  <View style={{ width: 20, height: 20, marginRight: 12, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="lock-closed-outline" size={18} color="#D9D9D9" />
-                  </View>
-                  <Text style={gp.settingLabel}>Alleen admins kunnen typen</Text>
-                  <Switch
-                    value={adminOnlyChat}
-                    onValueChange={handleToggleAdminOnly}
-                    trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
-                    thumbColor="#FFFFFF"
-                    style={{ transform: [{ translateY: -1 }], alignSelf: 'center' }}
-                  />
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Chatbot */}
-          {(() => {
-            const now = new Date();
-            const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-            const botUsageCount = ((group as any)?.bot_usage_month === currentMonth) ? ((group as any)?.bot_usage_count ?? 0) : 0;
-            const limitReached = botUsageCount >= BOT_MONTHLY_LIMIT;
-            const usagePct = Math.min(100, (botUsageCount / BOT_MONTHLY_LIMIT) * 100);
-            return (
-              <>
-                <Text style={gp.sectionHeader}>CHATBOT</Text>
-
-                {/* Usage progress bar — zichtbaar voor alle leden */}
-                <View style={gp.card}>
-                  <View style={gp.botUsageRow}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text style={gp.botUsageLabel}>Gebruik deze maand</Text>
-                      <Text style={gp.botUsageCount}>{botUsageCount} / {BOT_MONTHLY_LIMIT}</Text>
-                    </View>
-                    <View style={gp.botUsageBarBg}>
-                      <View
-                        style={[
-                          gp.botUsageBarFill,
-                          { width: `${usagePct}%` },
-                          limitReached && gp.botUsageBarFillFull,
-                        ]}
-                      />
-                    </View>
-                    {limitReached && (
-                      <Text style={gp.botUsageWarning}>Limiet bereikt — bot reageert pas weer volgende maand</Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Persoonlijkheid — alleen admins */}
-                {isAdmin && (
-                  <>
-                    <Text style={gp.botSubHeader}>PERSOONLIJKHEID</Text>
-                    <View style={gp.card}>
-                      {BOT_DIMENSIONS.map((dim, idx) => (
-                        <React.Fragment key={dim.key}>
-                          {idx > 0 && <View style={gp.divider} />}
-                          <BotDimensionChooser
-                            label={dim.label}
-                            value={(botSettings[dim.key] as string) ?? (BOT_DEFAULTS[dim.key] as string)}
-                            options={dim.options}
-                            onChange={(v) => setBotSettings((p) => ({ ...p, [dim.key]: v }))}
-                          />
-                        </React.Fragment>
-                      ))}
-                    </View>
-
-                    <Text style={gp.botSubHeader}>GEDRAG</Text>
-                    <View style={gp.card}>
-                      <View style={gp.botToggleRow}>
-                        <Text style={gp.botToggleLabel}>Reageren op cadeautjes</Text>
-                        <Switch
-                          value={botSettings.respond_to_gift_messages ?? false}
-                          onValueChange={(v) => setBotSettings((p) => ({ ...p, respond_to_gift_messages: v }))}
-                          trackColor={{ false: 'rgba(78,78,78,0.4)', true: '#00BEAE' }}
-                          thumbColor="#FFFFFF"
-                        />
-                      </View>
-                    </View>
-                  </>
-                )}
-              </>
-            );
-          })()}
-
-          {/* Groep verlaten */}
-          <View style={gp.section}>
-            <Pressable
-              onPress={handleLeaveGroup}
-              style={({ pressed }) => [gp.leaveBtn, pressed && { opacity: 0.7 }]}
-              disabled={leaving}
-            >
-              {leaving ? (
-                <ActivityIndicator size="small" color="#FF5A5A" />
-              ) : (
-                <>
-                  <Ionicons name="log-out-outline" size={18} color="#FF5A5A" />
-                  <Text style={gp.leaveBtnText}>Groep verlaten</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-
-          {/* Aangemaakt */}
-          {createdDate ? (
-            <Text style={gp.createdAt}>Aangemaakt op {createdDate}</Text>
-          ) : null}
-        </ScrollView>
-        </KeyboardAvoidingView>
-      </Animated.View>
-    </View>
-  );
-}
-
-const gp = StyleSheet.create({
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
-  content: { flex: 1, paddingHorizontal: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  title: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF' },
-  avatarSection: { alignItems: 'center', marginVertical: 16 },
-  avatar: { width: 105, height: 105, borderRadius: 9999 },
-  avatarFallback: { backgroundColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontFamily: 'Unbounded', fontSize: 36, fontWeight: '600', color: '#333' },
-  displayName: { fontFamily: 'Unbounded', fontSize: 24, color: '#FFFFFF', textAlign: 'center', marginTop: 8 },
-  memberCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484', textAlign: 'center', marginTop: 4 },
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 14, color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
-  card: { borderRadius: 25, overflow: 'hidden' },
-  divider: { height: 1, backgroundColor: 'rgba(78,78,78,0.3)', marginLeft: 64 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12 },
-  memberAvatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
-  memberAvatarText: { color: '#333', fontSize: 14, fontWeight: '600' },
-  memberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1 },
-  youBadge: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginRight: 8 },
-  adminBadge: { backgroundColor: 'rgba(0,190,174,0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginRight: 8 },
-  adminBadgeText: { fontFamily: 'Unbounded', fontSize: 10, color: '#00BEAE', fontWeight: '600' },
-  inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 55 },
-  inviteCode: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', letterSpacing: 2 },
-  shareText: { fontFamily: 'Unbounded', fontSize: 14, color: '#00BEAE' },
-  settingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 55 },
-  settingLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1, lineHeight: 20 },
-  botNameInput: {
-    fontFamily: 'Unbounded',
-    fontSize: 13,
-    color: '#FFFFFF',
-    minWidth: 120,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 8,
-  },
-  createdAt: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', textAlign: 'center', marginTop: 24 },
-  nameEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  nameInput: {
-    fontFamily: 'Unbounded',
-    fontSize: 24,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    minWidth: 140,
-    textAlign: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.3)',
-  },
-  nameDisplayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  section: {
-    marginTop: 24,
-  },
-  leaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,90,90,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,90,90,0.25)',
-  },
-  leaveBtnText: {
-    fontFamily: 'Unbounded',
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#FF5A5A',
-  },
-
-  // Chatbot
-  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginLeft: 20, marginTop: 12, marginBottom: 4, letterSpacing: 0.5 },
-  botDimRow: { paddingHorizontal: 16, paddingVertical: 12 },
-  botDimLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9', marginBottom: 10 },
-  botDimChips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  botDimChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1 },
-  botDimChipInactive: { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'transparent' },
-  botDimChipActive: { borderColor: '#00BEAE', backgroundColor: 'rgba(0,190,174,0.15)' },
-  botDimChipText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
-  botDimChipTextActive: { color: '#FFFFFF' },
-  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, minHeight: 52 },
-  botToggleLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  botUsageRow: { padding: 16 },
-  botUsageLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9' },
-  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
-  botUsageBarBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  botUsageBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#00BEAE' },
-  botUsageBarFillFull: { backgroundColor: '#FF3B30' },
-  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: 8 },
-});
 
 // ── Animated row wrapper for fade-out + collapse ──
 function AnimatedRow({ removing, onRemoved, children }: { removing: boolean; onRemoved: () => void; children: React.ReactNode }) {
@@ -3663,8 +3099,9 @@ export default function ChatScreen() {
   const [botNameMap, setBotNameMap] = useState<Record<string, string>>({});
   const [adminOnlyChatMap, setAdminOnlyChatMap] = useState<Record<string, boolean>>({});
   const [groupAdminMap, setGroupAdminMap] = useState<Record<string, boolean>>({});
+  const [drinksAsCategoriesMap, setDrinksAsCategoriesMap] = useState<Record<string, boolean>>({});
   const profileCache = useRef<Record<string, { profile: any; sharedGroups: any[]; friendshipStatus: string | null; friendshipId: string | null }>>({}).current;
-  const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[] }>>({}).current;
+  const groupProfileCache = useRef<Record<string, { group: any; members: any[]; activeCategories: { category: number; name: string }[]; drinks?: { id: string; name: string; emoji: string | null; price_override: number | null; category: number }[] }>>({}).current;
 
   // Preload messages for visible conversations
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
@@ -3727,7 +3164,7 @@ export default function ChatScreen() {
     const [{ data: g }, { data: gm }, { data: drinksData }] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('user_id, is_admin, joined_at').eq('group_id', groupId),
-      supabase.from('drinks').select('category').eq('group_id', groupId).eq('is_available', true),
+      supabase.from('drinks').select('id, name, emoji, price_override, category').eq('group_id', groupId).eq('is_available', true),
     ]);
     let members: any[] = [];
     if (gm && gm.length > 0) {
@@ -3742,11 +3179,17 @@ export default function ChatScreen() {
     const activeCategories = ([1, 2, 3, 4] as const)
       .filter((cat) => catsWithDrinks.has(cat))
       .map((cat) => ({ category: cat, name: catNames[cat - 1] || `Categorie ${cat}` }));
-    groupProfileCache[groupId] = { group: g, members, activeCategories };
+    // Keep full drinks list for drink-mode gift selection
+    const drinksFull = (drinksData || []).map((d: any) => ({
+      id: d.id, name: d.name, emoji: d.emoji ?? null,
+      price_override: d.price_override ?? null, category: d.category ?? 1,
+    }));
+    groupProfileCache[groupId] = { group: g, members, activeCategories, drinks: drinksFull };
     if (g) {
       setBotEnabledMap((prev) => ({ ...prev, [groupId]: g.bot_enabled !== false }));
       setBotNameMap((prev) => ({ ...prev, [groupId]: g.bot_name ?? BOT_DEFAULT_NAME }));
       setAdminOnlyChatMap((prev) => ({ ...prev, [groupId]: g.admin_only_chat === true }));
+      setDrinksAsCategoriesMap((prev) => ({ ...prev, [groupId]: g.drinks_as_categories === true }));
     }
     if (user && members.length > 0) {
       const me = members.find((m: any) => m.user_id === user.id);
@@ -4001,7 +3444,7 @@ export default function ChatScreen() {
             keyExtractor={(c) => c.id}
             refreshing={isManualRefresh}
             onRefresh={handleManualRefresh}
-            contentContainerStyle={{ paddingTop: 32, paddingBottom: 160 }}
+            contentContainerStyle={{ paddingTop: 24, paddingBottom: 160 }}
             showsVerticalScrollIndicator={false}
             viewabilityConfig={viewabilityConfig}
             onViewableItemsChanged={onViewableItemsChanged}
@@ -4058,14 +3501,15 @@ export default function ChatScreen() {
       {/* ── Chat detail overlay (slides in from right) ── */}
       {showingChat && currentConv && (
         <Animated.View
-          style={[StyleSheet.absoluteFillObject, {
+          style={{
+            position: 'absolute', top: 0, left: 0, width: SCREEN_W, height: SCREEN_H,
             transform: [{
               translateX: Animated.add(
                 swipeX,
                 slideAnim.interpolate({ inputRange: [0, 1], outputRange: [SCREEN_W, 0] })
               ),
             }],
-          }]}
+          }}
           {...chatPan.panHandlers}
         >
           <LinearGradient colors={[brand.bg.from, brand.bg.to]} style={StyleSheet.absoluteFillObject} />
@@ -4106,10 +3550,10 @@ export default function ChatScreen() {
           otherUserName={currentConv.type === 'dm' ? currentConv.name : undefined}
           cachedData={currentConv.group_id ? groupProfileCache[currentConv.group_id] : undefined}
           onClose={() => setShowGiftOverlay(false)}
-          onSend={async (recipientId, recipientName, gId, category, quantity, categoryName) => {
+          onSend={async (recipientId, recipientName, gId, category, quantity, labelName, drinkId) => {
             if (!user) return;
             // Called once per recipient by GiftOverlay
-            await sendGiftMessage(user.id, user.user_metadata?.full_name || 'Iemand', currentConv.id, recipientId, recipientName, gId, category, quantity, categoryName);
+            await sendGiftMessage(user.id, user.user_metadata?.full_name || 'Iemand', currentConv.id, recipientId, recipientName, gId, category, quantity, labelName, drinkId);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setTimeout(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowGiftOverlay(false); }, 100);
           }}

@@ -27,6 +27,7 @@ import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { supabase } from '@/src/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import type { Theme } from '@/src/theme';
+import { brand, colors, radius, space, typography, fontWeights } from '@/src/theme';
 import { BOT_DIMENSIONS, BOT_DEFAULTS, BOT_MONTHLY_LIMIT, type BotSettings } from '../constants/botSettings';
 
 interface Member {
@@ -42,6 +43,7 @@ interface Drink {
   name: string;
   category: number;
   emoji: string | null;
+  price_override?: number | null;
 }
 
 interface Props {
@@ -56,7 +58,8 @@ interface Props {
   categoryColors: readonly string[];
   updateGroupPrices: (data: Record<string, any>) => Promise<void>;
   updateGroupName: (name: string) => Promise<void>;
-  addDrink: (name: string, category: number, emoji: string) => Promise<void>;
+  markOwnChange?: () => void;
+  addDrink: (name: string, category: number, emoji: string, priceOverride?: number) => Promise<void>;
   removeDrink: (drinkId: string) => Promise<void>;
   toggleAdmin: (userId: string) => Promise<void>;
   removeMember: (userId: string) => Promise<void>;
@@ -69,7 +72,7 @@ interface Props {
   // Tally management
   tallyCounts?: Record<string, Record<number, number>>;
   recentTallies?: any[];
-  addTally?: (category: 1|2|3|4, userId?: string) => Promise<void>;
+  addTally?: (category: 1|2|3|4, userId?: string, drinkId?: string) => Promise<void>;
   removeTally?: (tallyId: string) => Promise<void>;
   activeCategories?: number[];
   getCategoryName?: (cat: number) => string;
@@ -110,14 +113,14 @@ const LONG_PRESS_DURATION = 500;
 function CategoryBadgeSelector({
   value,
   onChange,
-  colors,
+  catColors,
   enabledCategories,
   getCategoryName,
   onScrollEnable,
 }: {
   value: number;
   onChange: (v: number) => void;
-  colors: readonly string[];
+  catColors: readonly string[];
   enabledCategories: number[];
   getCategoryName?: (cat: number) => string;
   onScrollEnable?: (enabled: boolean) => void;
@@ -150,7 +153,7 @@ function CategoryBadgeSelector({
   useEffect(() => { valueRef.current = value; }, [value]);
   useEffect(() => () => { if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current); }, []);
 
-  const color = colors[(value - 1) % colors.length];
+  const color = catColors[(value - 1) % catColors.length];
   const label = getCategoryName?.(value) ?? `Cat ${value}`;
 
   const closeWheel = useCallback(() => {
@@ -290,7 +293,7 @@ function CategoryBadgeSelector({
                   outputRange: [0.82, 0.92, 1, 0.92, 0.82],
                   extrapolate: 'clamp',
                 });
-                const catColor = colors[(cat - 1) % colors.length];
+                const catColor = catColors[(cat - 1) % catColors.length];
                 const catLabel = getCategoryName?.(cat) ?? `Cat ${cat}`;
                 const isCenter = idx === centerIndex;
 
@@ -298,7 +301,7 @@ function CategoryBadgeSelector({
                   <View key={cat}>
                     <Animated.View style={{ height: ITEM_HEIGHT, marginBottom: ITEM_GAP, alignItems: 'center', justifyContent: 'center', opacity, transform: [{ scale }] }}>
                       <View style={[cbs.badge, { backgroundColor: catColor + '20' }, isCenter && cbs.badgeCenter]}>
-                        <Text style={[cbs.badgeLabel, { color: isCenter ? '#FFFFFF' : catColor }]} numberOfLines={1}>{catLabel}</Text>
+                        <Text style={[cbs.badgeLabel, { color: isCenter ? colors.dark.text.primary : catColor }]} numberOfLines={1}>{catLabel}</Text>
                       </View>
                     </Animated.View>
                   </View>
@@ -314,9 +317,10 @@ function CategoryBadgeSelector({
 }
 
 const cbs = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
-  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: '400' },
-  badgeCenter: { borderWidth: 1, borderColor: '#FFFFFF' },
+  // TODO(theme-migration): borderRadius 10 differs from radius.sm (8) by 2px — kept at 10 for visual fidelity
+  badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[3], paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start' },
+  badgeLabel: { fontFamily: 'Unbounded', fontSize: 13, fontWeight: fontWeights.regular },
+  badgeCenter: { borderWidth: 1, borderColor: colors.dark.text.primary },
   modalRoot: { flex: 1 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   wheelContainer: {
@@ -331,6 +335,7 @@ function FadeMask({ children }: { children: React.ReactNode }) {
       style={{ flex: 1 }}
       maskElement={
         <View style={{ flex: 1 }}>
+          {/* #000 is inherent to the mask gradient (opaque vs transparent) — not a theme color */}
           <LinearGradient colors={['transparent', '#000']} style={{ height: 32 }} />
           <View style={{ flex: 1, backgroundColor: '#000' }} />
         </View>
@@ -391,6 +396,7 @@ export default function SettingsOverlay({
   categoryColors,
   updateGroupPrices,
   updateGroupName,
+  markOwnChange,
   addDrink,
   removeDrink,
   toggleAdmin,
@@ -446,6 +452,10 @@ export default function SettingsOverlay({
   const [isSaving, setIsSaving] = useState(false);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [savedOk, setSavedOk] = useState(false);
+  const [drinksAsCategories, setDrinksAsCategories] = useState(false);
+  const [drinkPrices, setDrinkPrices] = useState<Record<string, string>>({});
+  const [drinkPriceErrors, setDrinkPriceErrors] = useState<Record<string, string | null>>({});
+  const [dacToggling, setDacToggling] = useState(false);
   const catOpacityAnims = useRef([
     new Animated.Value(1),
     new Animated.Value(1),
@@ -525,6 +535,17 @@ export default function SettingsOverlay({
       setBotSettings(loadedBotSettings);
       setInitialBotSettings(loadedBotSettings);
 
+      // Drinks as categories
+      setDrinksAsCategories(group.drinks_as_categories ?? false);
+      const priceMap: Record<string, string> = {};
+      drinks.forEach((d) => {
+        if (d.price_override != null) {
+          priceMap[d.id] = centsToEuroStr(d.price_override);
+        }
+      });
+      setDrinkPrices(priceMap);
+      setDrinkPriceErrors({});
+
       setShowOpen(true);
       scrimOpacity.setValue(0);
       contentAnim.setValue(0);
@@ -534,6 +555,21 @@ export default function SettingsOverlay({
       ]).start();
     }
   }, [visible]);
+
+  // Sync drinkPrices when drinks prop changes (e.g. new drink added via realtime)
+  useEffect(() => {
+    if (drinksAsCategories && visible) {
+      setDrinkPrices((prev) => {
+        const next = { ...prev };
+        drinks.forEach((d) => {
+          if (!(d.id in next) && d.price_override != null) {
+            next[d.id] = centsToEuroStr(d.price_override);
+          }
+        });
+        return next;
+      });
+    }
+  }, [drinks, drinksAsCategories, visible]);
 
   // Debounced auto-save for bot_settings
   useEffect(() => {
@@ -637,25 +673,61 @@ export default function SettingsOverlay({
       return;
     }
 
-    setIsSaving(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await updateGroupPrices({
-      ...(groupName.trim() ? { name: groupName.trim() } : {}),
-      price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
-      price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
-      price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
-      price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
-      name_category_1: catName1.trim() || 'Categorie 1',
-      name_category_2: catName2.trim() || 'Categorie 2',
-      name_category_3: catName3.trim() || 'Categorie 3',
-      name_category_4: catName4.trim() || 'Categorie 4',
-    });
-    setSavedOk(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSavedOk(false);
-      performClose();
-    }, 600);
+    // Detecteer of categorie-prijzen daadwerkelijk zijn gewijzigd t.o.v.
+    // de waardes waarmee de overlay is geopend. Zo ja: confirm-dialog
+    // tonen zodat de admin weet dat andere leden een melding krijgen.
+    const iv = initialValues.current;
+    const priceChanged =
+      !!iv && (
+        price1 !== iv.price1 ||
+        price2 !== iv.price2 ||
+        price3 !== iv.price3 ||
+        price4 !== iv.price4
+      );
+
+    const doSave = async () => {
+      setIsSaving(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Suppress de prijs-toast voor de actor zelf
+      if (priceChanged) markOwnChange?.();
+      await updateGroupPrices({
+        ...(groupName.trim() ? { name: groupName.trim() } : {}),
+        price_category_1: enabledCats.has(1) ? (p1 ?? 150) : null,
+        price_category_2: enabledCats.has(2) ? (p2 ?? 300) : null,
+        price_category_3: enabledCats.has(3) ? (p3 ?? 150) : null,
+        price_category_4: enabledCats.has(4) ? (p4 ?? 150) : null,
+        name_category_1: catName1.trim() || 'Categorie 1',
+        name_category_2: catName2.trim() || 'Categorie 2',
+        name_category_3: catName3.trim() || 'Categorie 3',
+        name_category_4: catName4.trim() || 'Categorie 4',
+      });
+      setSavedOk(true);
+      setTimeout(() => {
+        setIsSaving(false);
+        setSavedOk(false);
+        performClose();
+      }, 600);
+    };
+
+    if (priceChanged) {
+      const otherMembers = Math.max(0, (members?.length ?? 0) - 1);
+      const memberText =
+        otherMembers === 0
+          ? 'Geen andere leden krijgen een melding.'
+          : otherMembers === 1
+            ? '1 groepslid krijgt een melding.'
+            : `${otherMembers} groepsleden krijgen een melding.`;
+      Alert.alert(
+        'Prijs wijzigen?',
+        `De nieuwe prijzen zijn direct van toepassing. ${memberText}`,
+        [
+          { text: 'Annuleren', style: 'cancel' },
+          { text: 'Wijzig prijs', onPress: () => { void doSave(); } },
+        ]
+      );
+    } else {
+      await doSave();
+    }
   };
 
   const toggleCategory = (cat: number) => {
@@ -683,9 +755,149 @@ export default function SettingsOverlay({
     });
   };
 
+  const handleDrinkPriceChange = (drinkId: string, value: string) => {
+    setDrinkPrices((prev) => ({ ...prev, [drinkId]: value }));
+    if (drinkPriceErrors[drinkId]) {
+      setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: null }));
+    }
+  };
+
+  const handleDrinkPriceBlurAndSave = async (drinkId: string) => {
+    const value = drinkPrices[drinkId] ?? '';
+    if (!value.trim()) return;
+    const formatted = formatEuroStr(value);
+    if (formatted == null) {
+      setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: 'Ongeldig bedrag' }));
+      return;
+    }
+    setDrinkPrices((prev) => ({ ...prev, [drinkId]: formatted }));
+    setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: null }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const cents = euroStrToCents(value);
+    if (cents != null) {
+      // Suppress de prijs-toast voor de actor zelf
+      markOwnChange?.();
+      const { error } = await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
+      if (error) {
+        setDrinkPriceErrors((prev) => ({ ...prev, [drinkId]: 'Opslaan mislukt' }));
+      }
+    }
+  };
+
+  const handleToggleDrinksAsCategories = async (newValue: boolean) => {
+    if (dacToggling) return;
+    setDacToggling(true);
+    // Suppress de prijs/modus-toast voor de actor zelf
+    markOwnChange?.();
+    try {
+      if (newValue) {
+        // Toggle AAN: backup categories, set price_override on drinks
+        const backup: any = {
+          categories: {} as any,
+          drink_categories: {} as any,
+        };
+        for (let i = 1; i <= 4; i++) {
+          const nameKey = `name_category_${i}` as keyof typeof group;
+          const priceKey = `price_category_${i}` as keyof typeof group;
+          const enabled = enabledCats.has(i);
+          backup.categories[String(i)] = enabled ? {
+            name: group[nameKey] || `Categorie ${i}`,
+            price: group[priceKey] ?? 0,
+            enabled: true,
+          } : null;
+        }
+        drinks.forEach((d) => {
+          backup.drink_categories[d.id] = { category: d.category };
+        });
+
+        // Set price_override on drinks where null
+        const updates: PromiseLike<any>[] = [];
+        const newPriceMap: Record<string, string> = { ...drinkPrices };
+        drinks.forEach((d) => {
+          if (d.price_override == null) {
+            const catPriceKey = `price_category_${d.category}` as keyof typeof group;
+            const catPrice = (group[catPriceKey] as number) ?? 150;
+            updates.push(supabase.from('drinks').update({ price_override: catPrice }).eq('id', d.id).then());
+            newPriceMap[d.id] = centsToEuroStr(catPrice);
+          }
+        });
+        await Promise.all(updates);
+        setDrinkPrices(newPriceMap);
+
+        await supabase.from('groups').update({
+          drinks_as_categories: true,
+          category_backup: backup,
+        }).eq('id', groupId);
+
+        setDrinksAsCategories(true);
+      } else {
+        // Toggle UIT: restore categories from backup
+        const backup = group.category_backup;
+        const updateData: Record<string, any> = { drinks_as_categories: false };
+
+        if (backup?.categories) {
+          for (const [catStr, catData] of Object.entries(backup.categories)) {
+            const catNum = parseInt(catStr);
+            if (catData && typeof catData === 'object') {
+              const cd = catData as { name: string; price: number; enabled: boolean };
+              updateData[`name_category_${catNum}`] = cd.name;
+              updateData[`price_category_${catNum}`] = cd.enabled ? cd.price : null;
+            }
+          }
+        }
+
+        await supabase.from('groups').update(updateData).eq('id', groupId);
+
+        // Restore drink categories
+        if (backup?.drink_categories) {
+          const drinkUpdates: PromiseLike<any>[] = [];
+          const knownDrinkIds = new Set(Object.keys(backup.drink_categories));
+
+          drinks.forEach((d) => {
+            if (knownDrinkIds.has(d.id)) {
+              // Restore original category
+              const origCat = backup.drink_categories[d.id]?.category ?? d.category;
+              drinkUpdates.push(supabase.from('drinks').update({ category: origCat }).eq('id', d.id).then());
+            } else {
+              // New drink: find closest category by price
+              if (d.price_override != null && backup.categories) {
+                let bestCat = d.category;
+                let bestDiff = Infinity;
+                for (const [catStr, catData] of Object.entries(backup.categories)) {
+                  if (!catData || typeof catData !== 'object') continue;
+                  const cd = catData as { price: number; enabled: boolean };
+                  if (!cd.enabled) continue;
+                  const diff = Math.abs(d.price_override - cd.price);
+                  if (diff < bestDiff) {
+                    bestDiff = diff;
+                    bestCat = parseInt(catStr);
+                  }
+                }
+                drinkUpdates.push(supabase.from('drinks').update({ category: bestCat }).eq('id', d.id).then());
+              }
+            }
+          });
+          await Promise.all(drinkUpdates);
+        }
+
+        setDrinksAsCategories(false);
+      }
+      await refresh();
+    } finally {
+      setDacToggling(false);
+    }
+  };
+
   const handleAddDrink = async () => {
     if (!newDrinkName.trim()) return;
-    await addDrink(newDrinkName.trim(), parseInt(newDrinkCat) || 1, newDrinkEmoji || '🍺');
+    const cat = parseInt(newDrinkCat) || 1;
+    let defaultPrice: number | undefined;
+    if (drinksAsCategories && group) {
+      const catPriceKey = `price_category_${cat}` as keyof typeof group;
+      defaultPrice = (group[catPriceKey] as number) ?? 150;
+    }
+    await addDrink(newDrinkName.trim(), cat, newDrinkEmoji || '🍺', defaultPrice);
     setNewDrinkName('');
     setNewDrinkEmoji('');
     setNewDrinkCat('1');
@@ -795,13 +1007,13 @@ export default function SettingsOverlay({
         {/* Header */}
         <View style={s.header}>
           <Pressable onPress={handleClose} hitSlop={12} style={({ pressed }) => [{ marginRight: 12 }, pressed && { opacity: 0.7 }]} accessibilityLabel="Sluiten" accessibilityRole="button">
-            <Ionicons name="close" size={24} color="#FFFFFF" />
+            <Ionicons name="close" size={24} color={colors.dark.text.primary} />
           </Pressable>
           <Text style={s.headerTitle}>Instellingen</Text>
           <Pressable onPress={handleSave} hitSlop={12} disabled={isSaving} style={({ pressed }) => [{ marginLeft: 'auto' }, pressed && { opacity: 0.7 }]}>
             <View style={s.saveBtnRow}>
               {savedOk && (
-                <Ionicons name="checkmark" size={16} color="#00BEAE" style={{ marginRight: 4 }} />
+                <Ionicons name="checkmark" size={16} color={brand.cyan} style={{ marginRight: 4 }} />
               )}
               <Text style={[s.saveText, isSaving && { opacity: 0.5 }]}>
                 {savedOk ? 'Opgeslagen' : 'Opslaan'}
@@ -831,14 +1043,38 @@ export default function SettingsOverlay({
                 value={groupName}
                 onChangeText={setGroupName}
                 placeholder="Groepsnaam"
-                placeholderTextColor="#848484"
+                placeholderTextColor={brand.inactive}
                 maxLength={20}
               />
-              <Ionicons name="create-outline" size={18} color="#848484" style={{ marginLeft: 8 }} />
+              <Ionicons name="create-outline" size={18} color={brand.inactive} style={{ marginLeft: 8 }} />
             </View>
           </View>
 
-          {/* Categories */}
+          {/* Drinks as categories toggle */}
+          {isAdmin && (
+            <>
+              <Text style={s.sectionHeader}>PRIJSMODUS</Text>
+              <View style={s.card}>
+                <View style={s.autoTrustRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.autoTrustLabel}>Dranken als categorieën</Text>
+                    <Text style={s.autoTrustHint}>Elk drankje krijgt een eigen prijs</Text>
+                  </View>
+                  <Switch
+                    value={drinksAsCategories}
+                    onValueChange={handleToggleDrinksAsCategories}
+                    disabled={dacToggling}
+                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: brand.cyan }}
+                    thumbColor={colors.dark.text.primary}
+                  />
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Categories — hidden when drinks_as_categories is on */}
+          {!drinksAsCategories && (
+          <>
           <Text style={s.sectionHeader}>CATEGORIEËN</Text>
           <View style={s.catSectionRow}>
             {/* Toggles kolom links */}
@@ -857,7 +1093,7 @@ export default function SettingsOverlay({
                       <Ionicons
                         name={enabled ? 'checkmark' : 'close'}
                         size={16}
-                        color={enabled ? '#fff' : '#666'}
+                        color={enabled ? colors.dark.text.primary : colors.dark.text.tertiary}
                       />
                     </Pressable>
                   </Animated.View>
@@ -880,7 +1116,7 @@ export default function SettingsOverlay({
                         value={name}
                         onChangeText={setName}
                         placeholder={`Categorie ${catNum}`}
-                        placeholderTextColor="#848484"
+                        placeholderTextColor={brand.inactive}
                         editable={enabled}
                         maxLength={15}
                       />
@@ -894,7 +1130,7 @@ export default function SettingsOverlay({
                             onBlur={() => handlePriceBlur(i, price, setPrice)}
                             keyboardType="decimal-pad"
                             placeholder="0,00"
-                            placeholderTextColor="#848484"
+                            placeholderTextColor={brand.inactive}
                             maxLength={5}
                           />
                         </View>
@@ -911,6 +1147,9 @@ export default function SettingsOverlay({
             </View>
           </View>
 
+          </>
+          )}
+
           {/* Drinks */}
           <Text style={s.sectionHeader}>DE KAART</Text>
           <View style={s.card}>
@@ -925,21 +1164,45 @@ export default function SettingsOverlay({
                   {i > 0 && <View style={s.divider} />}
                   <View style={s.drinkRow}>
                     <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '🍺'}</Text>
-                    <Text style={s.drinkName}>{drink.name}</Text>
-                    <View style={[s.drinkCatBadge, { backgroundColor: catColor + '20' }]}>
-                      <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
-                    </View>
+                    <Text style={[s.drinkName, drinksAsCategories && { flex: 0, marginRight: 8 }]}>{drink.name}</Text>
+                    {drinksAsCategories && isAdmin ? (
+                      <View style={[s.catPriceWrapper, { marginLeft: 'auto', marginRight: space[2] }]}>
+                        <Text style={s.euroSign}>€</Text>
+                        <TextInput
+                          style={[s.catPriceInput, drinkPriceErrors[drink.id] ? s.catPriceInputError : null]}
+                          value={drinkPrices[drink.id] ?? ''}
+                          onChangeText={(v) => handleDrinkPriceChange(drink.id, v)}
+                          onBlur={() => handleDrinkPriceBlurAndSave(drink.id)}
+                          keyboardType="decimal-pad"
+                          placeholder="0,00"
+                          placeholderTextColor={brand.inactive}
+                          maxLength={5}
+                        />
+                      </View>
+                    ) : !drinksAsCategories ? (
+                      <View style={[s.drinkCatBadge, { backgroundColor: catColor + '20' }]}>
+                        <Text style={[s.drinkCatBadgeText, { color: catColor }]}>{catName}</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive, flex: 1, textAlign: 'right', marginRight: space[2] }}>
+                        €{centsToEuroStr(drink.price_override ?? 0)}
+                      </Text>
+                    )}
+                    {/* TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original */}
                     <Pressable onPress={() => handleRemoveDrink(drink.id, drink.name)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.7 }} accessibilityLabel={`${drink.name} verwijderen`} accessibilityRole="button">
                       <Ionicons name="close-circle" size={20} color="#EB5466" />
                     </Pressable>
                   </View>
+                  {drinksAsCategories && drinkPriceErrors[drink.id] && (
+                    <Text style={s.priceError}>{drinkPriceErrors[drink.id]}</Text>
+                  )}
                 </React.Fragment>
               );
             })}
             {/* Add drink inline */}
             <View style={s.divider} />
             <View style={s.addDrinkRow}>
-              <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor="#848484" value={newDrinkName} onChangeText={setNewDrinkName} />
+              <TextInput style={s.addDrinkInput} placeholder="Naam" placeholderTextColor={brand.inactive} value={newDrinkName} onChangeText={setNewDrinkName} />
               <View style={[s.addDrinkEmojiWrap, newDrinkEmoji === '' ? s.addDrinkEmojiEmpty : s.addDrinkEmojiFilled]}>
                 {newDrinkEmoji === '' && (
                   <Text style={s.addDrinkEmojiPlaceholder} pointerEvents="none">🍺</Text>
@@ -947,25 +1210,48 @@ export default function SettingsOverlay({
                 <TextInput style={s.addDrinkEmoji} value={newDrinkEmoji} onChangeText={setNewDrinkEmoji} />
               </View>
               <Pressable onPress={handleAddDrink} hitSlop={4} style={({ pressed }) => [s.addDrinkBtn, pressed && { opacity: 0.7 }]} accessibilityLabel="Drankje toevoegen" accessibilityRole="button">
-                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Ionicons name="add" size={20} color={colors.dark.text.primary} />
               </Pressable>
             </View>
-            {/* Category badge selector: hold to expand, drag to pick */}
-            <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
-              <CategoryBadgeSelector
-                value={parseInt(newDrinkCat) || 1}
-                onChange={(v) => setNewDrinkCat(String(v))}
-                colors={categoryColors}
-                enabledCategories={[...enabledCats].sort()}
-                getCategoryName={getCategoryName}
-                onScrollEnable={setScrollEnabled}
-              />
-            </View>
-            <Text style={s.catSelectorHint}>Houd ingedrukt en sleep om te kiezen</Text>
+            {/* Category badge selector: hold to expand, drag to pick — hidden in drink-mode */}
+            {!drinksAsCategories && (
+              <>
+                <View style={[s.addDrinkRow, { justifyContent: 'center', paddingVertical: 8 }]}>
+                  <CategoryBadgeSelector
+                    value={parseInt(newDrinkCat) || 1}
+                    onChange={(v) => setNewDrinkCat(String(v))}
+                    catColors={categoryColors}
+                    enabledCategories={[...enabledCats].sort()}
+                    getCategoryName={getCategoryName}
+                    onScrollEnable={setScrollEnabled}
+                  />
+                </View>
+                <Text style={s.catSelectorHint}>Houd ingedrukt en sleep om te kiezen</Text>
+              </>
+            )}
           </View>
 
           {/* Members */}
           <Text style={s.sectionHeader}>LEDEN</Text>
+          {isAdmin && (
+            <View style={[s.card, { marginBottom: 8 }]}>
+              <View style={s.autoTrustRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.autoTrustLabel}>Nieuwe leden automatisch vertrouwen?</Text>
+                  <Text style={s.autoTrustHint}>Nieuwe leden worden automatisch admin</Text>
+                </View>
+                <Switch
+                  value={group?.auto_trust_members ?? false}
+                  onValueChange={async (val) => {
+                    await supabase.from('groups').update({ auto_trust_members: val }).eq('id', groupId);
+                    refresh();
+                  }}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: brand.cyan }}
+                  thumbColor={colors.dark.text.primary}
+                />
+              </View>
+            </View>
+          )}
           <View style={s.card}>
             {members.map((member, i) => {
               const name = member.user_id === currentUserId ? 'Jij' : (member.profile?.full_name || 'Onbekend');
@@ -985,7 +1271,7 @@ export default function SettingsOverlay({
                       <Text style={s.memberName}>{name}</Text>
                       {member.is_admin && <Text style={s.adminBadge}>Admin</Text>}
                     </View>
-                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#848484" />
+                    <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={brand.inactive} />
                   </Pressable>
                   {/* Expanded: tally counts + admin actions */}
                   {isExpanded && (
@@ -1016,7 +1302,7 @@ export default function SettingsOverlay({
                                 accessibilityLabel="Streepje toevoegen"
                                 accessibilityRole="button"
                               >
-                                <Ionicons name="add" size={16} color="#00BEAE" />
+                                <Ionicons name="add" size={16} color={brand.cyan} />
                               </Pressable>
                             )}
                             {removeTally && count > 0 && (
@@ -1054,7 +1340,7 @@ export default function SettingsOverlay({
                       {!isSelf && (
                         <View style={s.memberActions}>
                           <Pressable onPress={() => handleToggleAdmin(member.user_id, name, member.is_admin)} style={({ pressed }) => [s.memberActionBtn, pressed && { opacity: 0.7 }]}>
-                            <Ionicons name={member.is_admin ? 'shield' : 'shield-outline'} size={18} color="#00BEAE" />
+                            <Ionicons name={member.is_admin ? 'shield' : 'shield-outline'} size={18} color={brand.cyan} />
                             <Text style={s.memberActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{member.is_admin ? 'Admin verwijderen' : 'Admin maken'}</Text>
                           </Pressable>
                           <Pressable onPress={() => handleRemoveMember(member.user_id, name)} style={({ pressed }) => [s.memberActionBtnDanger, pressed && { opacity: 0.7 }]}>
@@ -1157,29 +1443,30 @@ export default function SettingsOverlay({
                 } catch {}
               }}
             >
-              <Ionicons name="share-outline" size={18} color="#00BEAE" />
+              <Ionicons name="share-outline" size={18} color={brand.cyan} />
               <Text style={s.shareInviteText}>Deel uitnodiging</Text>
             </Pressable>
           </View>
 
           {/* Danger zone */}
-          <View style={[s.card, { marginTop: 24 }]}>
+          {/* TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original */}
+          <View style={[s.card, { marginTop: space[6] }]}>
             {isAdmin && (
               <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleRemoveAdmin}>
-                <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                <Ionicons name="shield-outline" size={20} color="#EB5466" style={{ marginRight: space[3] }} />
                 <Text style={s.dangerRowText}>Admin afstaan</Text>
               </Pressable>
             )}
             {isAdmin && <View style={s.divider} />}
             <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleLeaveGroup}>
-              <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+              <Ionicons name="exit-outline" size={20} color="#EB5466" style={{ marginRight: space[3] }} />
               <Text style={s.dangerRowText}>Groep verlaten</Text>
             </Pressable>
             {isAdmin && (
               <>
                 <View style={s.divider} />
                 <Pressable style={({ pressed }) => [s.dangerRow, pressed && { opacity: 0.7 }]} onPress={handleDeleteGroup}>
-                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: 12 }} />
+                  <Ionicons name="trash-outline" size={20} color="#EB5466" style={{ marginRight: space[3] }} />
                   <Text style={s.dangerRowText}>Groep verwijderen</Text>
                 </Pressable>
               </>
@@ -1200,142 +1487,157 @@ export default function SettingsOverlay({
 
 const s = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: space[5] },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: '400', color: '#FFFFFF' },
-  saveText: { fontFamily: 'Unbounded', fontSize: 14, fontWeight: '600', color: '#00BEAE' },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: space[4] },
+  headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: fontWeights.regular, color: colors.dark.text.primary },
+  saveText: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, fontWeight: fontWeights.semibold, color: brand.cyan },
   saveBtnRow: { flexDirection: 'row' as const, alignItems: 'center' as const },
 
   // Avatar
-  avatarSection: { alignItems: 'center', marginBottom: 8 },
-  avatar: { width: 80, height: 80, borderRadius: 40 },
-  avatarFallback: { backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 28, fontWeight: '600', color: '#333' },
-  avatarAction: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', marginTop: 8 },
+  avatarSection: { alignItems: 'center', marginBottom: space[2] },
+  avatar: { width: 80, height: 80, borderRadius: radius.full },
+  avatarFallback: { backgroundColor: brand.streepsWhite, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 28, fontWeight: fontWeights.semibold, color: '#333' },
+  avatarAction: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan, marginTop: space[2] },
 
   // Section
-  sectionHeader: { fontFamily: 'Unbounded', fontSize: 12, fontWeight: '400', color: '#848484', marginLeft: 4, marginTop: 24, marginBottom: 8 },
+  sectionHeader: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, fontWeight: fontWeights.regular, color: brand.inactive, marginLeft: space[1], marginTop: space[6], marginBottom: space[2] },
 
   // Card
+  // TODO(theme-migration): borderRadius 25 differs from radius['2xl'] (24) by 1px — kept at 25 for visual fidelity
   card: { borderRadius: 25, overflow: 'hidden' },
-  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: 16 },
+  divider: { height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginLeft: space[4] },
 
   // Inputs
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, marginHorizontal: 12, marginVertical: 8 },
-  inputText: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', height: 52 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 52, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.md, marginHorizontal: space[3], marginVertical: space[2] },
+  inputText: { fontFamily: 'Unbounded', fontSize: typography.body.fontSize, color: colors.dark.text.primary, height: 52 },
 
   // Categories
-  catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52 },
+  catRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], height: 52 },
+  // TODO(theme-migration): borderRadius 10 differs from radius.sm (8) by 2px — kept for visual fidelity
   catToggle: { width: 36, height: 36, borderRadius: 10, alignItems: 'center' as const, justifyContent: 'center' as const },
   catSectionRow: { flexDirection: 'row' as const, alignItems: 'stretch' as const },
   catTogglesColumn: { width: 52, alignItems: 'center' as const, justifyContent: 'flex-start' as const },
   catToggleWrapper: { height: 52, alignItems: 'center' as const, justifyContent: 'center' as const },
-  catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 52 },
+  catNameInput: { fontFamily: 'Unbounded', flex: 1, fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, height: 52 },
   catPriceWrapper: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingHorizontal: 10,
     height: 40,
     minWidth: 88,
   },
   euroSign: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    marginRight: 4,
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    marginRight: space[1],
   },
   catPriceInput: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'right' as const,
     height: 40,
     width: 56,
     fontVariant: ['tabular-nums'] as any,
   },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original
   catPriceInputError: {
     color: '#EB5466',
   },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original
   priceError: {
     fontFamily: 'Unbounded',
     fontSize: 10,
     color: '#EB5466',
     textAlign: 'right' as const,
-    paddingRight: 16,
-    paddingBottom: 4,
+    paddingRight: space[4],
+    paddingBottom: space[1],
     marginTop: -4,
   },
-  catDisabledLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484', width: 72, textAlign: 'right' },
+  catDisabledLabel: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.inactive, width: 72, textAlign: 'right' },
 
   // Drinks
-  drinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 50 },
-  drinkName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', flex: 1 },
-  emptyText: { fontFamily: 'Unbounded', color: '#848484', padding: 16, fontSize: 14 },
-  addDrinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, height: 52, gap: 8 },
-  addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: 14, color: '#FFFFFF', height: 48 },
-  addDrinkEmojiWrap: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  drinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 50 },
+  drinkName: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, flex: 1 },
+  emptyText: { fontFamily: 'Unbounded', color: brand.inactive, padding: space[4], fontSize: typography.bodySm.fontSize },
+  addDrinkRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], height: 52, gap: space[2] },
+  addDrinkInput: { fontFamily: 'Unbounded', flex: 1, fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, height: 48 },
+  addDrinkEmojiWrap: { width: 48, height: 48, borderRadius: radius.sm, justifyContent: 'center', alignItems: 'center' },
   addDrinkEmojiEmpty: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.06)' },
   addDrinkEmojiFilled: { borderWidth: 1.5, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.15)' },
   addDrinkEmojiPlaceholder: { position: 'absolute', fontSize: 20, opacity: 0.35, textAlign: 'center' },
-  addDrinkEmoji: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', textAlign: 'center', width: 48, height: 48 },
-  addDrinkBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF004D', alignItems: 'center', justifyContent: 'center' },
-  drinkCatBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 8 },
+  addDrinkEmoji: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, textAlign: 'center', width: 48, height: 48 },
+  addDrinkBtn: { width: 36, height: 36, borderRadius: radius.full, backgroundColor: brand.streepsRed, alignItems: 'center', justifyContent: 'center' },
+  drinkCatBadge: { paddingHorizontal: space[2], paddingVertical: space[1], borderRadius: radius.sm, marginRight: space[2] },
   drinkCatBadgeText: { fontFamily: 'Unbounded', fontSize: 11 },
-  catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', textAlign: 'center', paddingBottom: 8, paddingHorizontal: 16 },
+  catSelectorHint: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, textAlign: 'center', paddingBottom: space[2], paddingHorizontal: space[4] },
+
+  // Auto-trust
+  autoTrustRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], paddingVertical: 14 },
+  autoTrustLabel: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary },
+  autoTrustHint: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, marginTop: space[1] },
 
   // Members
-  memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 56 },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12, alignItems: 'center', justifyContent: 'center' },
-  memberAvatarFallback: { backgroundColor: '#F1F1F1' },
-  memberAvatarText: { fontSize: 14, fontWeight: '600', color: '#333' },
-  memberName: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  adminBadge: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', marginTop: 1 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 56 },
+  memberAvatar: { width: 36, height: 36, borderRadius: radius.full, marginRight: space[3], alignItems: 'center', justifyContent: 'center' },
+  memberAvatarFallback: { backgroundColor: brand.streepsWhite },
+  memberAvatarText: { fontSize: typography.bodySm.fontSize, fontWeight: fontWeights.semibold, color: '#333' },
+  memberName: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary },
+  adminBadge: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan, marginTop: 1 },
 
   // Expanded member
-  memberExpanded: { paddingHorizontal: 16, paddingBottom: 12 },
+  memberExpanded: { paddingHorizontal: space[4], paddingBottom: space[3] },
   tallyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  tallyDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-  tallyLabel: { fontFamily: 'Unbounded', fontSize: 12, color: '#FFFFFF', flex: 1 },
-  tallyCount: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', fontWeight: '600', marginRight: 8, minWidth: 24, textAlign: 'right' },
-  tallyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
-  memberActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(0,217,163,0.1)' },
-  memberActionText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', flexShrink: 1 },
-  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 18, paddingHorizontal: 8, backgroundColor: 'rgba(235,84,102,0.1)' },
-  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: 12, color: '#EB5466', flexShrink: 1 },
+  tallyDot: { width: 8, height: 8, borderRadius: radius.xs, marginRight: 10 },
+  tallyLabel: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: colors.dark.text.primary, flex: 1 },
+  tallyCount: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, fontWeight: fontWeights.semibold, marginRight: space[2], minWidth: 24, textAlign: 'right' },
+  tallyBtn: { width: 36, height: 36, borderRadius: radius.full, backgroundColor: 'rgba(78,78,78,0.4)', alignItems: 'center', justifyContent: 'center', marginLeft: space[1] },
+  memberActions: { flexDirection: 'row', gap: space[2], marginTop: space[2] },
+  memberActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: radius.full, paddingHorizontal: space[2], backgroundColor: 'rgba(0,217,163,0.1)' },
+  memberActionText: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan, flexShrink: 1 },
+  memberActionBtnDanger: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: radius.full, paddingHorizontal: space[2], backgroundColor: 'rgba(235,84,102,0.1)' },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by ~perceptually distinct red — kept original
+  memberActionTextDanger: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: '#EB5466', flexShrink: 1 },
 
   // Invite
-  inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, minHeight: 52 },
-  inviteCode: { fontFamily: 'Unbounded', fontSize: 16, color: '#FFFFFF', flex: 1, letterSpacing: 2 },
-  refreshText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE' },
-  shareInviteRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 20, minHeight: 48, gap: 10 },
-  shareInviteText: { fontFamily: 'Unbounded', fontSize: 13, color: '#00BEAE' },
+  inviteRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[5], minHeight: 52 },
+  inviteCode: { fontFamily: 'Unbounded', fontSize: typography.body.fontSize, color: colors.dark.text.primary, flex: 1, letterSpacing: 2 },
+  refreshText: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.cyan },
+  shareInviteRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: space[5], minHeight: 48, gap: 10 },
+  shareInviteText: { fontFamily: 'Unbounded', fontSize: 13, color: brand.cyan },
 
   // Danger
-  dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, minHeight: 52 },
-  dangerRowText: { fontFamily: 'Unbounded', fontSize: 14, color: '#EB5466', flex: 1 },
+  dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], minHeight: 52 },
+  // TODO(theme-migration): #EB5466 differs from semantic.error (#FF5272) by perceptually distinct red — kept original
+  dangerRowText: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: '#EB5466', flex: 1 },
 
   // Chatbot
-  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', marginLeft: 20, marginTop: 12, marginBottom: 4, letterSpacing: 0.5 },
-  botDimRow: { paddingHorizontal: 16, paddingVertical: 12 },
+  botSubHeader: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, marginLeft: space[5], marginTop: space[3], marginBottom: space[1], letterSpacing: 0.5 },
+  botDimRow: { paddingHorizontal: space[4], paddingVertical: space[3] },
+  // TODO(theme-migration): #D9D9D9 is a light grey with no direct token match — kept original
   botDimLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9', marginBottom: 10 },
-  botDimChips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  botDimChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderWidth: 1 },
+  botDimChips: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
+  botDimChip: { paddingHorizontal: 14, paddingVertical: space[2], borderRadius: 18, borderWidth: 1 },
   botDimChipInactive: { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'transparent' },
-  botDimChipActive: { borderColor: '#00BEAE', backgroundColor: 'rgba(0,190,174,0.15)' },
-  botDimChipText: { fontFamily: 'Unbounded', fontSize: 12, color: '#848484' },
-  botDimChipTextActive: { color: '#FFFFFF' },
-  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, minHeight: 52 },
-  botToggleLabel: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF' },
-  botUsageRow: { padding: 16 },
+  botDimChipActive: { borderColor: brand.cyan, backgroundColor: 'rgba(0,190,174,0.15)' },
+  botDimChipText: { fontFamily: 'Unbounded', fontSize: typography.caption.fontSize, color: brand.inactive },
+  botDimChipTextActive: { color: colors.dark.text.primary },
+  botToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space[4], paddingVertical: space[3], minHeight: 52 },
+  botToggleLabel: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary },
+  botUsageRow: { padding: space[4] },
+  // TODO(theme-migration): #D9D9D9 is a light grey with no direct token match — kept original
   botUsageLabel: { fontFamily: 'Unbounded', fontSize: 13, color: '#D9D9D9' },
-  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: '#848484' },
-  botUsageBarBg: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  botUsageBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#00BEAE' },
+  botUsageCount: { fontFamily: 'Unbounded', fontSize: 13, color: brand.inactive },
+  botUsageBarBg: { height: space[2], borderRadius: radius.xs, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  botUsageBarFill: { height: '100%', borderRadius: radius.xs, backgroundColor: brand.cyan },
+  // TODO(theme-migration): #FF3B30 (iOS system red) differs from semantic.error (#FF5272) by perceptually distinct red — kept original
   botUsageBarFillFull: { backgroundColor: '#FF3B30' },
-  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: 8 },
+  // TODO(theme-migration): #FF3B30 (iOS system red) differs from semantic.error (#FF5272) by perceptually distinct red — kept original
+  botUsageWarning: { fontFamily: 'Unbounded', fontSize: 11, color: '#FF3B30', marginTop: space[2] },
 });

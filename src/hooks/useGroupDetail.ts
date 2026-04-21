@@ -1,10 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Group, GroupMember, Drink, Tally, Profile } from '../types/database';
 
 interface TallyWithDetails extends Tally {
   user_name: string;
+}
+
+export interface PriceChangeEvent {
+  type: 'category' | 'drink' | 'mode_toggle';
+  label: string;
+  oldPrice?: number;
+  newPrice?: number;
+  timestamp: number;
 }
 
 export function useGroupDetail(groupId: string) {
@@ -18,6 +26,17 @@ export function useGroupDetail(groupId: string) {
   const [recentTallies, setRecentTallies] = useState<TallyWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lastPriceEvent, setLastPriceEvent] = useState<PriceChangeEvent | null>(null);
+
+  // Refs used to diff old vs new state on realtime updates
+  const prevGroupRef = useRef<Group | null>(null);
+  const prevDrinksRef = useRef<Drink[]>([]);
+  // Suppress notifications briefly when the local user is the actor of a change
+  const suppressUntilRef = useRef<number>(0);
+
+  const markOwnChange = useCallback(() => {
+    suppressUntilRef.current = Date.now() + 3000;
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (!user || !groupId) return;
@@ -36,7 +55,41 @@ export function useGroupDetail(groupId: string) {
         .order('category', { ascending: true }),
     ]);
 
-    if (groupRes.data) setGroup(groupRes.data);
+    if (groupRes.data) {
+      const newGroup = groupRes.data as Group;
+      const oldGroup = prevGroupRef.current;
+      const notifyAllowed = Date.now() > suppressUntilRef.current;
+      if (oldGroup && notifyAllowed) {
+        // Detect category price changes (only emit first diff to avoid spam)
+        for (let i = 1; i <= 4; i++) {
+          const priceKey = `price_category_${i}` as const;
+          const nameKey = `name_category_${i}` as const;
+          const oldPrice = (oldGroup as any)[priceKey] as number | null | undefined;
+          const newPrice = (newGroup as any)[priceKey] as number | null | undefined;
+          // Only notify if both sides have a concrete price and they differ
+          if (oldPrice != null && newPrice != null && oldPrice !== newPrice) {
+            setLastPriceEvent({
+              type: 'category',
+              label: (newGroup as any)[nameKey] ?? `Categorie ${i}`,
+              oldPrice,
+              newPrice,
+              timestamp: Date.now(),
+            });
+            break;
+          }
+        }
+        // Detect drinks_as_categories toggle
+        if ((oldGroup as any).drinks_as_categories !== (newGroup as any).drinks_as_categories) {
+          setLastPriceEvent({
+            type: 'mode_toggle',
+            label: '',
+            timestamp: Date.now(),
+          });
+        }
+      }
+      prevGroupRef.current = newGroup;
+      setGroup(newGroup);
+    }
     if (membersRes.data) {
       const enrichedMembers = membersRes.data.map((m: any) => {
         if (m.is_active && m.last_seen) {
@@ -52,7 +105,32 @@ export function useGroupDetail(groupId: string) {
       const me = enrichedMembers.find((m: any) => m.user_id === user.id);
       setIsAdmin(me?.is_admin ?? false);
     }
-    if (drinksRes.data) setDrinks(drinksRes.data as any);
+    if (drinksRes.data) {
+      const newDrinks = drinksRes.data as any as Drink[];
+      const oldDrinks = prevDrinksRef.current;
+      const notifyAllowed = Date.now() > suppressUntilRef.current;
+      if (oldDrinks.length > 0 && notifyAllowed) {
+        // Detect per-drink price_override changes (first diff only)
+        for (const nd of newDrinks) {
+          const od = oldDrinks.find((d) => d.id === nd.id);
+          if (!od) continue;
+          const oldPrice = (od as any).price_override as number | null | undefined;
+          const newPrice = (nd as any).price_override as number | null | undefined;
+          if (oldPrice != null && newPrice != null && oldPrice !== newPrice) {
+            setLastPriceEvent({
+              type: 'drink',
+              label: nd.name,
+              oldPrice,
+              newPrice,
+              timestamp: Date.now(),
+            });
+            break;
+          }
+        }
+      }
+      prevDrinksRef.current = newDrinks;
+      setDrinks(newDrinks);
+    }
 
     // Get recent tallies
     const { data: talliesData } = await supabase
@@ -125,6 +203,12 @@ export function useGroupDetail(groupId: string) {
   useEffect(() => {
     setLoading(true);
     setGroup(null);
+    // Reset diff-tracking refs on group switch so we don't falsely emit
+    // a price-change event for the first load of a new group.
+    prevGroupRef.current = null;
+    prevDrinksRef.current = [];
+    suppressUntilRef.current = 0;
+    setLastPriceEvent(null);
     fetchAll();
 
     // Subscribe to realtime changes
@@ -187,7 +271,7 @@ export function useGroupDetail(groupId: string) {
     };
   }, [fetchAll]);
 
-  const addTally = async (category: number, count: number = 1) => {
+  const addTally = async (category: number, count: number = 1, drinkId?: string) => {
     if (!user) return;
 
     const rows = Array.from({ length: count }, () => ({
@@ -195,6 +279,7 @@ export function useGroupDetail(groupId: string) {
       user_id: user.id,
       category,
       added_by: user.id,
+      ...(drinkId ? { drink_id: drinkId } : {}),
     }));
 
     await supabase.from('tallies').insert(rows);
@@ -259,13 +344,14 @@ export function useGroupDetail(groupId: string) {
       .eq('id', groupId);
   };
 
-  const addDrink = async (name: string, category: number, emoji: string) => {
+  const addDrink = async (name: string, category: number, emoji: string, priceOverride?: number) => {
     if (!user) return;
     await supabase.from('drinks').insert({
       group_id: groupId,
       name,
       category,
       emoji,
+      ...(priceOverride != null && { price_override: priceOverride }),
     });
     await fetchAll();
   };
@@ -334,13 +420,14 @@ export function useGroupDetail(groupId: string) {
     });
   };
 
-  const addTallyForMemberByCategory = async (category: number, userId: string) => {
+  const addTallyForMemberByCategory = async (category: number, userId: string, drinkId?: string) => {
     if (!user) return;
     await supabase.from('tallies').insert({
       group_id: groupId,
       user_id: userId,
       category,
       added_by: user.id,
+      ...(drinkId ? { drink_id: drinkId } : {}),
     });
   };
 
@@ -381,6 +468,8 @@ export function useGroupDetail(groupId: string) {
     credits,
     loading,
     isAdmin,
+    lastPriceEvent,
+    markOwnChange,
     addTally,
     addTallyForMember,
     addTallyForMemberByCategory,

@@ -9,6 +9,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { colors } from '@/src/theme';
 
 /**
  * CategoryRow — pill-shaped category selector button.
@@ -24,6 +25,8 @@ interface CategoryRowProps {
   categoryIndex?: number;
   selected?: boolean;
   onPress: () => void;
+  emoji?: string;      // shown large above name in vertical mode
+  vertical?: boolean;  // vertical tile layout (emoji → name → price)
 }
 
 const SPRING_CONFIG = { damping: 18, stiffness: 200 };
@@ -38,6 +41,8 @@ export default function CategoryRow({
   categoryIndex = 1,
   selected = false,
   onPress,
+  emoji,
+  vertical = false,
 }: CategoryRowProps) {
   const priceStr = `\u20AC ${(price / 100).toFixed(2).replace('.', ',')}`;
 
@@ -82,7 +87,7 @@ export default function CategoryRow({
     color: interpolateColor(
       selectedProgress.value,
       [0, 1],
-      [color, '#0F0F1E']
+      [color, colors.dark.background.primary]
     ),
     fontWeight: '400' as const,
   }));
@@ -101,12 +106,15 @@ export default function CategoryRow({
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={[s.pill, pillAnimatedStyle]}
+      style={[vertical ? s.tile : s.pill, pillAnimatedStyle]}
     >
-      <Animated.Text style={[s.name, nameAnimatedStyle]}>
+      {vertical && emoji && (
+        <Animated.Text style={s.tileEmoji}>{emoji}</Animated.Text>
+      )}
+      <Animated.Text style={[vertical ? s.tileName : s.name, nameAnimatedStyle]} numberOfLines={1}>
         {name}
       </Animated.Text>
-      <Animated.Text style={[s.price, priceAnimatedStyle]}>
+      <Animated.Text style={[vertical ? s.tilePrice : s.price, priceAnimatedStyle]}>
         {priceStr}
       </Animated.Text>
     </AnimatedPressable>
@@ -123,12 +131,34 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 10,
   },
+  tile: {
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    marginBottom: 0,
+  },
   name: {
     fontFamily: 'Unbounded',
     fontSize: 18,
   },
+  tileName: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  tileEmoji: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
   price: {
     fontFamily: 'Unbounded',
     fontSize: 15,
+  },
+  tilePrice: {
+    fontFamily: 'Unbounded',
+    fontSize: 12,
   },
 });

@@ -1,16 +1,16 @@
 import { Stack } from 'expo-router';
-import { useColorScheme } from '@/components/useColorScheme';
-import { Colors } from '@/src/constants/Colors';
+import { getTheme } from '@/src/theme';
+import { useTheme } from '@/src/contexts/ThemeContext';
 
 export default function GroupsLayout() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const { theme } = useTheme();
+  const tokens = getTheme(theme);
 
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
+        headerStyle: { backgroundColor: tokens.colors.surface.default },
+        headerTintColor: tokens.colors.text.primary,
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

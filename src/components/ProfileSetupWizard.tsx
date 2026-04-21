@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
+import { colors, brand, space, radius, typography, fontWeights } from '@/src/theme';
 
 const TOTAL_STEPS = 4;
 
@@ -233,7 +234,7 @@ export default function ProfileSetupWizard({
         value={fullName}
         onChangeText={setFullName}
         placeholder="Je naam"
-        placeholderTextColor="#848484"
+        placeholderTextColor={brand.inactive}
         autoFocus
         returnKeyType="done"
         maxLength={20}
@@ -252,7 +253,7 @@ export default function ProfileSetupWizard({
           const anim = genderAnims[opt.value];
           const animBorderColor = anim.interpolate({
             inputRange: [0, 1],
-            outputRange: ['rgba(255,255,255,0.15)', '#00BEAE'],
+            outputRange: ['rgba(255,255,255,0.15)', brand.cyan],
           });
           const animBgColor = anim.interpolate({
             inputRange: [0, 1],
@@ -260,11 +261,11 @@ export default function ProfileSetupWizard({
           });
           const animIconColor = anim.interpolate({
             inputRange: [0, 1],
-            outputRange: ['#848484', '#00BEAE'],
+            outputRange: [brand.inactive, brand.cyan],
           });
           const animTextColor = anim.interpolate({
             inputRange: [0, 1],
-            outputRange: ['#FFFFFF', '#00BEAE'],
+            outputRange: [colors.dark.text.primary, brand.cyan],
           });
           return (
             <Animated.View
@@ -302,7 +303,7 @@ export default function ProfileSetupWizard({
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={ws.avatarImage} transition={200} cachePolicy="memory-disk" />
         ) : (
-          <Ionicons name="camera" size={40} color="#848484" />
+          <Ionicons name="camera" size={40} color={brand.inactive} />
         )}
         {uploadingAvatar && (
           <View style={ws.avatarOverlay}>
@@ -321,7 +322,7 @@ export default function ProfileSetupWizard({
   const renderStep4 = () => (
     <View style={ws.stepContent}>
       <View style={ws.doneIcon}>
-        <Ionicons name="checkmark-circle" size={80} color="#00BEAE" />
+        <Ionicons name="checkmark-circle" size={80} color={brand.cyan} />
       </View>
       <Text style={ws.doneTitle}>Welkom, {fullName.trim() || 'gebruiker'}!</Text>
       <Text style={ws.doneSubtitle}>Je profiel is ingesteld</Text>
@@ -366,12 +367,12 @@ export default function ProfileSetupWizard({
       });
       const textColor = genderBtnAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ['#848484', '#FFFFFF'],
+        outputRange: [brand.inactive, colors.dark.text.primary],
       });
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable style={ws.backBtn} onPress={() => goToStep(1)}>
-            <Ionicons name="chevron-back" size={18} color="#848484" />
+            <Ionicons name="chevron-back" size={18} color={brand.inactive} />
             <Text style={ws.backBtnText}>Terug</Text>
           </Pressable>
           <Animated.View style={[ws.genderBtn, { backgroundColor: btnBg }]}>
@@ -392,7 +393,7 @@ export default function ProfileSetupWizard({
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={ws.backBtn} onPress={() => goToStep(2)}>
-          <Ionicons name="chevron-back" size={18} color="#848484" />
+          <Ionicons name="chevron-back" size={18} color={brand.inactive} />
           <Text style={ws.backBtnText}>Terug</Text>
         </Pressable>
         <Pressable style={ws.nextBtn} onPress={handleNextStep3Avatar}>
@@ -446,49 +447,49 @@ export default function ProfileSetupWizard({
 
 const ws = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: space[5] },
 
   // Progress
-  progressWrap: { marginBottom: 24 },
+  progressWrap: { marginBottom: space[6] },
   progressBar: {
     height: 4,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     backgroundColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   progressFill: {
     height: 4,
-    borderRadius: 4,
-    backgroundColor: '#00BEAE',
+    borderRadius: radius.xs,
+    backgroundColor: brand.cyan,
   },
   progressText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#848484',
-    marginTop: 8,
+    fontSize: typography.caption.fontSize,
+    color: brand.inactive,
+    marginTop: space[2],
   },
 
   // Step container
   stepContainer: { flex: 1 },
-  stepContent: { flex: 1, alignItems: 'center', paddingTop: 20 },
+  stepContent: { flex: 1, alignItems: 'center', paddingTop: space[5] },
   stepTitle: {
     fontFamily: 'Unbounded',
-    fontSize: 24,
+    fontSize: 24, // TODO(theme-migration): typography.heading2 is 22 (-2 delta) but fontWeight differs ('400' vs semibold) — keep literal for fidelity
     fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    color: colors.dark.text.primary,
+    marginBottom: space[2],
   },
   stepSubtitle: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    marginBottom: 32,
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    marginBottom: space[8],
   },
   stepSubtitleGender: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    marginBottom: 50,
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    marginBottom: 50, // TODO(theme-migration): 50px not on 4px grid (nearest space[12]=48, -2 delta) — keep exact for visual fidelity in gender step header
   },
 
   // Step 1: Name input
@@ -497,10 +498,10 @@ const ws = StyleSheet.create({
     width: '100%',
     height: 52,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
+    borderRadius: 25, // TODO(theme-migration): 25 is pill-specific (matches 52/2=26 close), radius.xl=20 differs -5 — keep for rounded pill look
+    paddingHorizontal: space[4],
+    fontSize: typography.body.fontSize,
+    color: colors.dark.text.primary,
   },
 
   // Step 2: Gender
@@ -508,13 +509,13 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 12,
+    rowGap: space[3],
     width: '100%',
   },
   genderOption: {
     width: '48.5%',
     aspectRatio: 1,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 2,
     overflow: 'hidden',
   },
@@ -526,9 +527,9 @@ const ws = StyleSheet.create({
   },
   genderLabel: {
     fontFamily: 'Unbounded',
-    fontSize: 13,
+    fontSize: 13, // TODO(theme-migration): 13 not in typography scale (caption=12, bodySm=14, +/-1 delta) — keep exact
     textAlign: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: space[2],
   },
   backBtn: {
     flex: 1,
@@ -537,14 +538,14 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: space[1],
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   backBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    fontWeight: fontWeights.semibold,
   },
   genderBtn: {
     flex: 1,
@@ -555,16 +556,16 @@ const ws = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   genderBtnActive: {
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   genderBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    fontWeight: fontWeights.semibold,
   },
   genderBtnTextActive: {
-    color: '#FFFFFF',
+    color: colors.dark.text.primary,
   },
 
   // Step 3: Avatar
@@ -592,33 +593,33 @@ const ws = StyleSheet.create({
   },
   uploadingText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#FFFFFF',
+    fontSize: typography.caption.fontSize,
+    color: colors.dark.text.primary,
   },
   avatarHint: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#00BEAE',
-    marginTop: 12,
+    fontSize: typography.caption.fontSize,
+    color: brand.cyan,
+    marginTop: space[3],
   },
 
   // Step 4: Done
   doneIcon: {
-    marginBottom: 16,
-    marginTop: 40,
+    marginBottom: space[4],
+    marginTop: space[10],
   },
   doneTitle: {
     fontFamily: 'Unbounded',
-    fontSize: 24,
+    fontSize: 24, // TODO(theme-migration): typography.heading2 is 22 (-2 delta) but fontWeight differs ('400' vs semibold) — keep literal for fidelity
     fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    color: colors.dark.text.primary,
+    marginBottom: space[2],
     textAlign: 'center',
   },
   doneSubtitle: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
     textAlign: 'center',
   },
 
@@ -626,8 +627,8 @@ const ws = StyleSheet.create({
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingTop: 16,
+    gap: space[3],
+    paddingTop: space[4],
   },
   skipBtn: {
     flex: 1,
@@ -639,9 +640,9 @@ const ws = StyleSheet.create({
   },
   skipBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    fontWeight: fontWeights.semibold,
   },
   nextBtn: {
     flex: 1,
@@ -649,16 +650,16 @@ const ws = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   nextBtnDisabled: {
     backgroundColor: 'rgba(0, 190, 174, 0.3)',
   },
   nextBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
   nextBtnTextDisabled: {
     opacity: 0.5,
@@ -669,12 +670,12 @@ const ws = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   beginBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.body.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
 });

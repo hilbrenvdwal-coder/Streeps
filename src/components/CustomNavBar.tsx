@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { brand, colors, components } from '@/src/theme';
 
 /**
  * Custom NavBar — Figma node 30:255, glassy look
@@ -25,18 +26,26 @@ const SCREEN_W = Dimensions.get('window').width;
 const DESIGN_W = 390;
 const scale = (v: number) => (v / DESIGN_W) * SCREEN_W;
 
-const TAB_ORDER = ['activiteit', 'home', 'chat'];
+const TAB_ORDER = ['geschiedenis', 'rekening', 'home', 'chat', 'explore'];
 
-const PILL_POSITIONS = [24, 155, 286];
-const PILL_W = 80;
-const ICON_X = [48 + 16, 179 + 16, 310 + 16];
+const TAB_COUNT = 5;
+const SIDE_MARGIN = 20;
+const PILL_W = 56;
+const FIRST_CENTER = SIDE_MARGIN + PILL_W / 2;
+const LAST_CENTER = DESIGN_W - SIDE_MARGIN - PILL_W / 2;
+const STRIDE = (LAST_CENTER - FIRST_CENTER) / (TAB_COUNT - 1);
+
+const PILL_POSITIONS = Array.from({ length: TAB_COUNT },
+  (_, i) => FIRST_CENTER + i * STRIDE - PILL_W / 2);
+const ICON_X = Array.from({ length: TAB_COUNT },
+  (_, i) => FIRST_CENTER + i * STRIDE);
 
 const PILL_LEFTS = PILL_POSITIONS.map((x) => scale(x));
 
 const PILL_W_SCALED = scale(PILL_W);
 
-const PILL_H = 50;
-const PILL_H_THIN = 38;
+const PILL_H = 42;
+const PILL_H_THIN = 32;
 
 const SPRING_CONF = { damping: 20, stiffness: 300, mass: 1 };
 
@@ -45,7 +54,7 @@ export default function CustomNavBar({ state, navigation }: any) {
 
   const activeRouteName = state.routes[state.index]?.name;
   const visibleIndex = TAB_ORDER.indexOf(activeRouteName);
-  const activeTab = visibleIndex >= 0 ? visibleIndex : 1;
+  const activeTab = visibleIndex >= 0 ? visibleIndex : 2;
 
   const prevTab = useRef(activeTab);
   const leftEdge = useSharedValue(PILL_LEFTS[activeTab]);
@@ -80,13 +89,15 @@ export default function CustomNavBar({ state, navigation }: any) {
     width: rightEdge.value - leftEdge.value,
     height: pillHeight.value,
     top: 14 + (PILL_H - pillHeight.value) / 2,
-    borderRadius: 44,
+    borderRadius: components.navBar.pillRadius,
   }));
 
   const icons: Array<{ name: keyof typeof Ionicons.glyphMap; nameFocused: keyof typeof Ionicons.glyphMap }> = [
-    { name: 'people-outline', nameFocused: 'people' },
-    { name: 'home-outline', nameFocused: 'home' },
+    { name: 'time-outline',        nameFocused: 'time' },
+    { name: 'wallet-outline',      nameFocused: 'wallet' },
+    { name: 'home-outline',        nameFocused: 'home' },
     { name: 'chatbubbles-outline', nameFocused: 'chatbubbles' },
+    { name: 'compass-outline',     nameFocused: 'compass' },
   ];
 
   return (
@@ -138,7 +149,7 @@ export default function CustomNavBar({ state, navigation }: any) {
               <Ionicons
                 name={isFocused ? icon.nameFocused : icon.name}
                 size={20}
-                color={isFocused ? '#FFFFFF' : '#878787'}
+                color={isFocused ? colors.dark.text.primary : brand.inactive}
               />
             </Pressable>
           );
@@ -151,8 +162,6 @@ export default function CustomNavBar({ state, navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
   },
   tintOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -167,13 +176,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
   bar: {
-    height: 77,
+    height: 64,
     position: 'relative',
   },
   pill: {
     position: 'absolute',
-    backgroundColor: '#FF0085',
-    shadowColor: '#FF0085',
+    backgroundColor: brand.magenta,
+    shadowColor: brand.magenta,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 9.4,
@@ -183,7 +192,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 48,
     height: 48,
-    top: 15,
+    top: 11,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,

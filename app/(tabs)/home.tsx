@@ -8,8 +8,10 @@ import GroupSetupWizard from '@/src/components/GroupSetupWizard';
 import { AnimatedCard } from '@/src/components/AnimatedCard';
 import HomeSkeleton from '@/src/components/HomeSkeleton';
 import SettingsOverlay from '@/src/components/SettingsOverlay';
+import AddDrinkOverlay from '@/src/components/AddDrinkOverlay';
 import StreepjesVerificatieModal from '@/src/components/StreepjesVerificatieModal';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useHomeReady } from '@/src/contexts/HomeReadyContext';
 import { supabase } from '@/src/lib/supabase';
 import { useGroupDetail } from '@/src/hooks/useGroupDetail';
 import { useGroups } from '@/src/hooks/useGroups';
@@ -216,7 +218,17 @@ export default function HomeScreen() {
     group, members, drinks, tallyCounts, tallyCategoryCounts, recentTallies, credits,
     loading: detailLoading, isAdmin, addTally, addTallyForMember, addTallyForMemberByCategory, removeTally, toggleAdmin, removeMember, leaveGroup, removeOwnAdmin, toggleActive, activateMe,
     updateGroupPrices, updateGroupName, addDrink, removeDrink, deleteGroup, regenerateInviteCode, refresh: refreshGroup,
+    lastPriceEvent, markOwnChange,
   } = useGroupDetail(selectedGroupId ?? '');
+
+  // Signal HomeReadyContext when home data is loaded
+  const { setHomeReady } = useHomeReady();
+  const homeDataReady = !groupsLoading && (groups.length === 0 || (!detailLoading && group !== null));
+  useEffect(() => {
+    if (homeDataReady) {
+      setHomeReady(true);
+    }
+  }, [homeDataReady]);
 
   // Auto-activate user in selected group
   const myMember = members.find((m) => m.user_id === user?.id);
@@ -225,7 +237,14 @@ export default function HomeScreen() {
     if (!myMember.is_active) activateMe();
   }, [selectedGroupId, myMember?.is_active]);
 
-  const { settling, getUnsettledTallies, createSettlement, fetchHistory, history } = useSettlements(selectedGroupId ?? '');
+  const { settling, getUnsettledTallies, createSettlement, fetchHistory, history, groupTotalCents, refreshGroupTotal } = useSettlements(selectedGroupId ?? '');
+
+  // Refresh group total when tallies change (admin only)
+  useEffect(() => {
+    if (group && isAdmin) {
+      refreshGroupTotal(group);
+    }
+  }, [group, isAdmin, recentTallies?.length, refreshGroupTotal]);
 
   // Tally flow state
   const [selectedCategory, setSelectedCategory] = useState<number | null>(1);
@@ -248,6 +267,31 @@ export default function HomeScreen() {
       Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setToast(null));
   };
+
+  // Price-change toast: wanneer een admin prijzen wijzigt, krijgen andere leden
+  // met de app open een toast. De actor wordt geskipt via suppressUntilRef in useGroupDetail.
+  useEffect(() => {
+    if (!lastPriceEvent) return;
+    const fmt = (c: number) => `€${(c / 100).toFixed(2).replace('.', ',')}`;
+    let msg = '';
+    if (
+      lastPriceEvent.type === 'category' &&
+      lastPriceEvent.oldPrice !== undefined &&
+      lastPriceEvent.newPrice !== undefined
+    ) {
+      msg = `Prijs gewijzigd: ${lastPriceEvent.label} ${fmt(lastPriceEvent.oldPrice)} → ${fmt(lastPriceEvent.newPrice)}`;
+    } else if (
+      lastPriceEvent.type === 'drink' &&
+      lastPriceEvent.oldPrice !== undefined &&
+      lastPriceEvent.newPrice !== undefined
+    ) {
+      msg = `${lastPriceEvent.label}: ${fmt(lastPriceEvent.oldPrice)} → ${fmt(lastPriceEvent.newPrice)}`;
+    } else if (lastPriceEvent.type === 'mode_toggle') {
+      msg = 'Prijs-modus gewijzigd in deze groep';
+    }
+    if (msg) showToast(msg, 'success');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPriceEvent?.timestamp]);
 
   // Content fade-in on data load (triggers on group switch + initial load)
   const contentOpacity = useRef(new Animated.Value(0)).current;
@@ -320,6 +364,7 @@ export default function HomeScreen() {
   // Group selector modal
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAddDrink, setShowAddDrink] = useState(false);
   const [wizardGroup, setWizardGroup] = useState<{ id: string; name: string; invite_code: string } | null>(null);
   const navBarAnim = useNavBarAnim();
 
@@ -400,10 +445,31 @@ export default function HomeScreen() {
     })
   ).current;
 
+  const isDrinkMode = group?.drinks_as_categories === true;
+
   const activeCategories = useMemo(() => {
     const catsWithDrinks = new Set(drinks.map((d) => d.category));
     return ([1, 2, 3, 4] as const).filter((cat) => catsWithDrinks.has(cat));
   }, [drinks]);
+
+  // In drink-mode: available drinks act as "categories"
+  const drinkCategories = useMemo(() => {
+    if (!isDrinkMode) return [];
+    return drinks.filter((d) => (d as any).is_available !== false);
+  }, [isDrinkMode, drinks]);
+
+  // Selected drink ID for drink-mode
+  const [selectedDrinkId, setSelectedDrinkId] = useState<string | null>(null);
+
+  // Auto-select first drink when entering drink-mode or drinks change
+  useEffect(() => {
+    if (isDrinkMode && drinkCategories.length > 0) {
+      if (!selectedDrinkId || !drinkCategories.some((d) => d.id === selectedDrinkId)) {
+        setSelectedDrinkId(drinkCategories[0].id);
+        setSelectedCategory(drinkCategories[0].category);
+      }
+    }
+  }, [isDrinkMode, drinkCategories]);
 
   // ── Live badge: auto-expires at the exact moment the 10-min window closes ──
   const [isLive, setIsLive] = useState(false);
@@ -488,20 +554,20 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCategoryTap = (cat: number) => {
+  const handleCategoryTap = (cat: number, drinkId?: string) => {
     if (adding) return; // debounce: block while tally is being saved
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(cat);
+    if (drinkId) setSelectedDrinkId(drinkId);
   };
 
   const handleConfirmTally = async () => {
     if (!selectedCategory || tallyCount < 1) { setShowVerification(false); return; }
     const count = tallyCount;
-    const catName = getCategoryName(selectedCategory);
     setShowVerification(false);
     setAdding(true);
     try {
-      await addTally(selectedCategory as 1 | 2 | 3 | 4, count);
+      await addTally(selectedCategory as 1 | 2 | 3 | 4, count, isDrinkMode ? (selectedDrinkId ?? undefined) : undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const newCount = confirmCount + 1;
       setConfirmCount(newCount);
@@ -605,6 +671,63 @@ export default function HomeScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  // ── Counter content (extracted for conditional placement) ──
+  const counterContent = (
+    <View style={s.counterWrap}>
+      <CounterControl
+        value={tallyCount}
+        onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
+        onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
+        onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
+        onSwipeCycle={(direction: 'next' | 'prev') => {
+          if (adding) return;
+          if (isDrinkMode) {
+            if (drinkCategories.length === 0) return;
+            const currentIdx = drinkCategories.findIndex((d) => d.id === selectedDrinkId);
+            if (currentIdx === -1) return;
+            const nextIdx = direction === 'next'
+              ? (currentIdx + 1) % drinkCategories.length
+              : (currentIdx - 1 + drinkCategories.length) % drinkCategories.length;
+            setSelectedDrinkId(drinkCategories[nextIdx].id);
+            setSelectedCategory(drinkCategories[nextIdx].category);
+            Haptics.selectionAsync();
+          } else {
+            const list = activeCategories;
+            if (!list || list.length === 0) return;
+            const currentIdx = list.findIndex((c) => c === selectedCategory);
+            if (currentIdx === -1) return;
+            const nextIdx = direction === 'next'
+              ? (currentIdx + 1) % list.length
+              : (currentIdx - 1 + list.length) % list.length;
+            setSelectedCategory(list[nextIdx]);
+            Haptics.selectionAsync();
+          }
+        }}
+        auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
+        activeColor={isDrinkMode
+          ? (selectedDrinkId ? t.categoryColors[drinkCategories.findIndex((d) => d.id === selectedDrinkId) % t.categoryColors.length] : undefined)
+          : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined)
+        }
+        disabled={isDrinkMode ? drinkCategories.length === 0 : activeCategories.length === 0}
+      />
+      {!isDrinkMode && selectedCategory && credits[selectedCategory] > 0 && (
+        <View style={s.creditBadge}>
+          <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
+        </View>
+      )}
+      <Animated.View
+        style={{
+          height: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
+          marginTop: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
+          opacity: hintProgress,
+          overflow: 'hidden',
+        }}
+      >
+        <Text style={s.submitHint}>Tik om te bevestigen</Text>
+      </Animated.View>
+    </View>
+  );
+
   // ════════════════════════════════════════════════════════════
   // RENDER — pixel-exact from Home_fixed_v3.svg
   // ════════════════════════════════════════════════════════════
@@ -625,6 +748,7 @@ export default function HomeScreen() {
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={s.scroll}
+        stickyHeaderIndices={isDrinkMode && selectedGroupId && group ? [3] : undefined}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -645,7 +769,7 @@ export default function HomeScreen() {
 
         {selectedGroupId && group ? (
           <Animated.View style={{ opacity: contentOpacity }}>
-            {/* ── Group Header ── SVG: Groepheader + Group 13 (expand icon) */}
+            {/* ── Group Header ── */}
             <Pressable style={s.groupHeader} onPress={() => setShowGroupSelector(true)}>
               <View style={s.groupTopRow}>
                 <Pressable onPress={(group as any)?.avatar_url ? handleAvatarPress : undefined} hitSlop={6}>
@@ -665,12 +789,23 @@ export default function HomeScreen() {
                 >
                   {group.name}
                 </Text>
-                {/* SVG Group 13: radial glow + up/down arrows */}
-                <View style={s.chevronWrap} pointerEvents="none">
-                  <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
-                    <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
-                    <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
-                  </Svg>
+                <View style={s.headerActions} pointerEvents="box-none">
+                  <Pressable
+                    onPress={() => openSettings()}
+                    hitSlop={10}
+                    style={({ pressed }) => [s.gearBtn, pressed && { opacity: 0.6 }]}
+                    accessibilityLabel="Instellingen"
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.9)" />
+                  </Pressable>
+                  {/* SVG Group 13: radial glow + up/down arrows */}
+                  <View style={s.chevronWrap} pointerEvents="none">
+                    <Svg width={23} height={28} viewBox="325 66 23 28" fill="none">
+                      <Path d="M348 77.5C336.5 66 336.5 66 336.5 66L325 77.5H329.6L336.5 70.6L343.4 77.5H348Z" fill="#F1F1F1" />
+                      <Path d="M325 82.1C336.5 93.6 336.5 93.6 336.5 93.6L348 82.1H343.4L336.5 89L329.6 82.1H325Z" fill="#F1F1F1" />
+                    </Svg>
+                  </View>
                 </View>
               </View>
               <View style={s.groupLabelRow}>
@@ -688,58 +823,53 @@ export default function HomeScreen() {
               </View>
             </Pressable>
 
-            {/* ── Counter ── SVG node Counter: minus(19,190) display(158,190) plus(245,190) */}
-            <View style={s.counterWrap}>
-              <CounterControl
-                value={tallyCount}
-                onIncrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setTallyCount((c) => Math.min(c + 1, 99)); }}
-                onDecrement={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTallyCount((c) => Math.max(c - 1, 0)); }}
-                onSubmit={() => { if (adding) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleCounterSubmit(); }}
-                onSwipeCycle={(direction: 'next' | 'prev') => {
-                  if (adding) return;
-                  const list = activeCategories;
-                  if (!list || list.length === 0) return;
-                  const currentIdx = list.findIndex((c) => c === selectedCategory);
-                  if (currentIdx === -1) return;
-                  const nextIdx = direction === 'next'
-                    ? (currentIdx + 1) % list.length
-                    : (currentIdx - 1 + list.length) % list.length;
-                  setSelectedCategory(list[nextIdx]);
-                  Haptics.selectionAsync();
-                }}
-                auroraColors={['#FF0085', '#FF00F5', '#00BEAE', '#00FE96']}
-                activeColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % t.categoryColors.length] : undefined}
-              />
-              {selectedCategory && credits[selectedCategory] > 0 && (
-                <View style={s.creditBadge}>
-                  <Text style={s.creditText}>-{credits[selectedCategory]}</Text>
-                </View>
-              )}
-              <Animated.View
-                style={{
-                  height: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }),
-                  marginTop: hintProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
-                  opacity: hintProgress,
-                  overflow: 'hidden',
-                }}
-              >
-                <Text style={s.submitHint}>Tik om te bevestigen</Text>
-              </Animated.View>
-            </View>
+            {/* Counter inline (normal mode) */}
+            {!isDrinkMode && counterContent}
+          </Animated.View>
+        ) : null}
 
+        {/* ── Sticky counter (drink-mode) — native stickyHeaderIndices target ── */}
+        {selectedGroupId && group && isDrinkMode ? (
+          <Animated.View style={[s.stickyCounterWrap, { opacity: contentOpacity }]}>
+            {counterContent}
+          </Animated.View>
+        ) : null}
+
+        {/* ── Rest of content (categories, leden, drankenlijst, admin, etc.) ── */}
+        {selectedGroupId && group ? (
+          <Animated.View style={{ opacity: contentOpacity }}>
             {/* ── Category Rows ── SVG: 350×50, borderRadius 25, 9px gap */}
             <View style={s.categories}>
-              {activeCategories.map((cat) => (
-                <CategoryRow
-                  key={cat}
-                  name={getCategoryName(cat)}
-                  price={getCategoryPrice(cat)}
-                  color={t.categoryColors[(cat - 1) % 4]}
-                  categoryIndex={cat}
-                  selected={selectedCategory === cat}
-                  onPress={() => handleCategoryTap(cat)}
-                />
-              ))}
+              {isDrinkMode ? (
+                <View style={s.drinkGrid}>
+                  {drinkCategories.map((drink, idx) => (
+                    <View key={drink.id} style={s.drinkTileWrap}>
+                      <CategoryRow
+                        name={drink.name}
+                        emoji={drink.emoji ?? '🍺'}
+                        price={(drink as any).price_override ?? 0}
+                        color={t.categoryColors[idx % t.categoryColors.length]}
+                        categoryIndex={idx + 1}
+                        selected={selectedDrinkId === drink.id}
+                        onPress={() => handleCategoryTap(drink.category, drink.id)}
+                        vertical
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                activeCategories.map((cat) => (
+                  <CategoryRow
+                    key={cat}
+                    name={getCategoryName(cat)}
+                    price={getCategoryPrice(cat)}
+                    color={t.categoryColors[(cat - 1) % 4]}
+                    categoryIndex={cat}
+                    selected={selectedCategory === cat}
+                    onPress={() => handleCategoryTap(cat)}
+                  />
+                ))
+              )}
             </View>
 
             {/* ── Leden ── */}
@@ -841,7 +971,7 @@ export default function HomeScreen() {
 
             {/* ── Drankenlijst ── */}
             {drinks.length === 0 && isAdmin && (
-              <Pressable style={s.emptyState} onPress={openSettings}>
+              <Pressable style={s.emptyState} onPress={() => setShowAddDrink(true)}>
                 <Text style={s.emptyStateText}>Nog geen drankjes — tik om toe te voegen</Text>
               </Pressable>
             )}
@@ -852,7 +982,20 @@ export default function HomeScreen() {
                 </View>
                 <View style={s.drankenlijstHeader}>
                   <Text style={s.drankenlijstTitle}>De kaart</Text>
-                  <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
+                  {isAdmin ? (
+                    <Pressable
+                      onPress={() => setShowAddDrink(true)}
+                      hitSlop={8}
+                      accessibilityLabel="Drankje toevoegen"
+                      accessibilityRole="button"
+                      style={({ pressed }) => [s.addDrinkHeaderBtn, pressed && { opacity: 0.85 }]}
+                    >
+                      <Ionicons name="add" size={16} color="#00BEAE" />
+                      <Text style={s.addDrinkHeaderBtnText}>drank</Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={s.drankenlijstCount}>{drinks.length} drankjes</Text>
+                  )}
                 </View>
                 <View style={s.drankenlijstList}>
                   {drinks.slice(0, 4).map((drink, i) => {
@@ -862,9 +1005,11 @@ export default function HomeScreen() {
                         <View style={s.drinkRow}>
                           <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
                           <Text style={s.drinkName}>{drink.name}</Text>
-                          <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
-                            <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
-                          </View>
+                          {!isDrinkMode && (
+                            <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                              <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                            </View>
+                          )}
                         </View>
                       </AnimatedCard>
                     );
@@ -878,9 +1023,11 @@ export default function HomeScreen() {
                             <View style={s.drinkRow}>
                               <Text style={{ fontSize: 20, marginRight: 12 }}>{drink.emoji ?? '\uD83C\uDF7A'}</Text>
                               <Text style={s.drinkName}>{drink.name}</Text>
-                              <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
-                                <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
-                              </View>
+                              {!isDrinkMode && (
+                                <View style={[s.catBadge, { backgroundColor: catColor + '20' }]}>
+                                  <Text style={{ fontFamily: 'Unbounded', color: catColor, fontSize: 12 }}>{getCategoryName(drink.category)}</Text>
+                                </View>
+                              )}
                             </View>
                           </AnimatedCard>
                         );
@@ -904,9 +1051,23 @@ export default function HomeScreen() {
             {/* ── Admin actions ── */}
             {isAdmin && (
               <View style={s.adminSection}>
-                <Pressable style={s.adminBtn} onPress={handleOpenSettlement} disabled={settling}>
-                  <Text style={s.adminBtnText}>{settling ? 'Bezig...' : 'Afrekenen'}</Text>
-                </Pressable>
+                <View style={s.settleRow}>
+                  <View style={s.settleTotalBox}>
+                    <Text style={s.settleTotalLabel}>OPENSTAAND</Text>
+                    <Text style={s.settleTotalAmount}>
+                      €{(groupTotalCents / 100).toFixed(2).replace('.', ',')}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={[s.settleBtn, (settling || groupTotalCents === 0) && s.settleBtnDisabled]}
+                    onPress={handleOpenSettlement}
+                    disabled={settling || groupTotalCents === 0}
+                  >
+                    <Text style={[s.settleBtnText, (settling || groupTotalCents === 0) && s.settleBtnTextDisabled]}>
+                      {settling ? 'Bezig...' : 'Afrekenen'}
+                    </Text>
+                  </Pressable>
+                </View>
                 <Pressable style={s.ghostBtn} onPress={async () => { await fetchHistory(); setShowSettlementHistory(true); }}>
                   <Text style={s.ghostBtnText}>Afrekening historie</Text>
                 </Pressable>
@@ -920,7 +1081,7 @@ export default function HomeScreen() {
                 <Ionicons name={showMoreOptions ? 'chevron-up' : 'chevron-down'} size={14} color="#848484" />
               </View>
             </Pressable>
-            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onSettings={openSettings} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
+            <MoreOptionsPanel visible={showMoreOptions} isAdmin={isAdmin} onLeave={() => Alert.alert('Groep verlaten', 'Weet je het zeker?', [{ text: 'Annuleren', style: 'cancel' }, { text: 'Uitstappen', style: 'destructive', onPress: async () => { await leaveGroup(); setSelectedGroupId(null); } }])} />
 
             <View style={{ height: 90 + insets.bottom }} />
           </Animated.View>
@@ -1025,6 +1186,7 @@ export default function HomeScreen() {
           categoryColors={t.categoryColors}
           updateGroupPrices={updateGroupPrices}
           updateGroupName={updateGroupName}
+          markOwnChange={markOwnChange}
           addDrink={addDrink}
           removeDrink={removeDrink}
           toggleAdmin={toggleAdmin}
@@ -1037,10 +1199,29 @@ export default function HomeScreen() {
           refresh={refreshGroup}
           tallyCounts={tallyCategoryCounts}
           recentTallies={recentTallies}
-          addTally={addTallyForMemberByCategory}
+          addTally={(cat, userId, drinkId) => addTallyForMemberByCategory(cat, userId!, drinkId)}
           removeTally={removeTally}
           activeCategories={activeCategories as number[]}
           getCategoryName={getCategoryName}
+        />
+      )}
+
+      {/* ── Add Drink overlay ── */}
+      {selectedGroupId && group && (
+        <AddDrinkOverlay
+          visible={showAddDrink}
+          onClose={() => setShowAddDrink(false)}
+          group={group}
+          isDrinkMode={isDrinkMode}
+          activeCategories={activeCategories as number[]}
+          categoryColors={t.categoryColors}
+          getCategoryName={getCategoryName}
+          addDrink={addDrink}
+          onDone={(count) => {
+            if (count > 0) {
+              showToast(count === 1 ? 'Drankje toegevoegd' : `${count} drankjes toegevoegd`, 'success');
+            }
+          }}
         />
       )}
 
@@ -1057,10 +1238,19 @@ export default function HomeScreen() {
       <StreepjesVerificatieModal
         visible={showVerification}
         count={tallyCount}
-        categoryName={selectedCategory ? getCategoryName(selectedCategory) : ''}
-        categoryColor={selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : '#00BEAE'}
-        categoryPrice={selectedCategory ? getCategoryPrice(selectedCategory) : undefined}
-        credit={selectedCategory ? (credits[selectedCategory] || 0) : 0}
+        categoryName={isDrinkMode
+          ? (drinkCategories.find((d) => d.id === selectedDrinkId)?.name ?? '')
+          : (selectedCategory ? getCategoryName(selectedCategory) : '')
+        }
+        categoryColor={isDrinkMode
+          ? t.categoryColors[Math.max(0, drinkCategories.findIndex((d) => d.id === selectedDrinkId)) % t.categoryColors.length]
+          : (selectedCategory ? t.categoryColors[(selectedCategory - 1) % 4] : '#00BEAE')
+        }
+        categoryPrice={isDrinkMode
+          ? ((drinkCategories.find((d) => d.id === selectedDrinkId) as any)?.price_override ?? 0)
+          : (selectedCategory ? getCategoryPrice(selectedCategory) : undefined)
+        }
+        credit={isDrinkMode ? 0 : (selectedCategory ? (credits[selectedCategory] || 0) : 0)}
         onConfirm={handleConfirmTally}
         onCancel={() => setShowVerification(false)}
       />
@@ -1196,7 +1386,13 @@ export default function HomeScreen() {
                 <View style={[s.checkbox, selected && s.checkboxChecked]} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: 'Unbounded', color: '#fff', fontSize: 14, fontWeight: '400' }}>{member.user_id === user?.id ? 'Jij' : member.full_name}</Text>
-                  {activeCategories.map((cat) => { const count = member.counts[cat] || 0; if (!count) return null; return (<Text key={cat} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>{getCategoryName(cat)}: {count}x</Text>); })}
+                  {isDrinkMode && member.drink_counts
+                    ? Object.values(member.drink_counts as Record<string, { name: string; emoji: string | null; count: number }>).map((d) => (
+                        <Text key={d.name} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>
+                          {d.emoji ? `${d.emoji} ` : ''}{d.name}: {d.count}x
+                        </Text>
+                      ))
+                    : activeCategories.map((cat) => { const count = member.counts[cat] || 0; if (!count) return null; return (<Text key={cat} style={{ fontFamily: 'Unbounded', color: '#848484', fontSize: 11 }}>{getCategoryName(cat)}: {count}x</Text>); })}
                 </View>
                 <Text style={{ fontFamily: 'Unbounded', fontSize: 16, color: '#00BEAE', fontWeight: '600' }}>{'\u20AC'} {(member.amount / 100).toFixed(2).replace('.', ',')}</Text>
               </Pressable>
@@ -1256,7 +1452,15 @@ const styles = StyleSheet.create({
   },
 
   // ── Scroll content ──
-  scroll: { paddingHorizontal: 20 },
+  scroll: { paddingHorizontal: 12 },
+
+  // ── Sticky counter wrap (drink-mode, native sticky header) ──
+  stickyCounterWrap: {
+    backgroundColor: 'transparent',
+    paddingVertical: 46,
+    marginTop: -46,
+    overflow: 'visible',
+  },
 
   // ── Group Selector ── SVG: top area
   selectorWrap: { marginTop: 8 },
@@ -1280,12 +1484,18 @@ const styles = StyleSheet.create({
     paddingLeft: 78, // avatar width (66) + gap (12)
   },
   chevronWrap: {
-    marginLeft: 'auto',
     width: 28,
     height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    gap: 8,
+  },
+  gearBtn: { padding: 4 },
   activePill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1404,7 +1614,9 @@ const styles = StyleSheet.create({
   creditText: { fontFamily: 'Unbounded', fontSize: 12, color: '#00BEAE', fontWeight: '600' },
 
   // ── Categories ── SVG: 350×50 rows, 9px gap
-  categories: { marginBottom: 24, paddingHorizontal: 10 },
+  categories: { marginBottom: 24, paddingHorizontal: 0 },
+  drinkGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, paddingHorizontal: 0, gap: 10, marginBottom: 24 },
+  drinkTileWrap: { width: '47%' as any },
 
   // ── Section Title ── SVG node 122:106
   sectionTitle: {
@@ -1434,7 +1646,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingTop: 20,
     zIndex: 1,
   },
@@ -1451,9 +1663,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     opacity: 0.5,
   },
+  addDrinkHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addDrinkHeaderBtnText: {
+    fontFamily: 'Unbounded',
+    fontSize: 13,
+    color: '#00BEAE',
+    fontWeight: '600',
+  },
   drankenlijstList: {
     paddingTop: 20,
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     zIndex: 1,
   },
 
@@ -1467,7 +1690,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingTop: 20,
     zIndex: 1,
   },
@@ -1486,7 +1709,7 @@ const styles = StyleSheet.create({
   },
   ledenList: {
     paddingTop: 20,
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     zIndex: 1,
   },
   lidRow: {
@@ -1540,6 +1763,57 @@ const styles = StyleSheet.create({
     backgroundColor: '#00BEAE',
   },
   adminBtnText: { fontFamily: 'Unbounded', color: '#0F0F1E', fontSize: 16, fontWeight: '700' },
+  settleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  settleTotalBox: {
+    flex: 1,
+    height: 52,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 190, 174, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 190, 174, 0.35)',
+    paddingHorizontal: 12,
+  },
+  settleTotalLabel: {
+    fontFamily: 'Unbounded',
+    color: '#A0A0B8',
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  settleTotalAmount: {
+    fontFamily: 'Unbounded',
+    color: '#00BEAE',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  settleBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00BEAE',
+  },
+  settleBtnDisabled: {
+    backgroundColor: '#2D2D44',
+    opacity: 0.6,
+  },
+  settleBtnText: {
+    fontFamily: 'Unbounded',
+    color: '#0F0F1E',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  settleBtnTextDisabled: {
+    color: '#A0A0B8',
+  },
   ghostBtn: {
     height: 48,
     borderRadius: 9999,
@@ -1687,7 +1961,7 @@ const styles = StyleSheet.create({
 });
 
 // ── MoreOptionsPanel: animated expand/collapse ──
-function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: boolean; isAdmin: boolean; onSettings: () => void; onLeave: () => void }) {
+function MoreOptionsPanel({ visible, isAdmin, onLeave }: { visible: boolean; isAdmin: boolean; onLeave: () => void }) {
   const anim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
 
@@ -1709,11 +1983,6 @@ function MoreOptionsPanel({ visible, isAdmin, onSettings, onLeave }: { visible: 
 
   return (
     <Animated.View style={{ maxHeight, opacity, overflow: 'hidden' as const }}>
-      {isAdmin && (
-        <Pressable style={{ marginTop: 24, height: 50, borderRadius: 25, backgroundColor: 'rgba(78,78,78,0.2)', alignItems: 'center', justifyContent: 'center' }} onPress={onSettings}>
-          <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FFFFFF' }}>Instellingen</Text>
-        </Pressable>
-      )}
       <Pressable style={{ marginTop: 16, marginBottom: 16, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,0,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,0,77,0.5)', alignItems: 'center', justifyContent: 'center' }} onPress={onLeave}>
         <Text style={{ fontFamily: 'Unbounded', fontSize: 16, fontWeight: '400', color: '#FF004D' }}>Uitstappen</Text>
       </Pressable>

@@ -24,6 +24,9 @@ export interface Group {
   name_category_2: string;
   name_category_3: string;
   name_category_4: string;
+  auto_trust_members: boolean;
+  drinks_as_categories: boolean;
+  category_backup: any;
   created_at: string;
   created_by: string;
 }
@@ -46,6 +49,7 @@ export interface Drink {
   category: DrinkCategory;
   emoji: string | null;
   is_available: boolean;
+  price_override: number | null;
   created_at: string;
 }
 
@@ -124,6 +128,7 @@ export interface TallyGift {
   giver_id: string;
   recipient_id: string;
   category: number;
+  drink_id: string | null;
   quantity: number;
   redeemed: number;
   conversation_id: string | null;

@@ -4,16 +4,18 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
+import { HomeReadyProvider, useHomeReady } from '@/src/contexts/HomeReadyContext';
 import { ThemeProvider as StreepsThemeProvider } from '@/src/contexts/ThemeContext';
 import { getTheme } from '@/src/theme';
 import { useHeartbeat } from '@/src/hooks/useHeartbeat';
 import { queryClient } from '@/src/lib/queryClient';
+import SplashAnimation from '@/src/components/SplashAnimation';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -33,9 +35,11 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
+  const [showSplash, setShowSplash] = useState(false);
+
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      setShowSplash(true);
     }
   }, [loaded]);
 
@@ -45,13 +49,26 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <StreepsThemeProvider>
-          <AuthProvider>
-            <RootLayoutNav />
-          </AuthProvider>
+          <HomeReadyProvider>
+            <AuthProvider>
+              <RootLayoutNav />
+              {showSplash && (
+                <SplashOverlay onComplete={() => setShowSplash(false)} />
+              )}
+            </AuthProvider>
+          </HomeReadyProvider>
         </StreepsThemeProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
+}
+
+function SplashOverlay({ onComplete }: { onComplete: () => void }) {
+  const { loading, session } = useAuth();
+  const { homeReady } = useHomeReady();
+  // Niet ingelogd → geen data om op te wachten
+  const dataLoading = session ? !homeReady : false;
+  return <SplashAnimation authLoading={loading} dataLoading={dataLoading} onComplete={onComplete} />;
 }
 
 function RootLayoutNav() {
@@ -133,14 +150,6 @@ function RootLayoutNav() {
       });
     }
   }, [session, loading, isRecovery]);
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: t.colors.background.primary }}>
-        <ActivityIndicator size="large" color={t.brand.magenta} />
-      </View>
-    );
-  }
 
   return (
     <ThemeProvider value={navTheme}>

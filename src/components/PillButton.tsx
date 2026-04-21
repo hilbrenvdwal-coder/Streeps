@@ -1,5 +1,8 @@
 import React, { useRef } from 'react';
 import { StyleSheet, Text, Pressable, Animated, Platform, type ViewStyle, type TextStyle } from 'react-native';
+import { brand, radius, fontWeights, animation, getTheme } from '@/src/theme';
+
+const theme = getTheme('dark');
 
 interface PillButtonProps {
   title: string;
@@ -14,8 +17,8 @@ interface PillButtonProps {
 
 export default function PillButton({
   title,
-  color = '#E91E8C',
-  textColor = '#FFFFFF',
+  color = brand.magenta,
+  textColor = theme.colors.text.primary,
   glow,
   onPress,
   disabled,
@@ -25,7 +28,7 @@ export default function PillButton({
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
-    Animated.timing(scale, { toValue: 0.97, duration: 150, useNativeDriver: true }).start();
+    Animated.timing(scale, { toValue: animation.press.scale, duration: 150, useNativeDriver: true }).start();
   const onPressOut = () =>
     Animated.timing(scale, { toValue: 1, duration: 250, useNativeDriver: true }).start();
 
@@ -34,7 +37,7 @@ export default function PillButton({
       <Pressable
         style={[
           styles.button,
-          { backgroundColor: color },
+          { backgroundColor: color, shadowColor: color },
           glow,
           disabled && styles.disabled,
         ]}
@@ -52,12 +55,11 @@ export default function PillButton({
 const styles = StyleSheet.create({
   button: {
     height: 52,
-    borderRadius: 9999,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#E91E8C',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.35,
         shadowRadius: 16,
@@ -68,9 +70,9 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: fontWeights.bold,
   },
   disabled: {
-    opacity: 0.38,
+    opacity: animation.disabled.opacity,
   },
 });

@@ -30,9 +30,9 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import CameraModal from '@/src/components/CameraModal';
 import { supabase } from '@/src/lib/supabase';
-import { categoryColors } from '@/src/theme';
+import { categoryColors, colors, brand, space, radius, typography, fontWeights, semantic } from '@/src/theme';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 interface GroupSetupWizardProps {
   visible: boolean;
@@ -65,24 +65,22 @@ export default function GroupSetupWizard({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
 
-  // Step 2: Categories
+  // Category labels (read from DB, used as "kleur-groep" label in drinks mode)
   const [catName1, setCatName1] = useState('Normaal');
   const [catName2, setCatName2] = useState('Speciaal');
   const [catName3, setCatName3] = useState('Categorie 3');
   const [catName4, setCatName4] = useState('Categorie 4');
-  const [price1, setPrice1] = useState('1,50');
-  const [price2, setPrice2] = useState('3,00');
-  const [price3, setPrice3] = useState('4,50');
-  const [price4, setPrice4] = useState('6,00');
   const [cat2Enabled, setCat2Enabled] = useState(true);
   const [cat3Enabled, setCat3Enabled] = useState(false);
   const [cat4Enabled, setCat4Enabled] = useState(false);
+  const [autoTrust, setAutoTrust] = useState(false);
 
-  // Step 3: Drinks
-  const [drinks, setDrinks] = useState<{ id: string; name: string; emoji: string; category: number }[]>([]);
+  // Step 2: Drinks (was step 3)
+  const [drinks, setDrinks] = useState<{ id: string; name: string; emoji: string; category: number; priceStr: string }[]>([]);
   const [newDrinkName, setNewDrinkName] = useState('');
   const [newDrinkEmoji, setNewDrinkEmoji] = useState('');
   const [newDrinkCat, setNewDrinkCat] = useState(1);
+  const [newDrinkPrice, setNewDrinkPrice] = useState('');
 
   const addBtnScale = useSharedValue(1);
   const addBtnAnimStyle = useAnimatedStyle(() => ({
@@ -99,19 +97,18 @@ export default function GroupSetupWizard({
       setCatName2('Speciaal');
       setCatName3('Categorie 3');
       setCatName4('Categorie 4');
-      setPrice1('1,50');
-      setPrice2('3,00');
-      setPrice3('4,50');
-      setPrice4('6,00');
       setCat2Enabled(true);
       setCat3Enabled(false);
       setCat4Enabled(false);
+      setAutoTrust(false);
       setNewDrinkName('');
       setNewDrinkEmoji('');
       setNewDrinkCat(1);
+      setNewDrinkPrice('');
 
-      // Load existing drinks from DB
+      // Load existing drinks + category labels from DB
       loadDrinks();
+      loadCategoryLabels();
 
       scrimOpacity.setValue(0);
       contentAnim.setValue(0);
@@ -123,13 +120,53 @@ export default function GroupSetupWizard({
     }
   }, [visible]);
 
+  // Helpers: convert between cents and euro string (Dutch notation with comma)
+  const centsToEuroStr = (cents: number | null | undefined): string => {
+    if (cents == null || cents === 0) return '';
+    return (cents / 100).toFixed(2).replace('.', ',');
+  };
+  const euroStrToCents = (str: string): number | null => {
+    if (!str.trim()) return null;
+    const normalized = str.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    if (isNaN(parsed) || parsed < 0.01 || parsed > 99.99) return null;
+    return Math.round(parsed * 100);
+  };
+
   const loadDrinks = async () => {
     const { data } = await supabase
       .from('drinks')
-      .select('id, name, emoji, category')
+      .select('id, name, emoji, category, price_override')
       .eq('group_id', groupId)
       .order('created_at', { ascending: true });
-    if (data) setDrinks(data.map((d) => ({ id: d.id, name: d.name, emoji: d.emoji ?? '🍺', category: d.category })));
+    if (data) {
+      setDrinks(
+        data.map((d) => ({
+          id: d.id,
+          name: d.name,
+          emoji: d.emoji ?? '🍺',
+          category: d.category,
+          priceStr: centsToEuroStr(d.price_override),
+        }))
+      );
+    }
+  };
+
+  const loadCategoryLabels = async () => {
+    const { data } = await supabase
+      .from('groups')
+      .select('name_category_1, name_category_2, name_category_3, name_category_4, price_category_2, price_category_3, price_category_4')
+      .eq('id', groupId)
+      .maybeSingle();
+    if (data) {
+      if (data.name_category_1) setCatName1(data.name_category_1);
+      if (data.name_category_2) setCatName2(data.name_category_2);
+      if (data.name_category_3) setCatName3(data.name_category_3);
+      if (data.name_category_4) setCatName4(data.name_category_4);
+      setCat2Enabled(data.price_category_2 != null);
+      setCat3Enabled(data.price_category_3 != null);
+      setCat4Enabled(data.price_category_4 != null);
+    }
   };
 
   const handleClose = useCallback(() => {
@@ -171,26 +208,14 @@ export default function GroupSetupWizard({
   }, []);
 
   const handleNext = useCallback(async () => {
-    if (step === 2) {
-      // Save categories to DB
-      const parseCents = (val: string) => {
-        const cleaned = val.replace(',', '.');
-        const num = parseFloat(cleaned);
-        return isNaN(num) ? 0 : Math.round(num * 100);
-      };
+    if (step === 1) {
+      // Save auto-trust setting to DB
       await supabase.from('groups').update({
-        name_category_1: catName1.trim() || 'Normaal',
-        name_category_2: catName2.trim() || 'Speciaal',
-        name_category_3: catName3.trim() || 'Categorie 3',
-        name_category_4: catName4.trim() || 'Categorie 4',
-        price_category_1: parseCents(price1) || 150,
-        price_category_2: cat2Enabled ? (parseCents(price2) || 300) : null,
-        price_category_3: cat3Enabled ? (parseCents(price3) || 450) : null,
-        price_category_4: cat4Enabled ? (parseCents(price4) || 600) : null,
+        auto_trust_members: autoTrust,
       }).eq('id', groupId);
     }
     goToStep(step + 1);
-  }, [step, catName1, catName2, catName3, catName4, price1, price2, price3, price4, cat2Enabled, cat3Enabled, cat4Enabled, groupId, goToStep]);
+  }, [step, autoTrust, groupId, goToStep]);
 
   const handleSkip = useCallback(() => {
     goToStep(step + 1);
@@ -222,7 +247,7 @@ export default function GroupSetupWizard({
     setUploadingAvatar(false);
   };
 
-  // Step 3: Add drink
+  // Step 2: Add drink
   const handleAddDrink = async () => {
     if (!newDrinkName.trim()) return;
     addBtnScale.value = withSequence(
@@ -231,21 +256,45 @@ export default function GroupSetupWizard({
     );
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const emoji = newDrinkEmoji.trim() || '🍺';
+    const priceCents = euroStrToCents(newDrinkPrice);
     const { data, error } = await supabase.from('drinks').insert({
       group_id: groupId,
       name: newDrinkName.trim(),
       emoji,
       category: newDrinkCat,
+      price_override: priceCents,
     }).select().single();
     if (error) { Alert.alert('Fout', error.message); return; }
-    if (data) setDrinks((prev) => [...prev, { id: data.id, name: data.name, emoji: data.emoji ?? '🍺', category: data.category }]);
+    if (data) setDrinks((prev) => [...prev, {
+      id: data.id,
+      name: data.name,
+      emoji: data.emoji ?? '🍺',
+      category: data.category,
+      priceStr: centsToEuroStr(data.price_override),
+    }]);
     setNewDrinkName('');
     setNewDrinkEmoji('');
+    setNewDrinkPrice('');
   };
 
   const handleRemoveDrink = async (drinkId: string) => {
     await supabase.from('drinks').delete().eq('id', drinkId);
     setDrinks((prev) => prev.filter((d) => d.id !== drinkId));
+  };
+
+  // Update a drink's price_override (called on blur from price input)
+  const handleUpdateDrinkPrice = async (drinkId: string, newPriceStr: string) => {
+    const cents = euroStrToCents(newPriceStr);
+    await supabase.from('drinks').update({ price_override: cents }).eq('id', drinkId);
+    setDrinks((prev) => prev.map((d) =>
+      d.id === drinkId ? { ...d, priceStr: centsToEuroStr(cents) } : d
+    ));
+  };
+
+  const handleUpdateDrinkPriceLocal = (drinkId: string, newPriceStr: string) => {
+    setDrinks((prev) => prev.map((d) =>
+      d.id === drinkId ? { ...d, priceStr: newPriceStr } : d
+    ));
   };
 
   // Step 4: Copy & share
@@ -295,7 +344,7 @@ export default function GroupSetupWizard({
         {groupAvatarUrl ? (
           <Image source={{ uri: groupAvatarUrl }} style={ws.avatarImage} transition={200} cachePolicy="memory-disk" />
         ) : (
-          <Ionicons name="camera" size={40} color="#848484" />
+          <Ionicons name="camera" size={40} color={brand.inactive} />
         )}
         {uploadingAvatar && (
           <View style={ws.avatarOverlay}>
@@ -307,75 +356,26 @@ export default function GroupSetupWizard({
       {groupAvatarUrl && (
         <Text style={ws.avatarHint}>Tik om te wijzigen</Text>
       )}
+
+      {/* Auto-trust toggle */}
+      <View style={ws.divider} />
+      <View style={ws.autoTrustRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={ws.autoTrustLabel}>Nieuwe leden automatisch vertrouwen?</Text>
+          <Text style={ws.autoTrustHint}>Nieuwe leden worden automatisch admin</Text>
+        </View>
+        <Switch
+          value={autoTrust}
+          onValueChange={setAutoTrust}
+          trackColor={{ false: 'rgba(255,255,255,0.1)', true: brand.cyan }}
+          thumbColor={colors.dark.text.primary}
+        />
+      </View>
     </View>
   );
 
-  // ── Step 2: Categories ──
-  const renderStep2 = () => {
-    const categories = [
-      { name: catName1, setName: setCatName1, price: price1, setPrice: setPrice1, enabled: true, setEnabled: null as null, index: 0 },
-      { name: catName2, setName: setCatName2, price: price2, setPrice: setPrice2, enabled: cat2Enabled, setEnabled: setCat2Enabled, index: 1 },
-      { name: catName3, setName: setCatName3, price: price3, setPrice: setPrice3, enabled: cat3Enabled, setEnabled: setCat3Enabled, index: 2 },
-      { name: catName4, setName: setCatName4, price: price4, setPrice: setPrice4, enabled: cat4Enabled, setEnabled: setCat4Enabled, index: 3 },
-    ];
-
-    return (
-      <View style={ws.stepContent}>
-        <Text style={ws.stepTitle}>Categorieën</Text>
-        <Text style={ws.stepSubtitle}>Stel prijzen in per categorie</Text>
-
-        {categories.map((cat, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <View style={ws.divider} />}
-            <View style={[ws.catRow, !cat.enabled && ws.catRowDisabled]}>
-              <View style={[ws.catBadge, { backgroundColor: categoryColors[cat.index] + '30' }]}>
-                <Text style={[ws.catBadgeText, { color: categoryColors[cat.index] }]}>{cat.name || `Cat ${i + 1}`}</Text>
-              </View>
-              {cat.enabled ? (
-                <>
-                  <TextInput
-                    style={ws.catNameInput}
-                    value={cat.name}
-                    onChangeText={cat.setName}
-                    placeholder={`Categorie ${i + 1}`}
-                    placeholderTextColor="#848484"
-                    maxLength={15}
-                  />
-                  <View style={ws.catPriceWrapper}>
-                    <Text style={ws.euroSign}>€</Text>
-                    <TextInput
-                      style={ws.catPriceInput}
-                      value={cat.price}
-                      onChangeText={cat.setPrice}
-                      keyboardType="decimal-pad"
-                      placeholder="0,00"
-                      placeholderTextColor="#848484"
-                    />
-                  </View>
-                </>
-              ) : (
-                <View style={{ flex: 1 }} />
-              )}
-              {cat.setEnabled !== null ? (
-                <Switch
-                  value={cat.enabled}
-                  onValueChange={cat.setEnabled}
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#00BEAE' }}
-                  thumbColor="#FFFFFF"
-                  style={{ marginLeft: 8, alignSelf: 'center' }}
-                />
-              ) : (
-                <View style={{ width: 59 }} />
-              )}
-            </View>
-          </React.Fragment>
-        ))}
-      </View>
-    );
-  };
-
-  // ── Step 3: Drinks ──
-  const renderStep3 = () => (
+  // ── Step 2: Drinks (was step 3) ──
+  const renderStep2 = () => (
     <KeyboardAvoidingView
       style={{ flex: 1, width: '100%' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -383,7 +383,7 @@ export default function GroupSetupWizard({
     >
     <View style={[ws.stepContent, { paddingBottom: 104 + insets.bottom }]}>
       <Text style={ws.stepTitle}>Drankjes</Text>
-      <Text style={ws.stepSubtitle}>Beheer de drankjes in je groep</Text>
+      <Text style={ws.stepSubtitle}>Beheer de drankjes en prijzen</Text>
 
       <ScrollView
         style={ws.drinksList}
@@ -396,14 +396,21 @@ export default function GroupSetupWizard({
             {i > 0 && <View style={ws.divider} />}
             <View style={ws.drinkRow}>
               <Text style={ws.drinkEmoji}>{drink.emoji}</Text>
-              <Text style={ws.drinkName}>{drink.name}</Text>
-              <View style={[ws.catBadge, { backgroundColor: categoryColors[(drink.category - 1) % 4] + '30', marginRight: 12 }]}>
-                <Text style={[ws.catBadgeText, { color: categoryColors[(drink.category - 1) % 4] }]}>
-                  {[catName1, catName2, catName3, catName4][(drink.category - 1) % 4] || `Cat ${drink.category}`}
-                </Text>
+              <Text style={ws.drinkName} numberOfLines={1}>{drink.name}</Text>
+              <View style={[ws.catPriceWrapper, { marginRight: 8 }]}>
+                <Text style={ws.euroSign}>€</Text>
+                <TextInput
+                  style={ws.catPriceInput}
+                  value={drink.priceStr}
+                  onChangeText={(val) => handleUpdateDrinkPriceLocal(drink.id, val)}
+                  onBlur={() => handleUpdateDrinkPrice(drink.id, drink.priceStr)}
+                  keyboardType="decimal-pad"
+                  placeholder="0,00"
+                  placeholderTextColor={brand.inactive}
+                />
               </View>
               <Pressable onPress={() => handleRemoveDrink(drink.id)} hitSlop={8}>
-                <Ionicons name="close-circle" size={20} color="#EB5466" />
+                <Ionicons name="close-circle" size={20} color="#EB5466" /* TODO(theme-migration): #EB5466 vs semantic.error #FF5272 — hue-adjacent red, R:-20 G:0 B:-12 delta, keep exact for visual fidelity */ />
               </Pressable>
             </View>
           </React.Fragment>
@@ -425,40 +432,26 @@ export default function GroupSetupWizard({
           <TextInput
             style={ws.addDrinkInput}
             placeholder="Naam"
-            placeholderTextColor="#848484"
+            placeholderTextColor={brand.inactive}
             value={newDrinkName}
             onChangeText={setNewDrinkName}
             returnKeyType="done"
             onSubmitEditing={handleAddDrink}
           />
-        </View>
-        <View style={ws.addDrinkCatRow}>
-          <View style={ws.catSelectorRow}>
-            {[1, 2, 3, 4]
-              .filter((c) => c === 1 || (c === 2 && cat2Enabled) || (c === 3 && cat3Enabled) || (c === 4 && cat4Enabled))
-              .map((c) => {
-                const isSelected = newDrinkCat === c;
-                const color = categoryColors[(c - 1) % 4];
-                const label = [catName1, catName2, catName3, catName4][(c - 1) % 4] || `Cat ${c}`;
-                return (
-                  <Pressable
-                    key={c}
-                    onPress={() => setNewDrinkCat(c)}
-                    style={[
-                      ws.catSelectorPill,
-                      { backgroundColor: isSelected ? color : color + '30' },
-                    ]}
-                  >
-                    <Text style={[ws.catSelectorPillText, { color: isSelected ? '#0F0F1E' : color }]}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+          <View style={ws.catPriceWrapper}>
+            <Text style={ws.euroSign}>€</Text>
+            <TextInput
+              style={ws.catPriceInput}
+              value={newDrinkPrice}
+              onChangeText={setNewDrinkPrice}
+              keyboardType="decimal-pad"
+              placeholder="0,00"
+              placeholderTextColor={brand.inactive}
+            />
           </View>
           <Reanimated.View style={addBtnAnimStyle}>
             <Pressable onPress={handleAddDrink} style={ws.addDrinkBtn}>
-              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Ionicons name="add" size={20} color={colors.dark.text.primary} />
             </Pressable>
           </Reanimated.View>
         </View>
@@ -467,8 +460,8 @@ export default function GroupSetupWizard({
     </KeyboardAvoidingView>
   );
 
-  // ── Step 4: Invite ──
-  const renderStep4 = () => (
+  // ── Step 3: Invite (was step 4) ──
+  const renderStep3 = () => (
     <View style={ws.stepContent}>
       <Text style={ws.stepTitle}>Nodig vrienden uit</Text>
       <Text style={ws.stepSubtitle}>Deel de code met je groep</Text>
@@ -479,22 +472,22 @@ export default function GroupSetupWizard({
 
       <View style={ws.inviteActions}>
         <Pressable style={ws.inviteBtn} onPress={handleCopy}>
-          <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
+          <Ionicons name="copy-outline" size={20} color={colors.dark.text.primary} />
           <Text style={ws.inviteBtnText}>Kopieer</Text>
         </Pressable>
-        <Pressable style={[ws.inviteBtn, { backgroundColor: '#00BEAE' }]} onPress={handleShare}>
-          <Ionicons name="share-outline" size={20} color="#FFFFFF" />
+        <Pressable style={[ws.inviteBtn, { backgroundColor: brand.cyan }]} onPress={handleShare}>
+          <Ionicons name="share-outline" size={20} color={colors.dark.text.primary} />
           <Text style={ws.inviteBtnText}>Deel</Text>
         </Pressable>
       </View>
     </View>
   );
 
-  // ── Step 5: Done ──
-  const renderStep5 = () => (
+  // ── Step 4: Done (was step 5) ──
+  const renderStep4 = () => (
     <View style={ws.stepContent}>
       <View style={ws.doneIcon}>
-        <Ionicons name="checkmark-circle" size={80} color="#00BEAE" />
+        <Ionicons name="checkmark-circle" size={80} color={brand.cyan} />
       </View>
       <Text style={ws.doneTitle}>Klaar!</Text>
       <Text style={ws.doneSubtitle}>{groupName} is helemaal ingesteld</Text>
@@ -503,7 +496,7 @@ export default function GroupSetupWizard({
 
   // ── Bottom bar ──
   const renderBottomBar = () => {
-    if (step === 5) {
+    if (step === 4) {
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable style={ws.beginBtn} onPress={handleFinish}>
@@ -517,11 +510,11 @@ export default function GroupSetupWizard({
       // Morph button: "Overslaan" (grey) when no photo, "Volgende" (teal) when photo
       const morphBg = morphBtnAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ['rgba(255,255,255,0.08)', '#00BEAE'],
+        outputRange: ['rgba(255,255,255,0.08)', brand.cyan],
       });
       const morphTextColor = morphBtnAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ['#848484', '#FFFFFF'],
+        outputRange: [brand.inactive, colors.dark.text.primary],
       });
       return (
         <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -540,11 +533,11 @@ export default function GroupSetupWizard({
       );
     }
 
-    // Steps 2, 3, 4: Back button + Volgende
+    // Steps 2, 3: Back button + Volgende
     return (
       <View style={[ws.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={ws.backBtn} onPress={handleBack}>
-          <Ionicons name="chevron-back" size={18} color="#848484" />
+          <Ionicons name="chevron-back" size={18} color={brand.inactive} />
           <Text style={ws.backBtnText}>Terug</Text>
         </Pressable>
         <Pressable style={[ws.nextBtn, { flex: 1 }]} onPress={handleNext}>
@@ -560,7 +553,6 @@ export default function GroupSetupWizard({
       case 2: return renderStep2();
       case 3: return renderStep3();
       case 4: return renderStep4();
-      case 5: return renderStep5();
       default: return null;
     }
   };
@@ -610,43 +602,43 @@ export default function GroupSetupWizard({
 
 const ws = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.75)' },
-  container: { flex: 1, paddingHorizontal: 20 },
+  container: { flex: 1, paddingHorizontal: space[5] },
 
   // Progress
-  progressWrap: { marginBottom: 24 },
+  progressWrap: { marginBottom: space[6] },
   progressBar: {
     height: 4,
-    borderRadius: 4,
+    borderRadius: radius.xs,
     backgroundColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   progressFill: {
     height: 4,
-    borderRadius: 4,
-    backgroundColor: '#00BEAE',
+    borderRadius: radius.xs,
+    backgroundColor: brand.cyan,
   },
   progressText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#848484',
-    marginTop: 8,
+    fontSize: typography.caption.fontSize,
+    color: brand.inactive,
+    marginTop: space[2],
   },
 
   // Step container
   stepContainer: { flex: 1 },
-  stepContent: { flex: 1, alignItems: 'center', paddingTop: 20 },
+  stepContent: { flex: 1, alignItems: 'center', paddingTop: space[5] },
   stepTitle: {
     fontFamily: 'Unbounded',
-    fontSize: 24,
+    fontSize: 24, // TODO(theme-migration): typography.heading2 is 22 (-2 delta) but fontWeight differs ('400' vs semibold) — keep literal for fidelity
     fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    color: colors.dark.text.primary,
+    marginBottom: space[2],
   },
   stepSubtitle: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
-    marginBottom: 32,
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+    marginBottom: space[8],
   },
 
   // Step 1: Avatar
@@ -674,14 +666,14 @@ const ws = StyleSheet.create({
   },
   uploadingText: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#FFFFFF',
+    fontSize: typography.caption.fontSize,
+    color: colors.dark.text.primary,
   },
   avatarHint: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#00BEAE',
-    marginTop: 12,
+    fontSize: typography.caption.fontSize,
+    color: brand.cyan,
+    marginTop: space[3],
   },
 
   // Step 2: Categories
@@ -689,60 +681,67 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    paddingVertical: 14, // TODO(theme-migration): 14 not on 4px grid (space[3]=12 or space[4]=16, ±2 delta) — keep exact
+    paddingHorizontal: space[1],
     minHeight: 72,
   },
   catRowDisabled: {
     opacity: 0.4,
   },
-  catBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 10,
-    minWidth: 72,
-    alignItems: 'center' as const,
-  },
-  catBadgeText: {
-    fontFamily: 'Unbounded',
-    fontSize: 11,
-    fontWeight: '600',
-  },
   catNameInput: {
     fontFamily: 'Unbounded',
     flex: 1,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     height: 44,
   },
   catPriceWrapper: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
+    borderRadius: 10, // TODO(theme-migration): 10 between radius.sm=8 and radius.md=12, keep for compact price-wrapper look
     paddingHorizontal: 10,
     height: 40,
   },
   euroSign: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
     marginRight: 2,
   },
   catPriceInput: {
     fontFamily: 'Unbounded',
     width: 52,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'right' as const,
     height: 40,
   },
   catDisabledText: {
     fontFamily: 'Unbounded',
     flex: 1,
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
+  },
+
+  // Auto-trust
+  autoTrustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 14, // TODO(theme-migration): 14 not on 4px grid — keep to match catRow rhythm
+    paddingHorizontal: space[1],
+  },
+  autoTrustLabel: {
+    fontFamily: 'Unbounded',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
+  },
+  autoTrustHint: {
+    fontFamily: 'Unbounded',
+    fontSize: 11, // TODO(theme-migration): 11 matches typography.overline.fontSize but no uppercase/letterSpacing intended here — keep literal
+    color: brand.inactive,
+    marginTop: space[1],
   },
 
   // Step 3: Drinks
@@ -753,41 +752,35 @@ const ws = StyleSheet.create({
   drinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: space[3],
+    paddingHorizontal: space[1],
   },
   drinkEmoji: {
     fontSize: 20,
-    marginRight: 12,
+    marginRight: space[3],
   },
   drinkName: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     flex: 1,
   },
   addDrinkRow: {
     flexDirection: 'column',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    gap: 8,
+    paddingVertical: space[2],
+    paddingHorizontal: space[1],
+    gap: space[2],
     width: '100%',
   },
   addDrinkInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  addDrinkCatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
+    gap: space[2],
   },
   addDrinkEmojiWrap: {
     width: 40,
     height: 44,
-    borderRadius: 12,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -810,8 +803,8 @@ const ws = StyleSheet.create({
   },
   addDrinkEmoji: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'center',
     width: 40,
     height: 44,
@@ -819,39 +812,18 @@ const ws = StyleSheet.create({
   addDrinkInput: {
     fontFamily: 'Unbounded',
     flex: 1,
-    fontSize: 14,
-    color: '#FFFFFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
     height: 44,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-  },
-  catSelectorRow: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    flex: 1,
-  },
-  catSelectorPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    minHeight: 44,
-    minWidth: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  catSelectorPillText: {
-    fontFamily: 'Unbounded',
-    fontSize: 11,
-    fontWeight: '600',
+    borderRadius: radius.md,
+    paddingHorizontal: space[3],
   },
   addDrinkBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FF004D',
+    backgroundColor: brand.streepsRed,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -859,55 +831,55 @@ const ws = StyleSheet.create({
   // Step 4: Invite
   inviteCodeWrap: {
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 16,
-    paddingVertical: 24,
-    paddingHorizontal: 32,
-    marginBottom: 24,
+    borderRadius: radius.lg,
+    paddingVertical: space[6],
+    paddingHorizontal: space[8],
+    marginBottom: space[6],
   },
   inviteCodeText: {
     fontFamily: 'Unbounded',
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: 28, // TODO(theme-migration): 28 not in typography scale (heading1=26, display=32) — keep for invite-code emphasis
+    fontWeight: fontWeights.bold,
+    color: colors.dark.text.primary,
     letterSpacing: 6,
     textAlign: 'center',
   },
   inviteActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: space[3],
   },
   inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: space[2],
     height: 48,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+    paddingHorizontal: space[6],
+    borderRadius: radius['2xl'],
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   inviteBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
 
   // Step 5: Done
   doneIcon: {
-    marginBottom: 16,
-    marginTop: 40,
+    marginBottom: space[4],
+    marginTop: space[10],
   },
   doneTitle: {
     fontFamily: 'Unbounded',
-    fontSize: 32,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: typography.display.fontSize,
+    fontWeight: '400', // TODO(theme-migration): typography.display is bold (700), keeping '400' for wizard done-screen softer look
+    color: colors.dark.text.primary,
+    marginBottom: space[2],
   },
   doneSubtitle: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    color: brand.inactive,
     textAlign: 'center',
   },
 
@@ -922,13 +894,13 @@ const ws = StyleSheet.create({
   // by greedy flex:1 siblings or a keyboard push.
   bottomBar: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    left: space[5],
+    right: space[5],
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingTop: 16,
+    gap: space[3],
+    paddingTop: space[4],
   },
   backBtn: {
     flex: 1,
@@ -937,14 +909,14 @@ const ws = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: space[1],
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   backBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#848484',
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: fontWeights.medium,
+    color: brand.inactive,
   },
   morphBtn: {
     flex: 1,
@@ -955,8 +927,8 @@ const ws = StyleSheet.create({
   },
   morphBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: fontWeights.semibold,
   },
   nextBtn: {
     flex: 1,
@@ -964,13 +936,13 @@ const ws = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   nextBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
   beginBtn: {
     flex: 1,
@@ -978,12 +950,12 @@ const ws = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
   },
   beginBtnText: {
     fontFamily: 'Unbounded',
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: typography.body.fontSize,
+    color: colors.dark.text.primary,
+    fontWeight: fontWeights.semibold,
   },
 });

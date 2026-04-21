@@ -344,7 +344,7 @@ export default function GroupSelector({
           </Animated.View>
 
           {/* Overlay card */}
-          <View style={[st.overlayCard, { top: insets.top + 13, marginHorizontal: 20 }]} pointerEvents="box-none">
+          <View style={[st.overlayCard, { top: insets.top + 13, marginHorizontal: 12 }]} pointerEvents="box-none">
             {/* Header replica */}
             <Pressable style={st.headerReplica} onPress={handleClose} pointerEvents="auto">
               <View style={st.headerRow}>
