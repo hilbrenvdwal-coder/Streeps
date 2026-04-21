@@ -12,12 +12,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, streepsMagenta, brand } from '@/src/theme';
+import { getTheme, streepsMagenta, brand, colors as themeColors } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
 import AvatarPlaceholder from '@/src/components/AvatarPlaceholder';
 import { useConversations, useChatMessages, useContacts, startDM, sendGiftMessage, type ConversationPreview } from '@/src/hooks/useChat';
+import { useFollows } from '@/src/hooks/useFollows';
 import { useNavBarAnim } from './_layout';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -2164,6 +2165,24 @@ function BotDimensionChooser({
   );
 }
 
+/**
+ * Relatieve tijd-label voor "laatst actief"-regel.
+ * Voorbeeld: `formatRelative(null)` → "nog geen activiteit",
+ *            `formatRelative('2026-04-21T09:00:00Z')` → "2 uur geleden".
+ */
+function formatRelative(iso: string | null | undefined): string {
+  if (!iso) return 'nog geen activiteit';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = diff / 60000;
+  if (mins < 1) return 'net nu';
+  if (mins < 60) return `${Math.round(mins)} min geleden`;
+  const hrs = mins / 60;
+  if (hrs < 24) return `${Math.round(hrs)} uur geleden`;
+  const days = hrs / 24;
+  if (days < 7) return `${Math.round(days)} dagen geleden`;
+  return new Date(iso).toLocaleDateString('nl-NL');
+}
+
 function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedData, onBotToggle, onBotNameChange, onAdminOnlyChatChange, onTallyAnnouncementsChange, onSettlementAnnouncementsChange, onBotWelcomeChange, onBotSettingsChange }: {
   visible: boolean; groupId: string | null; onClose: () => void;
   onViewProfile: (userId: string) => void;
@@ -2182,8 +2201,15 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
   const anim = useRef(new Animated.Value(0)).current;
   const { swipeX: gpSwipeX, scrimOpacity: gpScrimOpacity, panHandlers: gpPan } = useSwipeDismiss(onClose, anim);
 
+  const { follow, unfollow, isExplicitFollower } = useFollows();
+
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  // Bepaalt of de huidige user lid is van deze groep. `null` = nog niet bekend
+  // (tijdens laden); `false` = non-member (render minimal public card);
+  // `true` = member (render volledige overlay zoals voorheen).
+  const [isMember, setIsMember] = useState<boolean | null>(null);
+  const [followBusy, setFollowBusy] = useState(false);
   const [botEnabled, setBotEnabled] = useState(true);
   const [botNameDraft, setBotNameDraft] = useState('');
   const [savingBotName, setSavingBotName] = useState(false);
@@ -2376,6 +2402,13 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
       if (cachedData) {
         setGroup(cachedData.group);
         setMembers(cachedData.members);
+        // Cached paden komen uit member-contexts (bestaande chat flow); bepaal
+        // isMember op basis van de cached members zodat non-members toch de
+        // juiste restricted render krijgen als ze ooit via cache binnenkomen.
+        const memberInCache = user?.id
+          ? cachedData.members.some((m: any) => m.user_id === user.id)
+          : false;
+        setIsMember(memberInCache);
         setBotEnabled(cachedData.group?.bot_enabled !== false);
         setBotNameDraft(cachedData.group?.bot_name ?? BOT_DEFAULT_NAME);
         setTallyAnnouncementsEnabled(cachedData.group?.tally_announcements_enabled === true);
@@ -2386,6 +2419,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
         setBotSettings(loadedBotSettings);
         setInitialBotSettings(loadedBotSettings);
       } else {
+        setIsMember(null);
         fetchGroup();
       }
       setShow(true);
@@ -2398,11 +2432,52 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
 
   const fetchGroup = async () => {
     if (!groupId) return;
+
+    // ─── Step 1: bepaal lidmaatschap ──────────────────────────────────────
+    // Voor non-members falen/leveren de volle `groups.select('*')` en
+    // `group_members` queries onder RLS beperkte data. We doen eerst een
+    // snelle self-check; als de user geen lid is gebruiken we de
+    // SECURITY-DEFINER RPC `get_public_group_info` voor minimale publieke
+    // data (naam, avatar, member_count, last_activity_at).
+    let memberFlag = false;
+    if (user?.id) {
+      const { data: selfRow } = await supabase
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', groupId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      memberFlag = !!selfRow;
+    }
+
+    if (!memberFlag) {
+      // Non-member pad: RPC levert alleen publieke info.
+      const { data: publicInfo } = await supabase
+        .rpc('get_public_group_info', { p_group_id: groupId });
+      const info = Array.isArray(publicInfo) ? publicInfo[0] : publicInfo;
+      if (info) {
+        setGroup({
+          id: info.id,
+          name: info.name,
+          avatar_url: info.avatar_url,
+          member_count: info.member_count,
+          last_activity_at: info.last_activity_at,
+        });
+      } else {
+        setGroup(null);
+      }
+      setMembers([]);
+      setIsMember(false);
+      return;
+    }
+
+    // ─── Step 2: member pad — zoals voorheen ──────────────────────────────
     const [{ data: g }, { data: gm }] = await Promise.all([
       supabase.from('groups').select('*').eq('id', groupId).single(),
       supabase.from('group_members').select('user_id, is_admin, joined_at').eq('group_id', groupId),
     ]);
     setGroup(g);
+    setIsMember(true);
     setBotEnabled(g?.bot_enabled !== false);
     setBotNameDraft(g?.bot_name ?? BOT_DEFAULT_NAME);
     setTallyAnnouncementsEnabled(g?.tally_announcements_enabled === true);
@@ -2467,44 +2542,112 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
               <AvatarPlaceholder size={105} label={group?.name?.[0]?.toUpperCase() ?? '?'} borderRadius={9999} fontSize={36} />
             )}
           </View>
-          {editingName && isAdmin ? (
-            <View style={gp.nameEditRow}>
-              <TextInput
-                ref={nameInputRef}
-                style={gp.nameInput}
-                value={draftName}
-                onChangeText={setDraftName}
-                maxLength={20}
-                placeholder="Groepsnaam"
-                placeholderTextColor="#848484"
-                returnKeyType="done"
-                onSubmitEditing={handleSaveName}
-                onBlur={handleSaveName}
-                autoFocus
-                textAlign="center"
-              />
-              {savingName && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginLeft: 6 }} />}
-            </View>
-          ) : (
-            <Pressable
-              onPress={() => {
-                if (isAdmin) {
-                  setDraftName(group?.name ?? '');
-                  setEditingName(true);
-                  setTimeout(() => nameInputRef.current?.focus(), 50);
-                }
-              }}
-              disabled={!isAdmin}
-              style={({ pressed }) => pressed && isAdmin ? { opacity: 0.6 } : undefined}
-            >
+          {/* ─── Non-member variant ─────────────────────────────────────
+             Laat alleen naam + meta + volg-knop zien. Geen ledenlijst,
+             geen bot-/admin-instellingen, geen invite_code en geen
+             tallies/settlements/prijzen (RLS zou die velden hoe dan ook
+             afknijpen, maar we verbergen ze ook defensief op UI-nivo). */}
+          {isMember === false && (
+            <>
               <View style={gp.nameDisplayRow}>
                 <Text style={gp.displayName}>{group?.name || ''}</Text>
-                {isAdmin && <Ionicons name="pencil" size={14} color="#848484" style={{ marginLeft: 6 }} />}
               </View>
-            </Pressable>
+              <Text style={gp.memberCount}>
+                {typeof group?.member_count === 'number' ? group.member_count : 0}
+                {' '}
+                {group?.member_count === 1 ? 'lid' : 'leden'}
+                {' · laatst actief '}
+                {formatRelative(group?.last_activity_at ?? null)}
+              </Text>
+              <View style={gp.section}>
+                {groupId && isExplicitFollower(groupId) ? (
+                  <Pressable
+                    onPress={async () => {
+                      if (followBusy || !groupId) return;
+                      setFollowBusy(true);
+                      try { await unfollow(groupId); } catch {}
+                      setFollowBusy(false);
+                    }}
+                    disabled={followBusy}
+                    style={({ pressed }) => [gp.followBtnSecondary, pressed && { opacity: 0.7 }]}
+                  >
+                    {followBusy ? (
+                      <ActivityIndicator size="small" color={brand.cyan} />
+                    ) : (
+                      <Text style={gp.followBtnSecondaryText}>Niet meer volgen</Text>
+                    )}
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={async () => {
+                      if (followBusy || !groupId) return;
+                      setFollowBusy(true);
+                      try { await follow(groupId); } catch {}
+                      setFollowBusy(false);
+                    }}
+                    disabled={followBusy}
+                    style={({ pressed }) => [gp.followBtnPrimary, pressed && { opacity: 0.7 }]}
+                  >
+                    {followBusy ? (
+                      <ActivityIndicator size="small" color={themeColors.dark.background.primary} />
+                    ) : (
+                      <Text style={gp.followBtnPrimaryText}>Volgen</Text>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            </>
           )}
-          <Text style={gp.memberCount}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
 
+          {/* ─── Member variant ─────────────────────────────────────────
+             Volledige overlay (ledenlijst, invite, instellingen, bot,
+             verlaten, etc.). Wordt ook getoond zolang isMember===null
+             (nog aan het laden) zodat de cached/member-context niet met
+             een knipperende non-member UI opent. */}
+          {isMember !== false && (
+            <>
+              {editingName && isAdmin ? (
+                <View style={gp.nameEditRow}>
+                  <TextInput
+                    ref={nameInputRef}
+                    style={gp.nameInput}
+                    value={draftName}
+                    onChangeText={setDraftName}
+                    maxLength={20}
+                    placeholder="Groepsnaam"
+                    placeholderTextColor="#848484"
+                    returnKeyType="done"
+                    onSubmitEditing={handleSaveName}
+                    onBlur={handleSaveName}
+                    autoFocus
+                    textAlign="center"
+                  />
+                  {savingName && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginLeft: 6 }} />}
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    if (isAdmin) {
+                      setDraftName(group?.name ?? '');
+                      setEditingName(true);
+                      setTimeout(() => nameInputRef.current?.focus(), 50);
+                    }
+                  }}
+                  disabled={!isAdmin}
+                  style={({ pressed }) => pressed && isAdmin ? { opacity: 0.6 } : undefined}
+                >
+                  <View style={gp.nameDisplayRow}>
+                    <Text style={gp.displayName}>{group?.name || ''}</Text>
+                    {isAdmin && <Ionicons name="pencil" size={14} color="#848484" style={{ marginLeft: 6 }} />}
+                  </View>
+                </Pressable>
+              )}
+              <Text style={gp.memberCount}>{members.length} {members.length === 1 ? 'lid' : 'leden'}</Text>
+            </>
+          )}
+
+          {isMember !== false && (
+          <>
           {/* Leden */}
           <Text style={gp.sectionHeader}>LEDEN</Text>
           <View style={gp.card}>
@@ -2736,6 +2879,8 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
           {createdDate ? (
             <Text style={gp.createdAt}>Aangemaakt op {createdDate}</Text>
           ) : null}
+          </>
+          )}
         </ScrollView>
         </KeyboardAvoidingView>
       </Animated.View>
@@ -2825,6 +2970,40 @@ const gp = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     color: '#FF5A5A',
+  },
+
+  // Non-member follow/unfollow buttons.
+  followBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: brand.cyan,
+  },
+  followBtnPrimaryText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    fontWeight: '600',
+    color: themeColors.dark.background.primary,
+  },
+  followBtnSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: brand.cyan,
+  },
+  followBtnSecondaryText: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    fontWeight: '600',
+    color: brand.cyan,
   },
 
   // Chatbot
