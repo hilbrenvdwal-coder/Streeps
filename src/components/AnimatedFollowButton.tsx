@@ -100,6 +100,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.captionMedium,
+    fontFamily: 'Unbounded',
     fontWeight: '600',
     color: '#FFFFFF',
   },

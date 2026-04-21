@@ -128,11 +128,13 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.body,
+    fontFamily: 'Unbounded',
     color: colors.dark.text.primary,
     fontWeight: '500',
   },
   subline: {
     ...typography.caption,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
     marginTop: 2,
   },

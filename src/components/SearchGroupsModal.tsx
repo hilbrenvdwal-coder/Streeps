@@ -123,11 +123,13 @@ const rowStyles = StyleSheet.create({
   },
   name: {
     ...typography.body,
+    fontFamily: 'Unbounded',
     color: colors.dark.text.primary,
     fontWeight: '500',
   },
   subline: {
     ...typography.caption,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
     marginTop: 2,
   },
@@ -337,6 +339,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     color: colors.dark.text.primary,
     ...typography.body,
+    fontFamily: 'Unbounded',
   },
   body: {
     flex: 1,
@@ -349,6 +352,7 @@ const styles = StyleSheet.create({
   },
   stateText: {
     ...typography.body,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
     textAlign: 'center',
   },

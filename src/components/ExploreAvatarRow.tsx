@@ -102,11 +102,12 @@ const styles = StyleSheet.create({
   },
   liveBadgeWrap: {
     position: 'absolute',
-    top: -2,
+    bottom: -4,
     right: -4,
   },
   name: {
     ...typography.caption,
+    fontFamily: 'Unbounded',
     color: colors.dark.text.primary,
     marginTop: space[1],
     maxWidth: ITEM_MAX_WIDTH,

@@ -32,10 +32,12 @@ const styles = StyleSheet.create({
   },
   labelDefault: {
     ...typography.overline,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
   },
   labelMuted: {
     ...typography.caption,
+    fontFamily: 'Unbounded',
     color: colors.dark.text.tertiary,
     fontWeight: '500',
   },

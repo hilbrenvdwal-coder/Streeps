@@ -147,6 +147,7 @@ const styles = StyleSheet.create({
   },
   subline: {
     ...typography.caption,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
     marginTop: 2,
   },
@@ -163,6 +164,7 @@ const styles = StyleSheet.create({
   },
   followingPillText: {
     ...typography.captionMedium,
+    fontFamily: 'Unbounded',
     color: brand.cyan,
   },
 });

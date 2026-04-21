@@ -150,9 +150,8 @@ export default function ExploreFeed({ onGroupPress }: ExploreFeedProps) {
         buckets.map((bucket) => (
           <Fragment key={bucket.key}>
             <ExploreFeedSectionHeader label={bucket.label} />
-            {bucket.items.map((item, i) => (
+            {bucket.items.map((item) => (
               <Fragment key={item.groupId + ':' + bucket.key}>
-                {i > 0 && <View style={styles.separator} />}
                 <ExploreFeedItem
                   group={{
                     id: item.groupId,
@@ -162,6 +161,7 @@ export default function ExploreFeed({ onGroupPress }: ExploreFeedProps) {
                   isLive={item.isLive}
                   drinkCounts={item.drinkCounts}
                   onPress={() => onGroupPress(item.groupId)}
+                  seedKey={bucket.key}
                 />
               </Fragment>
             ))}
@@ -202,11 +202,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...typography.body,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
     textAlign: 'center',
   },
   emptySubtext: {
     ...typography.bodySm,
+    fontFamily: 'Unbounded',
     color: brand.inactive,
     textAlign: 'center',
     marginTop: space[1],
