@@ -9,6 +9,7 @@ import ReAnimated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { brand, radius, typography } from '@/src/theme';
 
 /**
  * Counter Control — native translation of "Counter" group from Home_fixed_v4.svg
@@ -39,7 +40,7 @@ interface CounterControlProps {
   disabled?: boolean;
 }
 
-const DEFAULT_RING_COLOR = '#FF0085';
+const DEFAULT_RING_COLOR = brand.magenta;
 
 // Swipe tuning constants
 const SWIPE_THRESHOLD = 60;   // px — distance at which a cycle is committed on release
@@ -300,7 +301,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
             style={StyleSheet.absoluteFillObject}
           />
           <Svg width={32} height={32} viewBox="0 0 32 32">
-            <Path d="M8 16 L24 16" stroke="#F1F1F1" strokeWidth={4} strokeLinecap="round" />
+            <Path d="M8 16 L24 16" stroke={brand.streepsWhite} strokeWidth={4} strokeLinecap="round" />
           </Svg>
         </Animated.View>
       </Pressable>
@@ -361,7 +362,7 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
             style={StyleSheet.absoluteFillObject}
           />
           <Svg width={32} height={32} viewBox="0 0 32 32">
-            <Path d="M16 6 L16 26 M6 16 L26 16" stroke="#F1F1F1" strokeWidth={4} strokeLinecap="round" />
+            <Path d="M16 6 L16 26 M6 16 L26 16" stroke={brand.streepsWhite} strokeWidth={4} strokeLinecap="round" />
           </Svg>
         </Animated.View>
       </Pressable>
@@ -369,13 +370,13 @@ export default function CounterControl({ value, onIncrement, onDecrement, onSubm
   );
 }
 
-const RADIUS = 20;
+const RADIUS = radius.xl;
 
 const s = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 14, // TODO(theme-migration): space token differs (sm=8, md=12, lg=16); 14 is between md/lg — keeping exact value
   },
 
   fill: {
@@ -453,7 +454,7 @@ const s = StyleSheet.create({
     top: -1,
     borderRadius: 31,
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderColor: '#FFFFFF', // TODO(theme-migration): pure white vs brand.streepsWhite (#F1F1F1) differs in hue
     // shadowColor set dynamically
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
@@ -463,9 +464,9 @@ const s = StyleSheet.create({
 
   value: {
     fontFamily: 'Unbounded-SemiBold',
-    fontSize: 28,
+    fontSize: typography.tallySm.fontSize,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#FFFFFF', // TODO(theme-migration): pure white vs brand.streepsWhite (#F1F1F1) differs in hue
     zIndex: 1,
   },
   valueOverlay: {
@@ -477,7 +478,7 @@ const s = StyleSheet.create({
     width: 19,
     height: 2,
     borderRadius: 1,
-    backgroundColor: '#F1F1F1',
+    backgroundColor: brand.streepsWhite,
     zIndex: 1,
   },
 
@@ -493,12 +494,12 @@ const s = StyleSheet.create({
     position: 'absolute',
     width: 28,
     height: 4,
-    backgroundColor: '#F1F1F1',
+    backgroundColor: brand.streepsWhite,
   },
   plusV: {
     position: 'absolute',
     width: 4,
     height: 28,
-    backgroundColor: '#F1F1F1',
+    backgroundColor: brand.streepsWhite,
   },
 });
