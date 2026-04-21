@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import AuroraBackground from './AuroraBackground';
+import { brand, colors, radius, space, animation } from '@/src/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -21,20 +22,22 @@ interface SplashAnimationProps {
 const LOGIN_GROUP_RIGHT = {
   container: { w: 590, h: 500 },
   shapes: [
-    { source: require('../../assets/aurora/login/login_p0.png'), color: '#FF0085', center: { x: 232.38, y: 3.83 }, width: 564, height: 711 },
+    { source: require('../../assets/aurora/login/login_p0.png'), color: brand.magenta, center: { x: 232.38, y: 3.83 }, width: 564, height: 711 },
+    // TODO(theme-migration): #FF00F5 has no matching brand token (hot pink, differs in hue from brand.magenta)
     { source: require('../../assets/aurora/login/login_p1.png'), color: '#FF00F5', center: { x: 274.84, y: 3.83 }, width: 564, height: 711 },
-    { source: require('../../assets/aurora/login/login_p2.png'), color: '#00BEAE', center: { x: 330.43, y: 5.59 }, width: 564, height: 711 },
-    { source: require('../../assets/aurora/login/login_p3.png'), color: '#00FE96', center: { x: 382.05, y: 9.11 }, width: 564, height: 711 },
+    { source: require('../../assets/aurora/login/login_p2.png'), color: brand.cyan, center: { x: 330.43, y: 5.59 }, width: 564, height: 711 },
+    { source: require('../../assets/aurora/login/login_p3.png'), color: brand.green, center: { x: 382.05, y: 9.11 }, width: 564, height: 711 },
   ],
 };
 
 const LOGIN_GROUP_LEFT = {
   container: { w: 590, h: 500 },
   shapes: [
-    { source: require('../../assets/aurora/login/login_p4.png'), color: '#FF0085', center: { x: 53.91, y: 187.94 }, width: 520, height: 506 },
+    { source: require('../../assets/aurora/login/login_p4.png'), color: brand.magenta, center: { x: 53.91, y: 187.94 }, width: 520, height: 506 },
+    // TODO(theme-migration): #FF00F5 has no matching brand token (hot pink, differs in hue from brand.magenta)
     { source: require('../../assets/aurora/login/login_p5.png'), color: '#FF00F5', center: { x: 29.15, y: 167.55 }, width: 520, height: 506 },
-    { source: require('../../assets/aurora/login/login_p6.png'), color: '#00BEAE', center: { x: -2.64, y: 140.08 }, width: 520, height: 506 },
-    { source: require('../../assets/aurora/login/login_p7.png'), color: '#00FE96', center: { x: -31.48, y: 113.75 }, width: 520, height: 506 },
+    { source: require('../../assets/aurora/login/login_p6.png'), color: brand.cyan, center: { x: -2.64, y: 140.08 }, width: 520, height: 506 },
+    { source: require('../../assets/aurora/login/login_p7.png'), color: brand.green, center: { x: -31.48, y: 113.75 }, width: 520, height: 506 },
   ],
 };
 
@@ -92,8 +95,8 @@ export default function SplashAnimation({ authLoading, dataLoading, onComplete }
 
     const colorScaleSpring = Animated.spring(colorLogoScale, {
       toValue: 1.0,
-      damping: 12,
-      stiffness: 80,
+      damping: animation.spring.damping,
+      stiffness: animation.spring.stiffness,
       useNativeDriver: true,
     });
 
@@ -253,6 +256,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 9999,
+    // TODO(theme-migration): #0D0D0D is intentionally darker than brand.bg.to (#141414) for splash; no matching token
     backgroundColor: '#0D0D0D',
   },
   auroraGroupRight: {
@@ -277,20 +281,21 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 130,
     height: 130,
-    borderRadius: 21,
+    borderRadius: radius.xl, // was 21, now 20 (delta 1px, within tolerance)
     overflow: 'hidden',
   },
   logoImage: {
     position: 'absolute',
     width: 130,
     height: 130,
-    borderRadius: 21,
+    borderRadius: radius.xl, // was 21, now 20 (delta 1px, within tolerance)
   },
   title: {
-    marginTop: 20,
+    marginTop: space.xl,
+    // TODO(theme-migration): fontSize 30 has no matching typography token (heading1=26, display=32); keeping to preserve visual hierarchy
     fontSize: 30,
     fontFamily: 'Unbounded-Bold',
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.dark.text.primary,
   },
 });
