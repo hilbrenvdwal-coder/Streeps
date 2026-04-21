@@ -2651,6 +2651,7 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
           avatar_url: info.avatar_url,
           member_count: info.member_count,
           last_activity_at: info.last_activity_at,
+          follower_count: info.follower_count ?? 0,
         });
       } else {
         setGroup(null);
@@ -2742,6 +2743,10 @@ function GroupProfileOverlay({ visible, groupId, onClose, onViewProfile, cachedD
                 <Text style={gp.displayName}>{group?.name || ''}</Text>
               </View>
               <Text style={gp.memberCount}>
+                {typeof group?.follower_count === 'number' ? group.follower_count : 0}
+                {' '}
+                {(typeof group?.follower_count === 'number' ? group.follower_count : 0) === 1 ? 'volger' : 'volgers'}
+                {' · '}
                 {typeof group?.member_count === 'number' ? group.member_count : 0}
                 {' '}
                 {group?.member_count === 1 ? 'lid' : 'leden'}
