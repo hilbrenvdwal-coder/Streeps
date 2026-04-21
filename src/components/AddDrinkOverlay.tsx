@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { brand, colors, radius, space, typography } from '@/src/theme';
 
 interface Props {
   visible: boolean;
@@ -191,7 +192,7 @@ export default function AddDrinkOverlay({
           <Animated.View
             style={[
               s.container,
-              { paddingTop: insets.top + 20 },
+              { paddingTop: insets.top + space[5] },
               contentAnimStyle,
             ]}
             pointerEvents="auto"
@@ -199,7 +200,7 @@ export default function AddDrinkOverlay({
             {/* Header */}
             <View style={s.header}>
               <Pressable onPress={onDoneWithToast} hitSlop={12} accessibilityLabel="Sluiten" accessibilityRole="button">
-                <Ionicons name="close" size={24} color="#FFFFFF" />
+                <Ionicons name="close" size={24} color={colors.dark.text.primary} />
               </Pressable>
               <Text style={s.title}>Drankje toevoegen</Text>
               <View style={{ width: 24 }} />
@@ -208,12 +209,12 @@ export default function AddDrinkOverlay({
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               style={{ flex: 1 }}
-              keyboardVerticalOffset={-(insets.bottom + 16)}
+              keyboardVerticalOffset={-(insets.bottom + space[4])}
             >
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 24 }}
+                contentContainerStyle={{ paddingBottom: space[6] }}
                 style={{ flex: 1 }}
               >
                 {/* Naam */}
@@ -222,7 +223,8 @@ export default function AddDrinkOverlay({
                   value={nameInput}
                   onChangeText={setNameInput}
                   placeholder="Bier"
-                  placeholderTextColor="#6B6B6B"
+                  // TODO(theme-migration): placeholder color #6B6B6B replaced with brand.inactive (#848484); ~+24 luminance shift (slightly lighter placeholder)
+                  placeholderTextColor={brand.inactive}
                   style={s.input}
                   autoCapitalize="sentences"
                   returnKeyType="next"
@@ -234,7 +236,8 @@ export default function AddDrinkOverlay({
                   value={emojiInput}
                   onChangeText={(v) => setEmojiInput(v.slice(0, 2))}
                   placeholder="🍺"
-                  placeholderTextColor="#6B6B6B"
+                  // TODO(theme-migration): placeholder color #6B6B6B replaced with brand.inactive (#848484); ~+24 luminance shift (slightly lighter placeholder)
+                  placeholderTextColor={brand.inactive}
                   style={s.input}
                   maxLength={2}
                 />
@@ -248,7 +251,8 @@ export default function AddDrinkOverlay({
                         value={priceInput}
                         onChangeText={setPriceInput}
                         placeholder="1,50"
-                        placeholderTextColor="#6B6B6B"
+                        // TODO(theme-migration): placeholder color #6B6B6B replaced with brand.inactive (#848484); ~+24 luminance shift (slightly lighter placeholder)
+                        placeholderTextColor={brand.inactive}
                         style={s.priceInput}
                         keyboardType="decimal-pad"
                       />
@@ -282,7 +286,7 @@ export default function AddDrinkOverlay({
                             <Text
                               style={[
                                 s.catPillText,
-                                { color: selected ? '#0F0F1E' : color },
+                                { color: selected ? colors.dark.background.primary : color },
                               ]}
                             >
                               {getCategoryName(cat)}
@@ -302,7 +306,7 @@ export default function AddDrinkOverlay({
               </ScrollView>
 
               {/* Footer */}
-              <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={[s.footer, { paddingBottom: insets.bottom + space[4] }]}>
                 <Pressable
                   onPress={handleSubmit}
                   disabled={submitDisabled}
@@ -340,113 +344,126 @@ const s = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: space[5],
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: space[4],
   },
   title: {
     fontFamily: 'Unbounded',
-    fontSize: 18,
+    fontSize: typography.heading3.fontSize,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: colors.dark.text.primary,
     flex: 1,
     textAlign: 'center',
   },
   label: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): label fontSize 13 kept literal; no exact typography scale match (caption=12, bodySm=14)
     fontSize: 13,
-    color: '#848484',
-    marginTop: 8,
+    color: brand.inactive,
+    marginTop: space[2],
     marginBottom: 6,
   },
   input: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): input fontSize 15 kept literal; no exact typography scale match (bodySm=14, body=16)
     fontSize: 15,
-    color: '#FFFFFF',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
+    color: colors.dark.text.primary,
+    // TODO(theme-migration): background #2A2A2A mapped to colors.dark.surface.default (#252540); hue shifts neutral grey -> bluish tint
+    backgroundColor: colors.dark.surface.default,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: space[3],
   },
   priceInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
+    // TODO(theme-migration): background #2A2A2A mapped to colors.dark.surface.default (#252540); hue shifts neutral grey -> bluish tint
+    backgroundColor: colors.dark.surface.default,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
   },
   priceEuroPrefix: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): prefix fontSize 15 kept literal; no exact typography scale match
     fontSize: 15,
-    color: '#848484',
+    color: brand.inactive,
     marginRight: 6,
   },
   priceInput: {
     flex: 1,
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): priceInput fontSize 15 kept literal; no exact typography scale match
     fontSize: 15,
-    color: '#FFFFFF',
-    paddingVertical: 12,
+    color: colors.dark.text.primary,
+    paddingVertical: space[3],
   },
   catPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: space[2],
   },
   catPill: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingVertical: space[2],
+    // TODO(theme-migration): catPill borderRadius 14 mapped to radius.lg (16); +2px change
+    borderRadius: radius.lg,
   },
   catPillText: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): catPillText fontSize 13 kept literal; no exact typography scale match
     fontSize: 13,
     fontWeight: '600',
   },
   addedCountHint: {
     fontFamily: 'Unbounded',
-    fontSize: 12,
-    color: '#00BEAE',
-    marginTop: 12,
+    fontSize: typography.caption.fontSize,
+    color: brand.cyan,
+    marginTop: space[3],
     textAlign: 'center',
   },
   footer: {
     flexDirection: 'row',
     gap: 10,
-    paddingTop: 16,
+    paddingTop: space[4],
   },
   primaryBtn: {
     flex: 1,
-    backgroundColor: '#00BEAE',
+    backgroundColor: brand.cyan,
     paddingVertical: 14,
-    borderRadius: 14,
+    // TODO(theme-migration): primaryBtn borderRadius 14 mapped to radius.lg (16); +2px change
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): primaryBtnText fontSize 15 kept literal; no exact typography scale match
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.dark.text.primary,
   },
   ghostBtn: {
     flex: 1,
     backgroundColor: 'transparent',
     paddingVertical: 14,
-    borderRadius: 14,
+    // TODO(theme-migration): ghostBtn borderRadius 14 mapped to radius.lg (16); +2px change
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#3A3A3A',
+    // TODO(theme-migration): border #3A3A3A mapped to colors.dark.border.strong (#3A3A55); hue shifts neutral grey -> bluish tint
+    borderColor: colors.dark.border.strong,
   },
   ghostBtnText: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): ghostBtnText fontSize 15 kept literal; no exact typography scale match
     fontSize: 15,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: colors.dark.text.primary,
   },
 });

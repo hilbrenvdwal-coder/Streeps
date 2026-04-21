@@ -13,6 +13,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { brand, colors, components, radius, space, typography } from '@/src/theme';
 
 const CLEARSCREEN_IMG = require('../../assets/clearscreen.png');
 const CLEARSCREEN_ASPECT = 681 / 305;
@@ -318,7 +319,7 @@ export default function StreepjesVerificatieModal({
                   transform: [{ scale: confirmScale }],
                   ...Platform.select({
                     ios: {
-                      shadowColor: '#00FE96',
+                      shadowColor: brand.green,
                       shadowOffset: { width: 0, height: 0 },
                       shadowOpacity: 0.5,
                       shadowRadius: 16,
@@ -335,7 +336,7 @@ export default function StreepjesVerificatieModal({
                 disabled={confirming}
                 android_ripple={{ color: 'rgba(0,0,0,0.15)' }}
               >
-                <Ionicons name="checkmark-sharp" size={24} color="#1A1A2E" />
+                <Ionicons name="checkmark-sharp" size={24} color={colors.dark.text.inverse} />
                 <Text style={s.confirmText}>Bevestig</Text>
               </Pressable>
             </Animated.View>
@@ -360,42 +361,46 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
+    // Sheet bg kept as rgba literal per addendum (custom translucent backdrop); no exact token match
     backgroundColor: 'rgba(10, 10, 12, 0.65)',
+    // TODO(theme-migration): sheet borderTopRadius 25 kept literal; no exact radius scale match (xl=20, 2xl=24). components.modal.borderRadius=20 would shift -5px which exceeds 4px threshold.
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingHorizontal: space[5],
+    paddingBottom: space[10],
     alignItems: 'center',
     overflow: 'hidden',
   },
   handle: {
-    width: 36,
-    height: 4,
+    width: components.modal.handleWidth,
+    height: components.modal.handleHeight,
     borderRadius: 2,
+    // Handle bg kept as rgba literal per addendum (translucent white over blur)
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: space[5],
   },
   title: {
     fontFamily: 'Unbounded-SemiBold',
-    fontSize: 22,
-    color: '#FFFFFF',
+    fontSize: typography.heading2.fontSize,
+    color: colors.dark.text.primary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: space[5],
   },
 
   // Info Card
   infoCard: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: '#1A1A1C',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
+    // TODO(theme-migration): infoCard bg #1A1A1C mapped to colors.dark.surface.default (#252540); +10 luminance shift + hue moves neutral -> bluish, exceeds 4px perceptual threshold
+    backgroundColor: colors.dark.surface.default,
+    borderRadius: radius.lg,
+    padding: space[4],
+    marginBottom: space[6],
     alignSelf: 'stretch',
   },
   infoLeft: {
-    marginRight: 16,
+    marginRight: space[4],
     alignItems: 'center',
   },
   countContainer: {
@@ -403,7 +408,7 @@ const s = StyleSheet.create({
     height: 64,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: space[1],
   },
   countGlow: {
     position: 'absolute',
@@ -414,14 +419,15 @@ const s = StyleSheet.create({
   },
   countText: {
     fontFamily: 'Unbounded-SemiBold',
-    fontSize: 48,
-    color: '#FFFFFF',
-    lineHeight: 56,
+    fontSize: typography.tally.fontSize,
+    color: colors.dark.text.primary,
+    lineHeight: typography.tally.lineHeight,
   },
   creditBadge: {
     position: 'absolute',
     top: -4,
     right: -8,
+    // Credit badge bg kept as rgba literal per addendum (semi-transparent green tint)
     backgroundColor: 'rgba(0, 217, 163, 0.25)',
     borderRadius: 10,
     paddingHorizontal: 6,
@@ -429,8 +435,9 @@ const s = StyleSheet.create({
   },
   creditText: {
     fontFamily: 'Unbounded',
-    fontSize: 11,
-    color: '#00BEAE',
+    // TODO(theme-migration): creditText fontSize 11 = typography.overline.fontSize, mapped
+    fontSize: typography.overline.fontSize,
+    color: brand.cyan,
     fontWeight: '600',
   },
   infoRight: {
@@ -438,72 +445,76 @@ const s = StyleSheet.create({
     justifyContent: 'space-evenly',
   },
   catBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: space[3],
     paddingVertical: 6,
     borderRadius: 10,
-    marginBottom: 4,
+    marginBottom: space[1],
     alignSelf: 'flex-start',
   },
   catBadgeText: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): catBadgeText fontSize 15 kept literal; no exact typography scale match (bodySm=14, body=16)
     fontSize: 15,
   },
   pricePerUnit: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#A0A0B8',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.secondary,
     marginBottom: 2,
   },
   totalPrice: {
     fontFamily: 'Unbounded-Medium',
-    fontSize: 16,
-    color: '#00BEAE',
+    fontSize: typography.body.fontSize,
+    color: brand.cyan,
   },
 
   // Splash message
   splashText: {
     fontFamily: 'Unbounded',
+    // TODO(theme-migration): splashText fontSize 13 kept literal; no exact typography scale match
     fontSize: 13,
+    // Splash text color kept as rgba literal per addendum (translucent white)
     color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'center',
     marginTop: 0,
-    marginBottom: 16,
+    marginBottom: space[4],
   },
 
   // Actions
   confirmBtn: {
     alignSelf: 'stretch',
     height: 56,
-    borderRadius: 16,
-    backgroundColor: '#00FE96',
+    borderRadius: radius.lg,
+    backgroundColor: brand.green,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: space[3],
   },
   confirmBtnInner: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: space[2],
   },
   confirmText: {
     fontFamily: 'Unbounded-SemiBold',
-    fontSize: 16,
-    color: '#1A1A2E',
+    fontSize: typography.body.fontSize,
+    color: colors.dark.text.inverse,
   },
   cancelBtn: {
     alignSelf: 'stretch',
     height: 48,
-    borderRadius: 9999,
+    borderRadius: radius.full,
     borderWidth: 1,
+    // Cancel border kept as rgba literal per addendum (translucent white)
     borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelText: {
     fontFamily: 'Unbounded',
-    fontSize: 14,
-    color: '#A0A0B8',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.dark.text.secondary,
   },
 
   // Clearscreen sweep

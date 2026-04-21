@@ -17,6 +17,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/src/lib/supabase';
+import { brand, colors, radius, space, typography } from '@/src/theme';
 
 interface Props {
   visible: boolean;
@@ -94,7 +95,7 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
         <Pressable style={StyleSheet.absoluteFillObject} onPress={performClose} />
       </Animated.View>
 
-      <Animated.View style={[s.container, { paddingTop: insets.top + 12 }, contentAnimStyle]} pointerEvents="box-none">
+      <Animated.View style={[s.container, { paddingTop: insets.top + space[3] }, contentAnimStyle]} pointerEvents="box-none">
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
@@ -102,7 +103,7 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
         >
           <View style={s.header}>
             <Pressable onPress={performClose} hitSlop={12} disabled={submitting}>
-              <Ionicons name="close" size={24} color={submitting ? '#848484' : '#FFFFFF'} />
+              <Ionicons name="close" size={24} color={submitting ? brand.inactive : colors.dark.text.primary} />
             </Pressable>
             <Text style={s.headerTitle}>Feedback</Text>
             <View style={{ width: 24 }} />
@@ -110,7 +111,7 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
 
           {success ? (
             <View style={s.successBox}>
-              <Ionicons name="checkmark-circle-outline" size={64} color="#00BEAE" />
+              <Ionicons name="checkmark-circle-outline" size={64} color={brand.cyan} />
               <Text style={s.successTitle}>Bedankt!</Text>
               <Text style={s.successBody}>Je feedback is ontvangen. We kijken ernaar.</Text>
             </View>
@@ -118,7 +119,7 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={{ paddingBottom: space[10] }}
             >
               <Text style={s.intro}>
                 Heb je een probleem met de app of een idee om 'm beter te maken? Laat het weten, dan kijken we ernaar.
@@ -129,7 +130,7 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
                   value={content}
                   onChangeText={setContent}
                   placeholder="Typ hier je idee of probleem..."
-                  placeholderTextColor="#848484"
+                  placeholderTextColor={brand.inactive}
                   multiline
                   textAlignVertical="top"
                   maxLength={2000}
@@ -147,7 +148,7 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
                 onPress={handleSubmit}
               >
                 {submitting ? (
-                  <ActivityIndicator size="small" color="#0E0D1C" />
+                  <ActivityIndicator size="small" color={colors.dark.background.primary} />
                 ) : (
                   <Text style={s.submitText}>Verstuur</Text>
                 )}
@@ -162,17 +163,22 @@ export default function FeedbackOverlay({ visible, onClose, userId }: Props) {
 
 const s = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
-  container: { flex: 1, paddingHorizontal: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: '400', color: '#FFFFFF' },
-  intro: { fontFamily: 'Unbounded', fontSize: 14, color: '#BBBBBB', lineHeight: 22, marginTop: 24, marginBottom: 20, paddingHorizontal: 4 },
-  card: { borderRadius: 25, backgroundColor: 'rgba(78, 78, 78, 0.2)', padding: 16, minHeight: 200 },
-  textInput: { fontFamily: 'Unbounded', fontSize: 14, color: '#FFFFFF', minHeight: 180, maxHeight: 260 },
-  charCount: { fontFamily: 'Unbounded', fontSize: 11, color: '#848484', textAlign: 'right', marginTop: 6, marginRight: 4 },
-  submitBtn: { marginTop: 24, height: 50, borderRadius: 25, backgroundColor: '#00BEAE', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, paddingHorizontal: space[5] },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space[4] },
+  headerTitle: { fontFamily: 'Unbounded', fontSize: 24, fontWeight: '400', color: colors.dark.text.primary },
+  // TODO(theme-migration): intro color #BBBBBB mapped to colors.dark.text.secondary (#A0A0B8); ~-27 luminance shift + hue moves neutral -> slight bluish; fontSize 14 = typography.bodySm
+  intro: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.secondary, lineHeight: 22, marginTop: space[6], marginBottom: space[5], paddingHorizontal: space[1] },
+  // TODO(theme-migration): card borderRadius 25 kept literal; no exact radius scale match (xl=20, 2xl=24). rgba(78,78,78,0.2) scrim bg kept as rgba literal per addendum.
+  card: { borderRadius: 25, backgroundColor: 'rgba(78, 78, 78, 0.2)', padding: space[4], minHeight: 200 },
+  textInput: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.primary, minHeight: 180, maxHeight: 260 },
+  charCount: { fontFamily: 'Unbounded', fontSize: 11, color: brand.inactive, textAlign: 'right', marginTop: 6, marginRight: space[1] },
+  // TODO(theme-migration): submitBtn borderRadius 25 kept literal; no exact radius scale match (xl=20, 2xl=24)
+  submitBtn: { marginTop: space[6], height: 50, borderRadius: 25, backgroundColor: brand.cyan, alignItems: 'center', justifyContent: 'center' },
   submitBtnDisabled: { opacity: 0.4 },
-  submitText: { fontFamily: 'Unbounded', fontSize: 16, fontWeight: '600', color: '#0E0D1C' },
+  // TODO(theme-migration): submitText color #0E0D1C mapped to colors.dark.background.primary (#0F0F1E); perceptually identical dark navy
+  submitText: { fontFamily: 'Unbounded', fontSize: typography.body.fontSize, fontWeight: '600', color: colors.dark.background.primary },
   successBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  successTitle: { fontFamily: 'Unbounded', fontSize: 22, color: '#FFFFFF', marginTop: 16 },
-  successBody: { fontFamily: 'Unbounded', fontSize: 14, color: '#BBBBBB', textAlign: 'center', marginTop: 8, paddingHorizontal: 24 },
+  successTitle: { fontFamily: 'Unbounded', fontSize: typography.heading2.fontSize, color: colors.dark.text.primary, marginTop: space[4] },
+  // TODO(theme-migration): successBody color #BBBBBB mapped to colors.dark.text.secondary (#A0A0B8); ~-27 luminance shift + hue moves neutral -> slight bluish
+  successBody: { fontFamily: 'Unbounded', fontSize: typography.bodySm.fontSize, color: colors.dark.text.secondary, textAlign: 'center', marginTop: space[2], paddingHorizontal: space[6] },
 });
