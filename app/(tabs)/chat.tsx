@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/components/useColorScheme';
-import { getTheme, streepsMagenta, brand, colors as themeColors } from '@/src/theme';
+import { getTheme, streepsMagenta, brand, colors as themeColors, radius as themeRadius, space as themeSpace, typography as themeTypography } from '@/src/theme';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { supabase } from '@/src/lib/supabase';
 import { AuroraPresetView } from '@/src/components/AuroraBackground';
@@ -1767,9 +1767,14 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
   const [show, setShow] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const { swipeX: upSwipeX, scrimOpacity: upScrimOpacity, panHandlers: upPan } = useSwipeDismiss(onClose, anim);
+  const { isFollowing, follow, unfollow, followedGroups } = useFollows();
 
   const [profile, setProfile] = useState<any>(null);
   const [sharedGroups, setSharedGroups] = useState<any[]>([]);
+  // All groups the friend is a member of (for "Volg"-entrypoint). Only contains
+  // public-safe metadata: id/name/avatar/member_count. NEVER exposes the member
+  // list, tallies or any tally data from groups the current user is not in.
+  const [theirGroups, setTheirGroups] = useState<Array<{ id: string; name: string; avatar_url: string | null; member_count: number }>>([]);
   const [friendshipStatus, setFriendshipStatus] = useState<string | null>(null);
   const [friendshipId, setFriendshipId] = useState<string | null>(null);
 
@@ -1810,6 +1815,7 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
       // Clear stale state FIRST — prevents flash of old profile when switching users
       setProfile(null);
       setSharedGroups([]);
+      setTheirGroups([]);
       setFriendshipStatus(null);
       setFriendshipId(null);
       // Use cached data immediately if available
@@ -1818,11 +1824,13 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
         setSharedGroups(cachedData.sharedGroups);
         setFriendshipStatus(cachedData.friendshipStatus);
         setFriendshipId(cachedData.friendshipId);
-      } else {
-        fetchIdRef.current += 1;
-        const myFetchId = fetchIdRef.current;
-        fetchProfile(myFetchId);
       }
+      // Always fetch — cachedData doesn't include `theirGroups`, and we want
+      // fresh friendship/group state. `fetchProfile` is a no-op re-setter if
+      // the data matches what cachedData already provided.
+      fetchIdRef.current += 1;
+      const myFetchId = fetchIdRef.current;
+      fetchProfile(myFetchId);
       setShow(true);
       anim.setValue(0);
       Animated.spring(anim, { toValue: 1, damping: 20, stiffness: 200, mass: 1, useNativeDriver: true }).start();
@@ -1833,9 +1841,14 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
 
   const fetchProfile = async (fetchId: number) => {
     if (!userId || !user) return;
-    const [{ data: p }, { data: theirGroups }, { data: myGroups }, { data: f }] = await Promise.all([
+    // Query A-D run in parallel: profile, friend's memberships (with group
+    // metadata), my memberships (for `sharedGroups` back-compat), friendship.
+    const [{ data: p }, { data: theirMemberships }, { data: myGroups }, { data: f }] = await Promise.all([
       supabase.from('profiles').select('id, full_name, avatar_url').eq('id', userId).single(),
-      supabase.from('group_members').select('group_id').eq('user_id', userId),
+      supabase
+        .from('group_members')
+        .select('group_id, groups(id, name, avatar_url)')
+        .eq('user_id', userId),
       supabase.from('group_members').select('group_id').eq('user_id', user.id),
       supabase.from('friendships').select('id, status, user_id')
         .or(`and(user_id.eq.${user.id},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${user.id})`)
@@ -1843,15 +1856,51 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
     ]);
     if (fetchId !== fetchIdRef.current) return;
     setProfile(p);
+
+    // Normalise the `groups(...)` PostgREST join (can be object or array).
+    type GroupRow = { id: string; name: string; avatar_url: string | null };
+    const pickGroup = (g: GroupRow | GroupRow[] | null | undefined): GroupRow | null => {
+      if (!g) return null;
+      if (Array.isArray(g)) return g[0] ?? null;
+      return g;
+    };
+    const friendGroups: GroupRow[] = ((theirMemberships ?? []) as Array<{ group_id: string; groups: GroupRow | GroupRow[] | null }>)
+      .map((row) => pickGroup(row.groups))
+      .filter((g): g is GroupRow => g !== null);
+
+    // Legacy `sharedGroups` output — still used elsewhere as a quick fallback.
     const myGroupIds = new Set((myGroups || []).map((g) => g.group_id));
-    const sharedIds = (theirGroups || []).filter((g) => myGroupIds.has(g.group_id)).map((g) => g.group_id);
-    if (sharedIds.length > 0) {
-      const { data: groups } = await supabase.from('groups').select('id, name').in('id', sharedIds);
+    const sharedGroupsData = friendGroups
+      .filter((g) => myGroupIds.has(g.id))
+      .map(({ id, name }) => ({ id, name }));
+    setSharedGroups(sharedGroupsData);
+
+    // Enrich with member counts for the follow-entrypoint list. One batched
+    // query: fetch all `group_members` rows for the friend's groups, then
+    // count client-side. Avoids N+1 per group.
+    const friendGroupIds = friendGroups.map((g) => g.id);
+    if (friendGroupIds.length > 0) {
+      const { data: memberRows } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .in('group_id', friendGroupIds);
       if (fetchId !== fetchIdRef.current) return;
-      setSharedGroups(groups || []);
+      const counts = new Map<string, number>();
+      for (const row of (memberRows ?? []) as { group_id: string }[]) {
+        counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
+      }
+      setTheirGroups(
+        friendGroups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          avatar_url: g.avatar_url ?? null,
+          member_count: counts.get(g.id) ?? 0,
+        })),
+      );
     } else {
-      setSharedGroups([]);
+      setTheirGroups([]);
     }
+
     const status = f?.status === 'pending' && f.user_id !== user.id ? 'pending_incoming' : (f?.status ?? null);
     setFriendshipStatus(status);
     setFriendshipId(f?.id ?? null);
@@ -1922,22 +1971,47 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
           </View>
           <Text style={up.displayName}>{profile?.full_name || 'Onbekend'}</Text>
 
-          {/* Shared groups */}
-          {sharedGroups.length > 0 && (
-            <>
-              <Text style={up.sectionHeader}>GEDEELDE GROEPEN</Text>
-              <View style={up.card}>
-                {sharedGroups.map((g, i) => (
-                  <React.Fragment key={g.id}>
-                    {i > 0 && <View style={up.divider} />}
-                    <View style={up.groupRow}>
-                      <Text style={up.groupName}>{g.name}</Text>
-                    </View>
-                  </React.Fragment>
-                ))}
-              </View>
-            </>
-          )}
+          {/* Groups the friend is a member of — entrypoint to follow */}
+          {theirGroups.length > 0 && (() => {
+            const firstName = (profile?.full_name || '').trim().split(/\s+/)[0] || 'VRIEND';
+            return (
+              <>
+                <Text style={up.sectionHeader}>{`GROEPEN VAN ${firstName.toUpperCase()}`}</Text>
+                <View style={up.card}>
+                  {theirGroups.map((g, i) => {
+                    const followedEntry = followedGroups.find((fg) => fg.id === g.id);
+                    const isMember = followedEntry?.isMember === true;
+                    const isFollowed = isFollowing(g.id);
+                    return (
+                      <React.Fragment key={g.id}>
+                        {i > 0 && <View style={up.divider} />}
+                        <FriendGroupRow
+                          group={g}
+                          isMember={isMember}
+                          isFollowed={isFollowed}
+                          onFollow={() => follow(g.id).catch(() => undefined)}
+                          onUnfollow={() => {
+                            Alert.alert(
+                              'Niet meer volgen?',
+                              `Stop met het volgen van ${g.name}?`,
+                              [
+                                { text: 'Annuleren', style: 'cancel' },
+                                {
+                                  text: 'Niet meer volgen',
+                                  style: 'destructive',
+                                  onPress: () => { unfollow(g.id).catch(() => undefined); },
+                                },
+                              ],
+                            );
+                          }}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
+              </>
+            );
+          })()}
 
           {/* Friend status / add button */}
           <AnimatedFriendButton
@@ -1986,6 +2060,121 @@ function UserProfileOverlay({ visible, userId, onClose, cachedData, onFriendship
     </View>
   );
 }
+
+// Row component used inside `UserProfileOverlay` for the friend's groups list.
+// Not extracted to a separate file per scope — visually inspired by
+// FollowedGroupRow but simpler (no last-activity subline, no navigation on tap).
+function FriendGroupRow({
+  group,
+  isMember,
+  isFollowed,
+  onFollow,
+  onUnfollow,
+}: {
+  group: { id: string; name: string; avatar_url: string | null; member_count: number };
+  isMember: boolean;
+  isFollowed: boolean;
+  onFollow: () => void;
+  onUnfollow: () => void;
+}) {
+  const avatarSize = 40;
+  return (
+    <View style={friendGroupRow.row}>
+      {group.avatar_url ? (
+        <Image
+          source={{ uri: group.avatar_url }}
+          style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
+          transition={200}
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <AvatarPlaceholder
+          size={avatarSize}
+          label={group.name[0]?.toUpperCase() ?? '?'}
+          borderRadius={avatarSize / 2}
+          fontSize={16}
+        />
+      )}
+      <View style={friendGroupRow.middle}>
+        <Text style={friendGroupRow.name} numberOfLines={1}>{group.name}</Text>
+        <Text style={friendGroupRow.sub} numberOfLines={1}>{`${group.member_count} leden`}</Text>
+      </View>
+      {isMember ? (
+        <Text style={friendGroupRow.inlineInactiveText}>Jij zit erin</Text>
+      ) : isFollowed ? (
+        <Pressable
+          onPress={onUnfollow}
+          hitSlop={8}
+          style={({ pressed }) => [friendGroupRow.followingPill, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Niet meer volgen"
+        >
+          <Text style={friendGroupRow.followingPillText}>Volgend</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={onFollow}
+          hitSlop={8}
+          style={({ pressed }) => [friendGroupRow.followBtn, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Volg ${group.name}`}
+        >
+          <Text style={friendGroupRow.followBtnText}>Volg</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+const friendGroupRow = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: themeSpace[4],
+    paddingVertical: themeSpace[3],
+    gap: themeSpace[3],
+  },
+  middle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    fontFamily: 'Unbounded',
+    fontSize: 14,
+    color: themeColors.dark.text.primary,
+  },
+  sub: {
+    ...themeTypography.caption,
+    color: brand.inactive,
+    marginTop: 2,
+  },
+  inlineInactiveText: {
+    fontFamily: 'Unbounded',
+    fontSize: 12,
+    color: brand.inactive,
+  },
+  followingPill: {
+    paddingHorizontal: themeSpace[3],
+    paddingVertical: themeSpace[1],
+    borderRadius: themeRadius.full,
+    borderWidth: 1,
+    borderColor: brand.cyan,
+  },
+  followingPillText: {
+    ...themeTypography.captionMedium,
+    color: brand.cyan,
+  },
+  followBtn: {
+    paddingHorizontal: themeSpace[4],
+    paddingVertical: themeSpace[2],
+    borderRadius: themeRadius.full,
+    backgroundColor: brand.cyan,
+  },
+  followBtnText: {
+    ...themeTypography.captionMedium,
+    color: themeColors.dark.text.primary,
+  },
+});
 
 const up = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
